@@ -604,7 +604,10 @@ check(D.ns.Titles.Text("Muradin-Forever") == "Elfbane, The Grudgebearer", "offic
 -- Challenges
 local CK = K.ns.Challenges
 K.level = 5
-check(not CK.Start("slayer"), "ready-made challenges start at level 1")
+local late = CK.Start("slayer")
+check(late and K.ns.Data.Get("challenges", late).startLevel == 5, "challenges can start at any level")
+check(A.ns.Challenges.Label(K.ns.Data.Get("challenges", late)) == "Slayer (from level 5)", "start level shown")
+CK.Abandon(late)
 K.level = 1
 K.equip[5] = 6125; K.equip[3] = 1000; K.equip[4] = 45; K.equip[16] = 25
 local slayerKey = CK.Start("slayer")
@@ -685,7 +688,14 @@ H.run(2)
 check(myKey and D.ns.Data.Get("challenges", myKey).name == "No Hearthstone", "custom challenge any level")
 check(not D.ns.Data.Put("challenges", "Kurdran-Forever#x", { name = "x", status = "failed" }, true), "can't write someone else's challenge")
 CK.Complete(myKey); H.run(2)
-check(D.ns.Data.Get("challenges", myKey).status == "completed", "custom challenge completed on honor")
+check(D.ns.Data.Get("challenges", myKey).status == "active", "can't complete your own challenge")
+check(#A.ns.Challenges.Showing("Kurdran-Forever") >= 1, "guildmates' challenges listed for the roster and tooltip")
+check(A.ns.Challenges.Judge(myKey, "completed"), "an officer marks it completed")
+H.run(2)
+check(D.ns.Data.Get("challenges", myKey).status == "completed", "completion reaches the guild")
+check(K.env.IronforgedNotice:IsShown() and K.env.IronforgedNotice.id == "challenge", "member told an officer completed it")
+local own = A.ns.Challenges.Start(nil, "Thane's Trial", "x"); H.run(1)
+check(not A.ns.Challenges.Judge(own, "completed"), "officers can't complete their own either")
 K.level = 1
 
 -- Invite from whispers

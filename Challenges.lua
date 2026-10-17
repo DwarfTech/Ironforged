@@ -1,5 +1,7 @@
 -- Ironforged: challenges.
--- Anyone can take on a challenge. Custom challenges run on the honor system. The ready-made ones
+-- Anyone can take on a challenge at any level; the level they started at is recorded and shown.
+-- Custom challenges run on the honor system. Only officers mark a custom challenge completed;
+-- ready-made ones complete themselves at max level. The ready-made ones
 -- are enforced by the addon: it takes off forbidden armor, keeps you PvP-flagged, closes the auction
 -- house, trade and mail, and fails the challenge if a rule is broken anyway.
 -- Records: "challenges" key = member .. "#" .. id
@@ -15,15 +17,15 @@ C.SLOT_NAMES = { [1] = "Head", [3] = "Shoulder", [4] = "Shirt", [5] = "Chest", [
 
 C.PRESETS = {
   slayer = { name = "Slayer", noSlots = { 3, 4, 5 }, pvp = true,
-    rules = "Start at level 1. No chest or shoulder armor, no shirt, and stay flagged for PvP all the way to max level." },
+    rules = "No chest or shoulder armor, no shirt, and stay flagged for PvP all the way to max level." },
   stoneskin = { name = "Stone-Skin", noSlots = { 1, 3, 5, 6, 7, 8, 9, 10, 15 },
-    rules = "Start at level 1. Wear no armor at all: weapons, rings, necklace, trinkets, shirt and tabard only." },
+    rules = "Wear no armor at all: weapons, rings, necklace, trinkets, shirt and tabard only." },
   selfmade = { name = "Self-Made", noAH = true, noTrade = true, noMail = true,
-    rules = "Start at level 1. No auction house, no trading and no mail. Everything you have, you earned." },
+    rules = "No auction house, no trading and no mail. Everything you have, you earned." },
   onelife = { name = "One Life", oneLife = true,
-    rules = "Start at level 1. Die once and the challenge is over." },
+    rules = "Die once and the challenge is over." },
   dwarffound = { name = "Dwarf Found", dwarfOnly = true,
-    rules = "Start at level 1. Trade and group only with dwarves. Everyone else is a stranger." },
+    rules = "Trade and group only with dwarves. Everyone else is a stranger." },
 }
 C.ORDER = { "slayer", "stoneskin", "selfmade", "onelife", "dwarffound" }
 
@@ -54,10 +56,19 @@ function C.All()
   return out
 end
 
+-- One member's challenges, newest first. Indexed once and kept until data or the roster changes.
+local byMember
+ns.On("DATA_CHANGED", function() byMember = nil end)
+ns.On("ROSTER", function() byMember = nil end)
 function C.Of(member)
-  local out = {}
-  for _, c in ipairs(C.All()) do if c.member == member then out[#out + 1] = c end end
-  return out
+  if not byMember then
+    byMember = {}
+    for _, c in ipairs(C.All()) do
+      byMember[c.member] = byMember[c.member] or {}
+      table.insert(byMember[c.member], c)
+    end
+  end
+  return byMember[member] or {}
 end
 
 -- My active challenges with a ready-made rule set: { key, data, preset }
@@ -91,10 +102,6 @@ function C.Start(presetId, name, rules)
   local preset = presetId and C.PRESETS[presetId]
   if presetId and not preset then return false end
   if preset then
-    if level() > 1 then
-      ns.Print("The " .. preset.name .. " challenge must be started at level 1. Make a new dwarf for it.")
-      return false
-    end
     for _, c in ipairs(C.MyEnforced()) do
       if c.data.preset == presetId then ns.Print("You're already on the " .. preset.name .. " challenge."); return false end
     end
@@ -128,8 +135,32 @@ end
 function C.Complete(key, atLevel)
   local d = Data.Get("challenges", key)
   if not d or d.status ~= "active" then return end
-  update(key, { status = "completed", ended = ns.Now(), lvl = atLevel or level() })
-  ns.Print("|cff40ff40Challenge completed:|r " .. d.name .. "! The hold will hear of this.")
+  if update(key, { status = "completed", ended = ns.Now(), lvl = atLevel or level() }) then
+    ns.Print("|cff40ff40Challenge completed:|r " .. d.name .. "! The hold will hear of this.")
+  end
+end
+
+-- An officer marks someone's challenge completed (or failed).
+function C.Judge(key, status, reason)
+  local d = Data.Get("challenges", key)
+  if not d or d.status ~= "active" or not ns.IAmOfficer() then return false end
+  if Data.SplitKey(key) == ns.PlayerName() then ns.Print("Another officer has to judge your own challenge."); return false end
+  local fields = { status = status, ended = ns.Now(), judgedBy = ns.PlayerName() }
+  if reason then fields.reason = reason end
+  return update(key, fields)
+end
+
+-- A member's challenges worth showing on tooltips and the roster: under way and completed.
+function C.Showing(member)
+  local out = {}
+  for _, ch in ipairs(C.Of(member)) do
+    if ch.data.status == "active" or ch.data.status == "completed" then out[#out + 1] = ch end
+  end
+  return out
+end
+
+function C.Label(d)
+  return d.name .. " (from level " .. tostring(d.startLevel or "?") .. (d.status == "completed" and ", completed" or "") .. ")"
 end
 
 function C.Abandon(key)
@@ -366,6 +397,16 @@ ns.On("DATA_CHANGED", function(coll, key)
   if coll ~= "challenges" or not key then return end
   local d = Data.Get("challenges", key)
   local member = Data.SplitKey(key)
+  if d and member == ns.PlayerName() and lastStatus[key] == "active" and d.status ~= "active" and d.judgedBy and d.judgedBy ~= member then
+    lastStatus[key] = d.status
+    local word = d.status == "completed" and "completed" or "failed"
+    ns.Print("|cffd4a017Challenge:|r " .. ns.ShortName(d.judgedBy) .. " marks your " .. d.name .. " challenge " .. word .. ".")
+    if ns.UI and ns.UI.Notice then
+      ns.UI.Notice({ id = "challenge", icon = "Interface\\Icons\\Achievement_General", title = "Challenge " .. word,
+        text = ns.ShortName(d.judgedBy) .. " marks |cffffd040" .. d.name .. "|r " .. word .. ".", buttons = { { text = "Huzzah!" } } })
+    end
+    return
+  end
   if not d or member == ns.PlayerName() or lastStatus[key] == d.status then lastStatus[key] = d and d.status; return end
   lastStatus[key] = d.status
   if ns.Now() - (tonumber(d.ended or d.ts) or 0) > 600 then return end

@@ -115,6 +115,15 @@ local function addTooltipLines(tooltip)
     tooltip:AddLine(table.concat(parts, " "), 0.83, 0.63, 0.09)
     added = true
   end
+  for _, ch in ipairs(ns.Challenges.Showing(full)) do
+    local d = ch.data
+    if d.status == "completed" then
+      tooltip:AddLine("Challenge: " .. ns.Challenges.Label(d), 0.25, 1, 0.25)
+    else
+      tooltip:AddLine("Challenge: " .. ns.Challenges.Label(d), 1, 0.82, 0.25)
+    end
+    added = true
+  end
   if added then tooltip:Show() end
 end
 

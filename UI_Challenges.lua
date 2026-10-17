@@ -3,7 +3,7 @@ local ADDON, ns = ...
 local UI = ns.UI
 local C = ns.Challenges
 
-local state = { mine = false, finished = true }
+local state = { finished = true }
 
 local function startForm()
   local opts = {}
@@ -17,7 +17,7 @@ local function startForm()
     title = "Take on a challenge",
     width = 560,
     fields = {
-      { type = "info", value = table.concat(lines, "\n") .. "\n|cff999999The addon enforces these. Your own challenges run on your honor.|r" },
+      { type = "info", value = table.concat(lines, "\n") .. "\n|cff999999The addon enforces these. Your own challenges run on your honor, and an officer marks them completed. Start at any level: the level you start at is shown on your tooltip.|r" },
       { key = "preset", label = "Challenge", type = "choice", value = C.ORDER[1], options = opts },
       { key = "name", label = "Your own: name", type = "text", value = "", maxLen = 40 },
       { key = "rules", label = "Your own: rules", type = "multiline", value = "", maxLen = 400, height = 60 },
@@ -38,7 +38,7 @@ local function showChallenge(key)
   local lines = {
     "|cffd4a017Dwarf:|r " .. ns.ShortName(member),
     "|cffd4a017Status:|r " .. (C.STATUS[d.status] or d.status or ""),
-    "|cffd4a017Kind:|r " .. (d.preset and "Ready-made, enforced by the addon" or "Their own, on their honor"),
+    "|cffd4a017Kind:|r " .. (d.preset and "Ready-made, enforced by the addon. Completes itself at max level." or "Their own, on their honor. An officer marks it completed."),
     "|cffd4a017Started:|r " .. ns.FormatDate(d.ts) .. " at level " .. tostring(d.startLevel or "?"),
     "|cffd4a017Level now:|r " .. tostring(d.lvl or "?"),
   }
@@ -50,8 +50,13 @@ local function showChallenge(key)
     buttons[#buttons + 1] = { text = "Give up", onClick = function()
       UI.Confirm("Give up on " .. d.name .. "?", function() C.Abandon(key) end)
     end }
-    buttons[#buttons + 1] = { text = "Completed!", onClick = function()
-      UI.Confirm("Mark " .. d.name .. " completed? On your honor.", function() C.Complete(key) end)
+  end
+  if not mine and ns.IAmOfficer() and d.status == "active" then
+    buttons[#buttons + 1] = { text = "Mark failed", onClick = function()
+      UI.Confirm("Mark " .. ns.ShortName(member) .. "'s " .. d.name .. " failed?", function() C.Judge(key, "failed", "Marked failed by an officer.") end)
+    end }
+    buttons[#buttons + 1] = { text = "Mark completed", onClick = function()
+      UI.Confirm("Mark " .. ns.ShortName(member) .. "'s " .. d.name .. " completed?", function() C.Judge(key, "completed") end)
     end }
   end
   if ns.IAmOfficer() or (mine and d.status ~= "active") then
@@ -67,41 +72,38 @@ local function refresh(f)
   local me = ns.PlayerName()
   local items = {}
   local counts = { active = 0, completed = 0, failed = 0 }
-  for _, c in ipairs(C.All()) do
+  for _, c in ipairs(C.Of(me)) do
     local d = c.data
     counts[d.status] = (counts[d.status] or 0) + 1
-    if (not state.mine or c.member == me) and (state.finished or d.status == "active") then
+    if state.finished or d.status == "active" then
       items[#items + 1] = {
         data = c.key,
-        keys = { [3] = d.ts or 0, [4] = d.lvl or 0 },
-        cols = { ns.ColorName(c.member), d.name .. (d.preset and " |cff999999(enforced)|r" or ""),
-          ns.FormatDate(d.ts) .. " |cff999999lvl " .. tostring(d.startLevel or "?") .. "|r", d.lvl or "",
-          C.STATUS[d.status] or "" },
+        keys = { [2] = d.ts or 0, [3] = d.startLevel or 0, [4] = d.lvl or 0 },
+        cols = { d.name .. (d.preset and " |cff999999(enforced)|r" or ""), ns.FormatDate(d.ts),
+          d.startLevel or "", d.lvl or "", C.STATUS[d.status] or "" },
       }
     end
   end
-  f.list:SetItems(items, "No challenges yet. Be the first to take one on.")
+  f.list:SetItems(items, "You haven't taken on a challenge yet.")
   f.count:SetText("|cffffd040" .. counts.active .. " under way|r   |cff40ff40" .. counts.completed .. " completed|r   |cffff4040" .. counts.failed .. " failed|r")
 end
 
 local function build(f, w, h)
   f.startB = UI.Button(f, "Take on a challenge", 150, 22, startForm)
   f.startB:SetPoint("TOPLEFT", 4, -6)
-  f.mineC = UI.Check(f, "Mine only", function(self) state.mine = self:GetChecked() and true or false; refresh(f) end)
-  f.mineC:SetPoint("LEFT", f.startB, "RIGHT", 12, 0)
   f.finC = UI.Check(f, "Show finished", function(self) state.finished = self:GetChecked() and true or false; refresh(f) end)
-  f.finC:SetPoint("LEFT", f.mineC, "RIGHT", 90, 0)
+  f.finC:SetPoint("LEFT", f.startB, "RIGHT", 12, 0)
   f.finC:SetChecked(true)
   f.count = UI.Label(f, "", "GameFontHighlightSmall")
   f.count:SetPoint("TOPRIGHT", -6, -10)
 
   f.list = UI.List(f, w, h - 58, {
-    { title = "Dwarf", width = 150 }, { title = "Challenge", width = 190 }, { title = "Started", width = 130 },
-    { title = "Level", width = 50 }, { title = "Status", width = 100 },
+    { title = "Challenge", width = 250 }, { title = "Started", width = 100 }, { title = "From level", width = 80 },
+    { title = "Level now", width = 80 }, { title = "Status", width = 100 },
   }, function(key) showChallenge(key) end)
   f.list:SetPoint("TOPLEFT", 0, -34)
 
-  f.note = UI.Label(f, "Ready-made challenges are enforced: forbidden armor comes off, the PvP flag stays on, and the auction house, trade and mail stay shut.", "GameFontDisableSmall")
+  f.note = UI.Label(f, "Your challenges. Guildmates' challenges show on the roster and their tooltips. Ready-made ones are enforced by the addon.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 6)
   f.note:SetWidth(w - 8)
 end

@@ -57,6 +57,29 @@ function UI.ManageInGuildWindow(name)
   })
 end
 
+-- Officers mark a guildmate's challenge completed or failed.
+function UI.JudgeChallenges(name)
+  local opts = {}
+  for _, ch in ipairs(ns.Challenges.Of(name)) do
+    if ch.data.status == "active" then
+      opts[#opts + 1] = { text = ch.data.name .. " (from level " .. tostring(ch.data.startLevel or "?") .. ")", value = ch.key }
+    end
+  end
+  if #opts == 0 then return end
+  UI.OpenForm({
+    title = ns.ShortName(name) .. "'s challenges",
+    width = 480,
+    fields = {
+      { type = "info", value = "Mark a challenge completed when they've earned it, or failed if they broke its rules." },
+      { key = "key", label = "Challenge", type = "choice", value = opts[1].value, options = opts },
+    },
+    buttons = {
+      { text = "Mark failed", onClick = function(v) if v.key then ns.Challenges.Judge(v.key, "failed", "Marked failed by an officer.") end end },
+      { text = "Mark completed", onClick = function(v) if v.key then ns.Challenges.Judge(v.key, "completed") end end },
+    },
+  })
+end
+
 -- Award a title to a guildmate (officers).
 function UI.AwardTitle(name)
   local opts = {}
@@ -127,6 +150,11 @@ function UI.ShowMember(name, opts)
     tl[#tl + 1] = "|cffffd040" .. t.title .. "|r" .. ((t.reason and t.reason ~= "") and (" |cff999999(" .. t.reason .. ")|r") or "")
   end
   add("Titles", table.concat(tl, ", "))
+  local cl = {}
+  for _, ch in ipairs(ns.Challenges.Of(name)) do
+    cl[#cl + 1] = ch.data.name .. " |cff999999(from level " .. tostring(ch.data.startLevel or "?") .. ")|r " .. (ns.Challenges.STATUS[ch.data.status] or "")
+  end
+  add("Challenges", table.concat(cl, ", "))
   if m.main then add("Alt of", ns.ShortName(m.main)) end
   local alts = {}
   for other, om in Data.Each("members") do
@@ -161,6 +189,11 @@ function UI.ShowMember(name, opts)
     for _, t in ipairs(ns.Titles.Of(name)) do if t.key then hasAwarded = true end end
     if hasAwarded then buttons[#buttons + 1] = { text = "Strip title", onClick = function() UI.StripTitle(name) end } end
     buttons[#buttons + 1] = { text = "Award title", onClick = function() UI.AwardTitle(name) end }
+    local judgeable = false
+    for _, ch in ipairs(ns.Challenges.Of(name)) do if ch.data.status == "active" then judgeable = true end end
+    if judgeable and name ~= ns.PlayerName() then
+      buttons[#buttons + 1] = { text = "Challenges", onClick = function() UI.JudgeChallenges(name) end }
+    end
   end
   if ns.IAmOfficer() and not opts.noManage then
     buttons[#buttons + 1] = { text = "Edit record", onClick = function() UI.EditMember(name) end }
@@ -208,11 +241,21 @@ local function build(f, w, h)
   f.count:SetPoint("RIGHT", f.scan, "LEFT", -8, 0)
 
   f.list = UI.List(f, w, h - 30, {
-    { title = "Name", width = 180 }, { title = "Rank", width = 84 }, { title = "Lvl", width = 28 },
-    { title = "Clan", width = 100 }, { title = "Title", width = 86 }, { title = "Race", width = 46 },
-    { title = "Seen", width = 62 },
+    { title = "Name", width = 150 }, { title = "Rank", width = 78 }, { title = "Lvl", width = 26 },
+    { title = "Clan", width = 84 }, { title = "Title", width = 76 }, { title = "Challenge", width = 88 },
+    { title = "Race", width = 44 }, { title = "Seen", width = 62 },
   }, function(name) UI.ShowMember(name) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
+end
+
+-- Roster cell: the member's challenges under way (completed ones in green).
+local function challengeCell(name)
+  local list = ns.Challenges.Showing(name)
+  if #list == 0 then return "" end
+  local first = list[1].data
+  local text = (first.status == "completed" and "|cff40ff40" or "|cffffd040") .. first.name .. "|r"
+  if #list > 1 then text = text .. " |cff999999+" .. (#list - 1) .. "|r" end
+  return text
 end
 
 local function refresh(f)
@@ -226,7 +269,9 @@ local function refresh(f)
     local shamed = #ns.Gear.NonDwarfInvites(name) > 0
     local problem = ns.Gear.IsDwarf(name) == false or shamed
     local titles = ns.Titles.Of(name)
-    local hay = (name .. " " .. clan .. " " .. ns.Titles.Text(name, " ")):lower()
+    local chs = {}
+    for _, ch in ipairs(ns.Challenges.Showing(name)) do chs[#chs + 1] = ch.data.name end
+    local hay = (name .. " " .. clan .. " " .. ns.Titles.Text(name, " ") .. " " .. table.concat(chs, " ")):lower()
     if (not state.onlineOnly or info.online) and (not state.problemsOnly or problem)
       and (state.search == "" or hay:find(state.search, 1, true)) then
       local display = ns.ColorName(name)
@@ -239,8 +284,9 @@ local function refresh(f)
       items[#items + 1] = {
         data = name,
         sortRank = info.rankIndex or 99,
-        keys = { [1] = ns.NameKey(name), [2] = info.rankIndex or 99, [7] = ns.SeenKey(info) },
+        keys = { [1] = ns.NameKey(name), [2] = info.rankIndex or 99, [8] = ns.SeenKey(info) },
         cols = { display, info.rankName or "", info.level or "", clan, titles[1] and (titles[1].title .. (#titles > 1 and (" |cff999999+" .. (#titles - 1) .. "|r") or "")) or "",
+          challengeCell(name),
           ns.Gear.RaceStatus(name), ns.LastSeenText(info) },
       }
       shown = shown + 1

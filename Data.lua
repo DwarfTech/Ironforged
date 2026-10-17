@@ -270,7 +270,11 @@ function Data.CanWrite(author, coll, key, data)
   elseif coll == "challenges" then
     local member = splitKey(key)
     if data == nil then return member == author or officer end
-    return member == author and ns.roster[author] ~= nil
+    -- no one marks their own custom challenge completed; ready-made ones complete themselves
+    if member == author then
+      return ns.roster[author] ~= nil and not (data.status == "completed" and not data.preset)
+    end
+    return officer
   elseif coll == "lfd" then
     local leader = splitKey(key)
     if data == nil then return leader == author or officer end
