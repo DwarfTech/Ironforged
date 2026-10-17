@@ -5,30 +5,38 @@ local C = ns.Challenges
 
 local state = { finished = true }
 
-local function startForm()
+-- The form changes with the pick: a ready-made challenge shows its rules; "My own challenge"
+-- shows boxes for a name and rules.
+local function startForm(selected)
+  selected = selected or C.ORDER[1]
   local opts = {}
-  for _, id in ipairs(C.ORDER) do opts[#opts + 1] = { text = C.PRESETS[id].name .. " (enforced)", value = id } end
-  opts[#opts + 1] = { text = "My own challenge (honor system)", value = false }
-  local lines = {}
-  for _, id in ipairs(C.ORDER) do
-    lines[#lines + 1] = "|cffd4a017" .. C.PRESETS[id].name .. ":|r " .. C.PRESETS[id].rules
+  for _, id in ipairs(C.ORDER) do opts[#opts + 1] = { text = C.PRESETS[id].name, value = id } end
+  opts[#opts + 1] = { text = "My own challenge", value = "custom" }
+  local fields = {
+    { key = "preset", label = "Challenge", type = "choice", value = selected, options = opts,
+      onChange = function(v) if v ~= selected then startForm(v) end end },
+  }
+  local p = C.PRESETS[selected]
+  if p then
+    fields[#fields + 1] = { type = "info", value = "|cffd4a017Rules:|r " .. p.rules ..
+      "\n\n|cff999999The addon enforces these rules, and the challenge completes itself at max level. You can start at any level; your tooltip shows the level you started at.|r" }
+  else
+    fields[#fields + 1] = { key = "name", label = "Name", type = "text", value = "", maxLen = 40 }
+    fields[#fields + 1] = { key = "rules", label = "Rules", type = "multiline", value = "", maxLen = 400, height = 70 }
+    fields[#fields + 1] = { type = "info", value = "|cff999999Your own challenge runs on your honor. An officer marks it completed when you've earned it.|r" }
   end
   UI.OpenForm({
     title = "Take on a challenge",
-    width = 560,
-    fields = {
-      { type = "info", value = table.concat(lines, "\n") .. "\n|cff999999The addon enforces these. Your own challenges run on your honor, and an officer marks them completed. Start at any level: the level you start at is shown on your tooltip.|r" },
-      { key = "preset", label = "Challenge", type = "choice", value = C.ORDER[1], options = opts },
-      { key = "name", label = "Your own: name", type = "text", value = "", maxLen = 40 },
-      { key = "rules", label = "Your own: rules", type = "multiline", value = "", maxLen = 400, height = 60 },
-    },
+    width = 520,
+    fields = fields,
     saveText = "Accept",
     onSave = function(v)
-      if v.preset then return C.Start(v.preset) and true or false end
+      if C.PRESETS[v.preset] then return C.Start(v.preset) and true or false end
       return C.Start(nil, v.name, v.rules) and true or false
     end,
   })
 end
+UI.StartChallengeForm = startForm
 
 local function showChallenge(key)
   local d = ns.Data.Get("challenges", key)
@@ -89,7 +97,7 @@ local function refresh(f)
 end
 
 local function build(f, w, h)
-  f.startB = UI.Button(f, "Take on a challenge", 150, 22, startForm)
+  f.startB = UI.Button(f, "Take on a challenge", 150, 22, function() startForm() end)
   f.startB:SetPoint("TOPLEFT", 4, -6)
   f.finC = UI.Check(f, "Show finished", function(self) state.finished = self:GetChecked() and true or false; refresh(f) end)
   f.finC:SetPoint("LEFT", f.startB, "RIGHT", 12, 0)

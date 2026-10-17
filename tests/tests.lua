@@ -681,6 +681,18 @@ CK.Abandon(slayer2)
 K.env.SetPVP(0)
 check(K.pvp == false, "free to turn it off once the challenge ends")
 
+-- start form shows rules for a ready-made pick, and name/rules boxes only for your own
+K.ns.UI.StartChallengeForm("slayer")
+local dlg = K.env.IronforgedDialog
+local hasName = false
+for _, f in ipairs(K.frames) do if f.__kind == "EditBox" and f:IsShown() and f:GetParent() == dlg.body then hasName = true end end
+check(not hasName, "no name box for a ready-made challenge")
+K.ns.UI.StartChallengeForm("custom")
+hasName = false
+for _, f in ipairs(K.frames) do if f.__kind == "EditBox" and f:GetParent() == dlg.body then hasName = true end end
+check(hasName, "name box for your own challenge")
+dlg:Hide()
+
 -- custom, honor system
 K.level = 20
 local myKey = CK.Start(nil, "No Hearthstone", "Walk everywhere.")

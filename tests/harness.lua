@@ -89,6 +89,8 @@ local function makeClient(shortName, race, fullName)
   env.DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) table.insert(client.chat, m) end }
   env.CreateFrame = function(kind, name, parent, template)
     local f = newStub(kind, name)
+    f.__parent = parent
+    f.GetParent = function(self) return self.__parent end
     table.insert(client.frames, f)
     if name then env[name] = f end
     return f

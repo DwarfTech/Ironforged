@@ -447,7 +447,10 @@ function UI.OpenForm(spec)
         end
         btn:SetText(textFor(current))
         btn:SetScript("OnClick", function(self)
-          UI.Pick(self, f.options or {}, function(v, t) current = v; self:SetText(t) end, f.label)
+          UI.Pick(self, f.options or {}, function(v, t)
+            current = v; self:SetText(t)
+            if f.onChange then f.onChange(v) end
+          end, f.label)
         end)
         getters[f.key] = function() return current end
       elseif f.type == "check" then
