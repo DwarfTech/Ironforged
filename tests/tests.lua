@@ -403,13 +403,13 @@ K.inRaid = false
 K.target = nil
 check(K.ns.Blood.ELF_RULES:find("raid", 1, true), "Elfbane rules written for the tooltip")
 check(K.ns.Blood.AVENGED_RULES:find("open grudge", 1, true), "Avenged rules written for the tooltip")
--- witnessed death avenges too
+-- seeing a grudged foe dead does not avenge the grudge
 check(Hh.ns.Data.Put("grudges", "Hilda-Forever#h2", { against = "Zug", faction = "Horde", deed = "Ganked lowbies", ts = 4 }), "second Horde grudge")
 H.run(5)
 D.units.nameplate3 = { name = "Zug", race = "Troll", faction = "Horde", dead = true }
 H.fire(D, "NAME_PLATE_UNIT_ADDED", "nameplate3")
 H.run(5)
-check(AD.Avenged("Hilda-Forever#h2") and AD.Avenged("Hilda-Forever#h2").how == "witnessed", "Horde grudge avenged when seen dead")
+check(AD.Avenged("Hilda-Forever#h2") == nil, "seeing them dead doesn't avenge the grudge")
 -- officer avenges the Alliance grudge
 check(B.ns.Blood.MarkAvenged(ag, "Dagna-Forever"), "officer marks Alliance grudge avenged")
 H.run(5)

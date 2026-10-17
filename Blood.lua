@@ -4,7 +4,7 @@
 --     saw on their nameplate, target or tooltip. Solo kills count; in a party the elf must have
 --     been your target; in a raid they don't count. The same elf counts at most once an hour.
 --   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
---     foe, or sees them fall. Alliance grudges are avenged by an officer.
+--     foe. Alliance grudges are avenged by an officer.
 --   * Grudged foes get a red warning on their tooltip. The first time a grudged foe is spotted,
 --     an alert goes to you and the guild; each grudge alerts only once.
 local ADDON, ns = ...
@@ -214,8 +214,7 @@ Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves.\n" ..
   "- In a raid: elf kills don't count.\n- The same elf counts at most once an hour."
 
 Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
-  "- Get an honorable kill on a Horde player with an open grudge against them, or\n" ..
-  "- see that player dead (on a nameplate, your target or mouseover) before anyone else does.\n" ..
+  "You avenge one by getting an honorable kill on a Horde player with an open grudge against them.\n" ..
   "Each open grudge counts once. Alliance grudges are marked avenged by an officer and don't add to this count."
 
 function Blood.CountElf(victim, how)
@@ -327,14 +326,9 @@ local function checkUnit(unit, fromNameplate)
   if not name or ns.IsGuildmateName(name) then return end
   local grudges = Data.GrudgesAgainst(name)
   if #grudges == 0 then return end
-  -- a Horde foe on a grudge, seen dead: avenged
+  -- a corpse raises no alarm (and seeing one avenges nothing: only an honorable kill does)
   local okDead, dead = pcall(UnitIsDeadOrGhost, unit)
-  if okDead and dead and not isSecret(dead) then
-    local hordeGrudge = false
-    for _, g in ipairs(grudges) do if g.data.faction == "Horde" then hordeGrudge = true end end
-    if hordeGrudge then avenge(name, "witnessed") end
-    return
-  end
+  if okDead and dead and not isSecret(dead) then return end
   if ns.settings.grudgeAlerts == false then return end
   local zone = zoneName()
   if alertSighting(name, nil, zone) and ns.Comm then ns.Comm.BroadcastSighting(name, zone) end

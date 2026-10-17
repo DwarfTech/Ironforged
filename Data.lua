@@ -247,7 +247,7 @@ function Data.CanWrite(author, coll, key, data)
     if officer then return true end
     -- anyone in the guild avenges a Horde grudge by slaying the foe
     local g = Data.Get("grudges", key)
-    return ns.roster[author] ~= nil and g ~= nil and g.faction == "Horde" and (data.how == "slain" or data.how == "witnessed")
+    return ns.roster[author] ~= nil and g ~= nil and g.faction == "Horde" and data.how == "slain"
   elseif coll == "pvp" then
     return author == key
   elseif coll == "gambles" then
