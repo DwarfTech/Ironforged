@@ -32,7 +32,7 @@ end
 function G.InMyRaid(name)
   if name == ns.PlayerName() then return IsInRaid and IsInRaid() end
   if not (IsInRaid and IsInRaid()) or not UnitInRaid then return false end
-  local ok, r = pcall(UnitInRaid, ns.CharName(name, false))
+  local ok, r = pcall(UnitInRaid, ns.CharName(name))
   return ok and r ~= nil
 end
 local MAX_AMOUNT = 1000000
@@ -102,7 +102,7 @@ function G.Open(amount, channel)
     phase = "open", players = {}, order = {}, rolls = {}, tie = {}, tieRolls = {} }
   local word = ns.AutoInvite and ns.AutoInvite.Word() or "inv"
   G.game.kw = word
-  local host = ns.CharName(me, false)
+  local host = ns.CharName(me)
   if channel == "RAID" then say("Ironforged Cross Gambling: " .. amount .. "g! Type 1 to join, -1 to leave.", "RAID") end
   -- the guild is told to type 1 and get into the raid, where the rolling happens
   say("Ironforged Cross Gambling: " .. amount .. "g hosted by " .. host .. "! Type 1 to join. Rolls happen in " .. host ..
@@ -133,7 +133,7 @@ function G.StartRolling()
   local missing = {}
   for _, n in ipairs(g.order) do if not G.InMyRaid(n) then missing[#missing + 1] = n end end
   if #missing > 0 then
-    local host = ns.CharName(g.host, false)
+    local host = ns.CharName(g.host)
     say("Rolling has started! " .. rollNames(missing) .. ": join " .. host .. "'s raid to roll. Whisper " .. host ..
       " \"" .. (g.kw or "inv") .. "\" for an invite.", "GUILD")
   end

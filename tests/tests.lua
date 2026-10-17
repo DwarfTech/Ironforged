@@ -962,7 +962,7 @@ H.boot(Bc)
 H.run(90)
 check(Bc.ns.PlayerName() == "Buttercup Clamstone-Forever", "surnamed member recognised")
 check(Bc.ns.Data.Digest("grudges") == AD.Digest("grudges"), "surnamed member syncs (whispered records arrive)")
-check(A.ns.CharName("Buttercup Clamstone-Forever") == "Buttercup-Forever" and A.ns.CharName("Buttercup Clamstone-Forever", false) == "Buttercup", "real character name")
+check(A.ns.CharName("Buttercup Clamstone-Forever") == "Buttercup Clamstone" and A.ns.CharName("Buttercup Clamstone") == "Buttercup Clamstone" and A.ns.CharName("Thorin-Forever") == "Thorin", "character name is first name and surname without the realm")
 A.inRaid, K.inRaid, D.inRaid, Bc.inRaid = true, true, true, true
 A.ns.Gamble.Open(100); H.run(2)
 Bc.ns.Gamble.Join(); K.ns.Gamble.Join(); H.run(2)

@@ -231,7 +231,7 @@ local function showDoom(foe, deed, count)
   local d = buildDoom()
   d.foe = foe
   -- the emote finds them by their character name
-  local who = ns.CharName(foe, false)
+  local who = ns.CharName(foe)
   d.go:SetAttribute("macrotext", "/doom " .. who)
   d.sub:SetText("|cffff8060" .. foe .. "|r" .. ((deed and deed ~= "") and (": " .. deed) or "") ..
     ((count or 1) > 1 and ("  |cff999999(+" .. (count - 1) .. " more)|r") or ""))

@@ -112,7 +112,7 @@ function L.Invite(member)
   if ok then
     ns.Print("Invited " .. ns.ShortName(member) .. ".")
   elseif ns.UI and ns.UI.CopyCommand then
-    ns.UI.CopyCommand("/invite " .. ns.CharName(member, false), "Invite " .. ns.ShortName(member))
+    ns.UI.CopyCommand("/invite " .. ns.CharName(member), "Invite " .. ns.ShortName(member))
   end
   return ok
 end

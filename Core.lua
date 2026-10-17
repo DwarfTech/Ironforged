@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.16.6"
+ns.VERSION = "2.16.8"
 ns.PROTOCOL = 11
 ns.PREFIX = "IRONFORGED"
 ns.COLOR = "ffd4a017"
@@ -110,8 +110,9 @@ function ns.FullName(name)
   if type(name) ~= "string" or name == "" then return nil end
   if ns.roster and ns.roster[name] then return name end
   local key = ns.NameKey(name)
+  -- Only an exact first-name-and-surname match counts. "Sunny Skyborne" is not the guildmate
+  -- "Sunny Dworf" just because they share a first name.
   local known = ns.rosterByShort[key] or ns.rosterByShort[(name:gsub("%-.*$", "")):lower()]
-    or ns.rosterByShort[key:match("^(%S+)%s") or ""]
   if known then return known end
   if name:find("-", 1, true) then return name end
   local realm = ns.RealmSuffix()
@@ -128,16 +129,11 @@ function ns.ShortName(name)
   return name
 end
 
--- The name the game server knows a character by, for whispers, invites and slash commands.
--- Forever shows first and last names ("Buttercup Clamstone-ClassicBetaPvP"), but the character's
--- actual name is the first one: "Buttercup-ClassicBetaPvP". withRealm=false drops the realm too.
-function ns.CharName(name, withRealm)
+-- The name used for whispers, invites and slash commands: first name and surname together, with
+-- no realm ("Buttercup Clamstone-ClassicBetaPvP" -> "Buttercup Clamstone").
+function ns.CharName(name)
   if type(name) ~= "string" then return name end
-  local base, realm = name:match("^(.-)%-([^%s%-]+)$")
-  base = base or name
-  local first = base:match("^(%S+)") or base
-  if realm and withRealm ~= false then return first .. "-" .. realm end
-  return first
+  return (name:match("^(.-)%-[^%s%-]+$")) or name
 end
 
 -- Your own roster name, matched by character ID first (exact), then by name.
@@ -256,6 +252,8 @@ local SETTINGS_DEFAULTS = {
   autoInvite = true,
   inviteAnyone = false,
   inviteKeyword = "inv",
+  rosterOnlineOnly = false, -- Roster tab filters
+  rosterProblemsOnly = false,
 }
 
 local function applyDefaults(t, defaults)

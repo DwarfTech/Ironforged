@@ -3,7 +3,23 @@ local ADDON, ns = ...
 local UI = ns.UI
 local Data = ns.Data
 
-local state = { search = "", onlineOnly = false, problemsOnly = false }
+local state = { search = "" }
+
+-- The two tick boxes are kept in the saved settings, so they survive /reload.
+local problemsBox
+local scanButton
+-- The scan button is greyed out while a scan is running.
+ns.On("SCAN_STATE", function()
+  if not scanButton then return end
+  local busy = ns.Gear.IsScanning()
+  scanButton:SetEnabled(not busy)
+  scanButton:SetText(busy and "Scanning..." or "Scan races")
+end)
+local function filterOn(key) return ns.settings and ns.settings[key] == true end
+function UI.SetRosterProblems(on)
+  if ns.settings then ns.settings.rosterProblemsOnly = on and true or false end
+  if problemsBox then problemsBox:SetChecked(filterOn("rosterProblemsOnly")) end
+end
 
 function UI.EditMember(name)
   local m = Data.Member(name)
@@ -50,9 +66,9 @@ function UI.ManageInGuildWindow(name)
     fields = { { type = "info", value = "|cffd4a017" .. short .. "|r  (" .. (info.rankName or "?") .. ", level " .. tostring(info.level or "?") .. ")" ..
       "\n\nBlizzard only lets you promote, demote or remove someone with a command you type yourself, or from its own guild window. Pick one and the addon gives you the command to copy." } },
     buttons = {
-      { text = "Remove", onClick = function() UI.CopyCommand("/gremove " .. ns.CharName(name, false), "Remove " .. short) end },
-      { text = "Demote", onClick = function() UI.CopyCommand("/gdemote " .. ns.CharName(name, false), "Demote " .. short) end },
-      { text = "Promote", onClick = function() UI.CopyCommand("/gpromote " .. ns.CharName(name, false), "Promote " .. short) end },
+      { text = "Remove", onClick = function() UI.CopyCommand("/gremove " .. ns.CharName(name), "Remove " .. short) end },
+      { text = "Demote", onClick = function() UI.CopyCommand("/gdemote " .. ns.CharName(name), "Demote " .. short) end },
+      { text = "Promote", onClick = function() UI.CopyCommand("/gpromote " .. ns.CharName(name), "Promote " .. short) end },
     },
   })
 end
@@ -138,6 +154,33 @@ function UI.ShowMember(name, opts)
   })
 end
 
+-- Invite a guildmate to my party; if the game refuses, offer the /invite command to copy.
+local function inviteToParty(name)
+  local info = ns.roster[name]
+  if info and not info.online then
+    ns.Print(ns.ShortName(name) .. " is not online.")
+    return
+  end
+  local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+  if fn and pcall(fn, ns.CharName(name)) then
+    ns.Print("Invited " .. ns.ShortName(name) .. ".")
+  elseif UI.CopyCommand then
+    UI.CopyCommand("/invite " .. ns.CharName(name), "Invite " .. ns.ShortName(name))
+  end
+end
+
+-- Right-click menu on a roster row.
+local function rowMenu(row, name)
+  if MenuUtil and MenuUtil.CreateContextMenu then
+    MenuUtil.CreateContextMenu(row, function(_, root)
+      if root.CreateTitle then root:CreateTitle(ns.ShortName(name)) end
+      root:CreateButton("Invite to party", function() inviteToParty(name) end)
+    end)
+  else
+    inviteToParty(name) -- no menu API in this client: the one option runs directly
+  end
+end
+
 local function build(f, w, h)
   local search = UI.EditBox(f, 170, 40)
   search:SetPoint("TOPLEFT", 6, -2)
@@ -150,21 +193,21 @@ local function build(f, w, h)
   end)
 
   local online = UI.Check(f, "Online only", function(self)
-    state.onlineOnly = self:GetChecked() and true or false
+    ns.settings.rosterOnlineOnly = self:GetChecked() and true or false
     UI.ScheduleRefresh()
   end)
   online:SetPoint("LEFT", search, "RIGHT", 10, 0)
+  online:SetChecked(filterOn("rosterOnlineOnly"))
   local problems = UI.Check(f, "Rule problems", function(self)
-    state.problemsOnly = self:GetChecked() and true or false
+    ns.settings.rosterProblemsOnly = self:GetChecked() and true or false
     UI.ScheduleRefresh()
   end)
-  UI.SetRosterProblems = function(on)
-    state.problemsOnly = on and true or false
-    problems:SetChecked(state.problemsOnly)
-  end
   problems:SetPoint("LEFT", online, "RIGHT", 84, 0)
+  problems:SetChecked(filterOn("rosterProblemsOnly"))
+  problemsBox = problems
 
   f.scan = UI.Button(f, "Scan races", 90, 22, function() ns.Gear.ScanGuild() end)
+  scanButton = f.scan
   f.scan:SetPoint("TOPRIGHT", -2, -2)
   f.count = UI.Label(f, "", "GameFontHighlightSmall")
   f.count:SetPoint("RIGHT", f.scan, "LEFT", -8, 0)
@@ -173,7 +216,9 @@ local function build(f, w, h)
     { title = "Name", width = 150 }, { title = "Rank", width = 78 }, { title = "Lvl", width = 26 },
     { title = "Clan", width = 84 }, { title = "Title", width = 76 }, { title = "Challenge", width = 88 },
     { title = "Race", width = 44 }, { title = "Seen", width = 62 },
-  }, function(name) UI.ShowMember(name) end)
+  }, function(name, row, button)
+    if button == "RightButton" then rowMenu(row, name) else UI.ShowMember(name) end
+  end)
   f.list:SetPoint("TOPLEFT", 0, -28)
   f.list:SetPoint("BOTTOMRIGHT", 0, 2)
 end
@@ -202,7 +247,7 @@ local function refresh(f)
     local chs = {}
     for _, ch in ipairs(ns.Challenges.Showing(name)) do chs[#chs + 1] = ch.data.name end
     local hay = (name .. " " .. clan .. " " .. ns.Titles.Text(name, " ") .. " " .. table.concat(chs, " ")):lower()
-    if (not state.onlineOnly or info.online) and (not state.problemsOnly or problem)
+    if (not filterOn("rosterOnlineOnly") or info.online) and (not filterOn("rosterProblemsOnly") or problem)
       and (state.search == "" or hay:find(state.search, 1, true)) then
       local display = ns.ColorName(name)
       if m.main then display = display .. " |cff888888(alt)|r" end

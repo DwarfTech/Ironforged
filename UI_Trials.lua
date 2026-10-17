@@ -273,7 +273,7 @@ local function build(f, w, h)
   -- until they reach the trial's rank.
   local promote = UI.Button(panel, "", pw - 20, 24, function(self)
     if not self.target then return end
-    UI.CopyCommand("/gpromote " .. ns.CharName(self.target, false), "Promote " .. ns.ShortName(self.target))
+    UI.CopyCommand("/gpromote " .. ns.CharName(self.target), "Promote " .. ns.ShortName(self.target))
     if C_Timer then
       C_Timer.After(3, ns.RequestRoster)
       C_Timer.After(8, ns.RequestRoster)

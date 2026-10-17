@@ -99,37 +99,133 @@ local function raceFromGUID(guid)
   return nil
 end
 
-function Gear.ScanGuild()
+-- GetPlayerInfoByGUID only knows characters the client has already cached; the first call for an
+-- unknown one starts a lookup and the answer arrives a moment later. So the scan asks in rounds:
+-- each round asks about everyone still unresolved (in small batches, to go easy on the server),
+-- waits, and asks again, until all are known or a round or two finds nothing new.
+local SCAN_BATCH, SCAN_BATCH_DELAY, SCAN_ROUND_DELAY, SCAN_MAX_ROUNDS = 25, 0.4, 1.5, 8
+local scanning = false
+local scanVerbose = false -- a scan someone asked for prints progress; the background one is silent
+
+-- True while a scan the player asked for is running (the quiet background scan does not count).
+function Gear.IsScanning() return scanning and scanVerbose end
+
+local function after(delay, fn)
+  if C_Timer and C_Timer.After then C_Timer.After(delay, fn) else fn() end
+end
+
+-- silent = true is the background scan: it only asks about members whose race isn't known yet
+-- and prints nothing. A scan the player asks for covers everyone and reports.
+function Gear.ScanGuild(silent)
   if not ns.Data.Ready() then return end
-  if InCombatLockdown and InCombatLockdown() then ns.Print("Finish the fight first."); return end
+  if scanning then
+    -- a background scan is already running: report on it instead of starting another
+    if not silent and not scanVerbose then
+      scanVerbose = true
+      ns.Print("Scanning guild races...")
+      ns.Fire("SCAN_STATE")
+    end
+    return
+  end
+  if InCombatLockdown and InCombatLockdown() then
+    if not silent then ns.Print("Finish the fight first.") end
+    return
+  end
+  scanVerbose = not silent
   local officer = ns.IAmOfficer()
-  local found, dwarves, others, unknown, shared = 0, 0, 0, 0, 0
-  local outsiders = {}
+  local names = {}
   for _, name in ipairs(ns.rosterList) do
+    local skip = silent and Gear.RaceOf(name) ~= nil and (not officer or ns.Data.Get("racecheck", name) ~= nil)
+    if not skip then names[#names + 1] = name end
+  end
+  local resolved, resolvedCount, shared = {}, 0, 0
+  local round, emptyRounds = 0, 0
+
+  local function lookup(name)
     local info = ns.roster[name]
-    local race = raceFromGUID(info.guid)
-    if race then
-      found = found + 1
-      seenCache()[name] = race
-      seenCache()["~" .. shortKey(name)] = race
-      local old = ns.Data.Get("racecheck", name)
-      if officer and (not old or old.race ~= race) then
-        if ns.Data.Put("racecheck", name, { race = race }, true) then shared = shared + 1 end
+    local race = info and raceFromGUID(info.guid)
+    if not race then return false end
+    seenCache()[name] = race
+    seenCache()["~" .. shortKey(name)] = race
+    local old = ns.Data.Get("racecheck", name)
+    if officer and (not old or old.race ~= race) then
+      if ns.Data.Put("racecheck", name, { race = race }, true) then shared = shared + 1 end
+    end
+    return true
+  end
+
+  local function finish()
+    local verbose = scanVerbose
+    scanning, scanVerbose = false, false
+    local dwarves, others, unknown = 0, 0, 0
+    local outsiders = {}
+    for _, name in ipairs(ns.rosterList) do
+      local dwarf = Gear.IsDwarf(name)
+      if dwarf == true then dwarves = dwarves + 1
+      elseif dwarf == false then others = others + 1; outsiders[#outsiders + 1] = ns.ShortName(name)
+      else unknown = unknown + 1 end
+    end
+    if verbose then
+      ns.Print(string.format("Scanned %d guildmates: %d dwarves, %d not dwarves, %d unknown.", #ns.rosterList, dwarves, others, unknown))
+      if #outsiders > 0 then ns.Print("|cffff6060Not dwarves:|r " .. table.concat(outsiders, ", ")) end
+      if unknown > 0 then
+        ns.Print("Unknown races fill in as you group with, target or mouse over those members, or when they install Ironforged.")
+      end
+      if not officer and resolvedCount > 0 then ns.Print("Only officers' scans are shared with the guild; this one is just for you.") end
+    end
+    if verbose or resolvedCount > 0 then ns.Fire("DATA_CHANGED", "racecheck") end
+    ns.Fire("SCAN_STATE")
+  end
+
+  local function runRound()
+    round = round + 1
+    local i, gained = 1, 0
+    local function step()
+      local last = math.min(i + SCAN_BATCH - 1, #names)
+      for k = i, last do
+        local name = names[k]
+        if not resolved[name] and lookup(name) then resolved[name] = true; resolvedCount = resolvedCount + 1; gained = gained + 1 end
+      end
+      i = last + 1
+      if i <= #names then after(SCAN_BATCH_DELAY, step); return end
+      -- the round is done: is anyone with a character ID still unresolved?
+      local pending = 0
+      for _, name in ipairs(names) do
+        local info = ns.roster[name]
+        if not resolved[name] and info and info.guid then pending = pending + 1 end
+      end
+      emptyRounds = (gained == 0) and (emptyRounds + 1) or 0
+      if pending == 0 or round >= SCAN_MAX_ROUNDS or emptyRounds >= 2 or not (C_Timer and C_Timer.After) then
+        finish()
+      else
+        if scanVerbose then ns.Print(string.format("Scanning guild races... %d of %d known", resolvedCount, #names)) end
+        after(SCAN_ROUND_DELAY, runRound)
       end
     end
-    local dwarf = Gear.IsDwarf(name)
-    if dwarf == true then dwarves = dwarves + 1
-    elseif dwarf == false then others = others + 1; outsiders[#outsiders + 1] = ns.ShortName(name)
-    else unknown = unknown + 1 end
+    step()
   end
-  ns.Print(string.format("Scanned %d guildmates: %d dwarves, %d not dwarves, %d unknown.", #ns.rosterList, dwarves, others, unknown))
-  if #outsiders > 0 then ns.Print("|cffff6060Not dwarves:|r " .. table.concat(outsiders, ", ")) end
-  if unknown > 0 then
-    ns.Print("Unknown races fill in as you group with, target or mouse over those members, or when they install Ironforged.")
+
+  scanning = true
+  if scanVerbose then
+    ns.Fire("SCAN_STATE")
+    ns.Print("Scanning guild races...")
   end
-  if not officer and found > 0 then ns.Print("Only officers' scans are shared with the guild; this one is just for you.") end
-  ns.Fire("DATA_CHANGED", "racecheck")
+  runRound()
 end
+
+-- Quietly look up races in the background, soon after login and then once a minute, so the
+-- Roster tab already has them when it is opened.
+local function backgroundScan()
+  if not ns.Data.Ready() or #ns.rosterList == 0 then return end
+  Gear.ScanGuild(true)
+end
+local backgroundStarted = false
+ns.On("DATA_READY", function()
+  if backgroundStarted or not (C_Timer and C_Timer.After and C_Timer.NewTicker) then return end
+  backgroundStarted = true
+  C_Timer.After(10, backgroundScan)
+  C_Timer.NewTicker(60, backgroundScan)
+end)
 
 -- Check everyone in your party or raid whenever the group changes.
 local function scanGroup()
@@ -271,7 +367,7 @@ function Gear.CheckIntruders()
       seen.members[name] = true
       local inviters = Gear.InvitersOf(name)
       local by = #inviters > 0 and (" Invited by " .. table.concat(inviters, ", "):gsub("%-[^,]*", "") .. ".") or ""
-      local line = ns.ShortName(name) .. " is in the guild and is not a dwarf." .. by
+      local line = ns.ShortName(name) .. " is in the guild and is not a dwarf. " .. tostring(Gear.RaceOf(name)) .. " - " .. by
       ns.Print("|cffff6060" .. line .. "|r")
       popupLines[#popupLines + 1] = line
     end
