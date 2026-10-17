@@ -172,7 +172,7 @@ local function build(f, w, h)
     if G.IsHost() and G.Active() then
       UI.Confirm("Remove " .. first(name) .. " from this game?", function() G.Kick(name) end)
     else
-      UI.ShowMember(name)
+      UI.ShowMember(name, { noManage = true })
     end
   end)
   f.players:SetPoint("TOPLEFT", 0, -102)
@@ -181,7 +181,7 @@ local function build(f, w, h)
   hall:SetPoint("TOPLEFT", listW + 12, -88)
   f.board = UI.List(f, w - listW - 8, h - 132, {
     { title = "Dwarf", width = 160 }, { title = "Net gold", width = 100 }, { title = "Games", width = 80 },
-  }, function(name) UI.ShowMember(name) end)
+  }, function(name) UI.ShowMember(name, { noManage = true }) end)
   f.board:SetPoint("TOPLEFT", listW + 8, -102)
 
   f.note = UI.Label(f, "Rolls happen in the host's raid. Highest roll wins; lowest pays the winner the difference. Pay up by trade. Host: click a player to remove them.", "GameFontDisableSmall")

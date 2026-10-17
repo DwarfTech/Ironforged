@@ -529,6 +529,17 @@ local st = K.ns.Gamble.Standings()
 local dag, tho
 for _, x in ipairs(st) do if x.name == "Dagna-Forever" then dag = x end if x.name == "Thorin-Forever" then tho = x end end
 check(dag and dag.net == 76 and tho and tho.net == -76, "Hall of Fortune synced to everyone")
+-- no management buttons from the gambling page
+A.ns.ToggleMain("gamble")
+local gtab
+for _, f in ipairs(A.frames) do if f.players and f.board then gtab = f end end
+local brow
+for _, row in ipairs(gtab.board.rows) do if row.item then brow = row end end
+brow.__scripts.OnClick(brow, "LeftButton")
+local gManage = false
+for _, b in ipairs(A.env.IronforgedDialog.buttons) do if b.__text == "Manage" or b.__text == "Edit record" then gManage = true end end
+check(not gManage, "no management buttons from the gambling page")
+A.env.IronforgedDialog:Hide()
 -- Gambling opens from the header, and the host can remove a player
 A.ns.ToggleMain("roster")
 local gbtn = A.env.StoneholdNone
