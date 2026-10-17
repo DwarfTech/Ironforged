@@ -150,6 +150,7 @@ local function build(f, w, h)
     { title = "Going", width = 46 }, { title = "Maybe", width = 46 }, { title = "You", width = 80 },
   }, function(id) showEvent(id) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 2)
 end
 
 local function refresh(f)

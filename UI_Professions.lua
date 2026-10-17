@@ -156,7 +156,7 @@ local function build(f, w, h)
 
   f.info = UI.Label(f, "", "GameFontHighlightSmall")
   f.info:SetPoint("TOPLEFT", 6, -38)
-  f.info:SetWidth(w - 12)
+  f.info:SetPoint("TOPRIGHT", -6, -38)
   f.info:SetWordWrap(false)
 
   local function onClick(d)
@@ -175,15 +175,18 @@ local function build(f, w, h)
     { title = "Profession", width = 180 }, { title = "Dwarves", width = 100 }, { title = "Online", width = 100 }, { title = "Most skilled", width = 220 },
   }, onClick)
   f.profs:SetPoint("TOPLEFT", 0, -56)
+  f.profs:SetPoint("BOTTOMRIGHT", 0, 28)
   f.crafters = UI.List(f, w, h - 84, {
     { title = "Dwarf", width = 220 }, { title = "Skill", width = 110 }, { title = "Recipes", width = 110 }, { title = "Status", width = 110 },
   }, onClick)
   f.crafters:SetPoint("TOPLEFT", 0, -56)
+  f.crafters:SetPoint("BOTTOMRIGHT", 0, 28)
   f.crafters:Hide()
   f.recipes = UI.List(f, w, h - 84, {
     { title = "Recipe", width = 250 }, { title = "Crafter", width = 160 }, { title = "Profession", width = 120 }, { title = "Skill", width = 80 },
   }, onClick)
   f.recipes:SetPoint("TOPLEFT", 0, -56)
+  f.recipes:SetPoint("BOTTOMRIGHT", 0, 28)
   f.recipes:Hide()
 
   f.note = UI.Label(f, "Open each of your profession windows once so the hold can see your recipes.", "GameFontDisableSmall")

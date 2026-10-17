@@ -134,6 +134,7 @@ function UI.MultiLine(parent, width, height, maxLetters)
   if maxLetters then edit:SetMaxLetters(maxLetters) end
   edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
   scroll:SetScrollChild(edit)
+  holder:SetScript("OnSizeChanged", function(_, w) edit:SetWidth(math.max(20, (w or width) - 36)) end)
   holder:EnableMouse(true)
   holder:SetScript("OnMouseDown", function() edit:SetFocus() end)
   holder.edit = edit
@@ -236,20 +237,24 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
   list.items = {}
   list.offset = 0
   list.onClick = onClick
+  list.rows = {}
+  list.visible = 0
+
+  -- The list stretches with its anchors: column widths are scaled from the widths given here
+  -- and as many rows are shown as fit the height.
+  local baseInner = width - 28
+  local colX, colW = {}, {}
+  for c, col in ipairs(columns) do colW[c] = col.width end
 
   local header = CreateFrame("Frame", nil, list)
   header:SetPoint("TOPLEFT", 6, -5)
   header:SetSize(width - 28, 18)
   -- Click a column title to sort by it; click again to reverse.
   list.headers = {}
-  local x = 0
   for c, col in ipairs(columns) do
     local hb = CreateFrame("Button", nil, header)
-    hb:SetPoint("LEFT", x, 0)
-    hb:SetSize(col.width - 2, 18)
     local fs = UI.Label(hb, col.title, "GameFontNormalSmall")
     fs:SetPoint("LEFT", 0, 0)
-    fs:SetWidth(col.width - 4)
     fs:SetWordWrap(false)
     hb.label, hb.title = fs, col.title
     local hl = hb:CreateTexture(nil, "HIGHLIGHT")
@@ -264,7 +269,6 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
       end)
     end
     list.headers[c] = hb
-    x = x + col.width
   end
   local bar = list:CreateTexture(nil, "BORDER")
   bar:SetPoint("TOPLEFT", 3, -3)
@@ -277,12 +281,21 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
   line:SetPoint("TOPLEFT", 6, -24)
   line:SetPoint("TOPRIGHT", -22, -24)
 
-  local visible = math.floor((height - 32) / rowHeight)
-  list.visible = visible
-  list.rows = {}
-  for i = 1, visible do
+  local innerW = baseInner
+
+  local function placeRow(row)
+    row:SetWidth(innerW)
+    for c = 1, #columns do
+      local fs = row.cells[c]
+      fs:ClearAllPoints()
+      fs:SetPoint("LEFT", colX[c] or 0, 0)
+      fs:SetWidth(math.max(8, (colW[c] or columns[c].width) - 4))
+    end
+  end
+
+  local function makeRow(i)
     local row = CreateFrame("Button", nil, list)
-    row:SetSize(width - 28, rowHeight)
+    row:SetHeight(rowHeight)
     row:SetPoint("TOPLEFT", 6, -26 - (i - 1) * rowHeight)
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
@@ -291,20 +304,18 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
     stripe:SetAllPoints()
     stripe:SetColorTexture(1, 1, 1, (i % 2 == 0) and 0.03 or 0)
     row.cells = {}
-    local cx = 0
-    for c, col in ipairs(columns) do
+    for c = 1, #columns do
       local fs = UI.Label(row, "", "GameFontHighlightSmall")
-      fs:SetPoint("LEFT", cx, 0)
-      fs:SetWidth(col.width - 4)
       fs:SetWordWrap(false)
       row.cells[c] = fs
-      cx = cx + col.width
     end
+    placeRow(row)
     row:SetScript("OnClick", function(self, button)
       if self.item and list.onClick then list.onClick(self.item.data, self, button) end
     end)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     list.rows[i] = row
+    return row
   end
 
   local slider = CreateFrame("Slider", nil, list)
@@ -327,7 +338,7 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
 
   list:EnableMouseWheel(true)
   list:SetScript("OnMouseWheel", function(_, delta)
-    local maxOff = math.max(0, #list.items - visible)
+    local maxOff = math.max(0, #list.items - list.visible)
     local v = math.max(0, math.min(maxOff, list.offset - delta * 3))
     slider:SetValue(v)
   end)
@@ -337,9 +348,9 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
   list.empty = empty
 
   function list:Redraw()
-    for i = 1, visible do
+    for i = 1, #self.rows do
       local row = self.rows[i]
-      local item = self.items[i + self.offset]
+      local item = (i <= self.visible) and self.items[i + self.offset] or nil
       row.item = item
       if item then
         for c = 1, #columns do
@@ -353,6 +364,40 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
       end
     end
   end
+
+  -- Fit the scroll range and the rows to the current item count and visible row count.
+  function list:Update()
+    local maxOff = math.max(0, #self.items - self.visible)
+    if self.offset > maxOff then self.offset = maxOff end
+    self.slider:SetMinMaxValues(0, maxOff)
+    self.slider:SetValue(self.offset)
+    if maxOff == 0 then self.slider:Hide() else self.slider:Show() end
+    self:Redraw()
+  end
+
+  local function relayout(w, h)
+    w, h = w or width, h or height
+    innerW = math.max(60, w - 28)
+    local ratio = innerW / baseInner
+    header:SetWidth(innerW)
+    local x = 0
+    for c, col in ipairs(columns) do
+      local cw = math.floor(col.width * ratio + 0.5)
+      colX[c], colW[c] = x, cw
+      local hb = list.headers[c]
+      hb:ClearAllPoints()
+      hb:SetPoint("LEFT", x, 0)
+      hb:SetSize(math.max(6, cw - 2), 18)
+      hb.label:SetWidth(math.max(6, cw - 4))
+      x = x + cw
+    end
+    local vis = math.max(1, math.floor((h - 32) / rowHeight))
+    for i = #list.rows + 1, vis do makeRow(i) end
+    list.visible = vis
+    for _, row in ipairs(list.rows) do placeRow(row) end
+    list:Update()
+  end
+  list:SetScript("OnSizeChanged", function(_, w, h) relayout(w, h) end)
 
   -- Sort value for a cell: the item's own key for that column if it gave one, else the cell's
   -- text without colour codes, compared as a number when it is one.
@@ -394,16 +439,48 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
       hb.label:SetText(hb.title .. arrow)
     end
     self.items = items
-    local maxOff = math.max(0, #self.items - visible)
-    if self.offset > maxOff then self.offset = maxOff end
-    self.slider:SetMinMaxValues(0, maxOff)
-    self.slider:SetValue(self.offset)
-    if maxOff == 0 then self.slider:Hide() else self.slider:Show() end
     self.empty:SetText(#self.items == 0 and (emptyText or "Nothing here yet.") or "")
-    self:Redraw()
+    self:Update()
   end
 
+  relayout(width, height)
   return list
+end
+
+----------------------------------------------------------------------
+-- Resizing: drag any edge or corner of `frame`. Call frame:SetResizable(true) yourself.
+----------------------------------------------------------------------
+function UI.AddSizeGrips(frame, onDone)
+  local function grip(point, setup)
+    local g = CreateFrame("Frame", nil, frame)
+    g:SetFrameLevel((frame:GetFrameLevel() or 1) + 10)
+    setup(g)
+    g:EnableMouse(true)
+    g:SetScript("OnMouseDown", function(_, btn) if btn == "LeftButton" then frame:StartSizing(point) end end)
+    g:SetScript("OnMouseUp", function() frame:StopMovingOrSizing(); if onDone then onDone() end end)
+    return g
+  end
+  grip("LEFT", function(g) g:SetWidth(6); g:SetPoint("TOPLEFT", 0, -40); g:SetPoint("BOTTOMLEFT", 0, 16) end)
+  grip("RIGHT", function(g) g:SetWidth(6); g:SetPoint("TOPRIGHT", 0, -40); g:SetPoint("BOTTOMRIGHT", 0, 16) end)
+  grip("TOP", function(g) g:SetHeight(6); g:SetPoint("TOPLEFT", 16, 0); g:SetPoint("TOPRIGHT", -40, 0) end)
+  grip("BOTTOM", function(g) g:SetHeight(6); g:SetPoint("BOTTOMLEFT", 16, 0); g:SetPoint("BOTTOMRIGHT", -16, 0) end)
+  grip("TOPLEFT", function(g) g:SetSize(16, 16); g:SetPoint("TOPLEFT", 0, 0) end)
+  grip("BOTTOMLEFT", function(g) g:SetSize(16, 16); g:SetPoint("BOTTOMLEFT", 0, 0) end)
+  local corner = grip("BOTTOMRIGHT", function(g) g:SetSize(18, 18); g:SetPoint("BOTTOMRIGHT", -2, 2) end)
+  corner:SetFrameLevel((frame:GetFrameLevel() or 1) + 12)
+  local tex = corner:CreateTexture(nil, "OVERLAY")
+  tex:SetAllPoints()
+  tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  corner:SetScript("OnEnter", function() tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight") end)
+  corner:SetScript("OnLeave", function() tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up") end)
+end
+
+function UI.SetSizeBounds(frame, minW, minH, maxW, maxH)
+  if frame.SetResizeBounds then frame:SetResizeBounds(minW, minH, maxW, maxH)
+  elseif frame.SetMinResize then
+    frame:SetMinResize(minW, minH)
+    if frame.SetMaxResize then frame:SetMaxResize(maxW, maxH) end
+  end
 end
 
 ----------------------------------------------------------------------
@@ -427,6 +504,8 @@ local function getDialog()
   dialog:SetScript("OnDragStart", dialog.StartMoving)
   dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
   dialog:SetClampedToScreen(true)
+  dialog:SetResizable(true)
+  UI.AddSizeGrips(dialog)
   UI.Backdrop(dialog)
   dialog.title = UI.Label(dialog, "", "GameFontNormalLarge")
   UI.TitleFont(dialog.title, 18)
@@ -480,30 +559,45 @@ function UI.OpenForm(spec)
   local inputW = width - 32 - labelW - 8
   local y = 0
   local getters = {}
+  local fields = spec.fields or {}
+  -- Fields are placed after the buttons are counted (see below). The last multiline box, or
+  -- failing that the last info text, takes any extra height; fields under it stay at the bottom.
+  local stretchIdx
+  for i, fld in ipairs(fields) do if fld.type == "multiline" then stretchIdx = i end end
+  if not stretchIdx then
+    for i, fld in ipairs(fields) do if fld.type == "info" then stretchIdx = i end end
+  end
+  local places, stretch = {}, nil
+  local function put(frame, x, yy, i, right)
+    frame:SetPoint("TOPLEFT", body, "TOPLEFT", x, -yy) -- provisional; measured text needs a point
+    places[#places + 1] = { frame = frame, x = x, y = yy, i = i, right = right }
+  end
 
-  for _, f in ipairs(spec.fields or {}) do
+  for i, f in ipairs(fields) do
     local h = 26
     if f.type == "info" then
       local fs = UI.Label(body, f.value or "", f.font or "GameFontHighlight")
-      fs:SetPoint("TOPLEFT", 0, -y)
       fs:SetWidth(width - 32)
       fs:SetJustifyV("TOP")
       fs:SetSpacing(2)
+      put(fs, 0, y, i, true)
       h = math.max(16, fs:GetStringHeight() + 8)
+      if i == stretchIdx then stretch = { frame = fs, bottom = y + h, shrink = math.max(0, h - 40), info = true } end
     else
       local label = UI.Label(body, f.label or "", "GameFontNormalSmall")
-      label:SetPoint("TOPLEFT", 0, -y - 4)
       label:SetWidth(labelW)
+      put(label, 0, y + 4, i)
       if f.type == "multiline" then
         h = (f.height or 90) + 6
         local m = UI.MultiLine(body, inputW, f.height or 90, f.maxLen)
-        m:SetPoint("TOPLEFT", labelW + 8, -y)
+        put(m, labelW + 8, y, i, true)
         m:SetText(f.value or "")
         getters[f.key] = function() return m:GetText() end
+        if i == stretchIdx then stretch = { frame = m, bottom = y + (f.height or 90), shrink = math.max(0, (f.height or 90) - 50) } end
       elseif f.type == "choice" then
         local current = f.value
         local btn = UI.Button(body, "", math.min(inputW, 220), 22)
-        btn:SetPoint("TOPLEFT", labelW + 8, -y)
+        put(btn, labelW + 8, y, i)
         local function textFor(v)
           for _, o in ipairs(f.options or {}) do if o.value == v then return o.text end end
           return f.none or "(none)"
@@ -518,12 +612,12 @@ function UI.OpenForm(spec)
         getters[f.key] = function() return current end
       elseif f.type == "check" then
         local c = UI.Check(body, f.checkText or "")
-        c:SetPoint("TOPLEFT", labelW + 4, -y + 2)
+        put(c, labelW + 4, y - 2, i)
         c:SetChecked(f.value and true or false)
         getters[f.key] = function() return c:GetChecked() and true or false end
       else
         local e = UI.EditBox(body, inputW - 6, f.maxLen)
-        e:SetPoint("TOPLEFT", labelW + 14, -y)
+        put(e, labelW + 14, y, i, true)
         e:SetText(f.value or "")
         e:SetCursorPosition(0)
         if f.select then
@@ -603,7 +697,54 @@ function UI.OpenForm(spec)
     end
   end
 
-  d:SetSize(width, math.max(140, y + 100 + (rows - 1) * 26))
+  local dh = math.max(140, y + 100 + (rows - 1) * 26)
+  local origBodyH = dh - 86
+  local screenH = (UIParent and UIParent:GetHeight()) or 768
+  local screenW = (UIParent and UIParent:GetWidth()) or 1024
+  -- Text taller than the screen goes into a scroll frame instead of running off it.
+  local cap = math.max(400, math.floor(screenH * 0.9))
+  if dh > cap and stretch and stretch.info then
+    local text = stretch.frame
+    local scroll = CreateFrame("ScrollFrame", nil, body, "UIPanelScrollFrameTemplate")
+    local child = CreateFrame("Frame", nil, scroll)
+    child:SetSize(width - 60, text:GetStringHeight() + 8)
+    scroll:SetScrollChild(child)
+    text:SetParent(child)
+    text:ClearAllPoints()
+    text:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
+    text:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, 0)
+    local function fit()
+      child:SetHeight(text:GetStringHeight() + 8)
+    end
+    scroll:SetScript("OnSizeChanged", function(_, sw)
+      child:SetWidth(math.max(20, (sw or 100)))
+      fit()
+      if C_Timer then C_Timer.After(0, fit) end
+    end)
+    for _, p in ipairs(places) do if p.frame == text then p.frame = scroll end end
+    stretch.frame = scroll
+    stretch.scroll = true
+    dh = cap
+  end
+  d:SetSize(width, dh)
+  -- Anchor every field to the body so the window can be resized: fields stretch sideways, the
+  -- stretch field also takes extra height and the fields below it stay pinned to the bottom.
+  local bodyH = origBodyH -- distances to the bottom edge stay as laid out; only the stretch field shrinks
+  for _, p in ipairs(places) do
+    local fr = p.frame
+    fr:ClearAllPoints()
+    local below = stretchIdx and p.i > stretchIdx
+    if below then
+      fr:SetPoint("TOPLEFT", body, "BOTTOMLEFT", p.x, bodyH - p.y)
+      if p.right then fr:SetPoint("TOPRIGHT", body, "BOTTOMRIGHT", 0, bodyH - p.y) end
+    else
+      fr:SetPoint("TOPLEFT", body, "TOPLEFT", p.x, -p.y)
+      if p.right and not (stretch and stretch.frame == fr) then fr:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, -p.y) end
+    end
+  end
+  if stretch then stretch.frame:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", stretch.scroll and -24 or 0, bodyH - stretch.bottom) end
+  UI.SetSizeBounds(d, math.max(300, math.floor(width * 0.7)), math.max(140, math.min(dh, cap) - (stretch and stretch.shrink or 0)),
+    math.max(1400, screenW), math.max(1000, screenH))
   d:Show()
   d:Raise()
 end

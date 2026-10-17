@@ -124,7 +124,7 @@ local function build(f, w, h)
 
   f.mineInfo = UI.Label(f, "", "GameFontHighlightSmall")
   f.mineInfo:SetPoint("TOPLEFT", 6, -64)
-  f.mineInfo:SetWidth(w - 12)
+  f.mineInfo:SetPoint("TOPRIGHT", -6, -64)
   f.mineInfo:SetWordWrap(false)
 
   f.list = UI.List(f, w, h - 110, {
@@ -132,10 +132,11 @@ local function build(f, w, h)
     { title = "Posted", width = 100 }, { title = "Status", width = 90 },
   }, function(key) showPost(key) end)
   f.list:SetPoint("TOPLEFT", 0, -82)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 28)
 
   f.footer = UI.Label(f, "Guildmates with Ironforged get a popup to sign up. Posts close after two hours. Click a group to sign up or manage it.", "GameFontDisableSmall")
   f.footer:SetPoint("BOTTOMLEFT", 4, 6)
-  f.footer:SetWidth(w - 8)
+  f.footer:SetPoint("BOTTOMRIGHT", -4, 6)
 end
 
 UI.RegisterTab("lfd", "Looking for Dwarf", build, refresh)

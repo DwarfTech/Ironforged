@@ -81,6 +81,7 @@ local function build(f, w, h)
     end
   end)
   f.list:SetPoint("TOPLEFT", 0, -34)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 6)
 end
 
 UI.RegisterTab("titles", "Titles", build, refresh)

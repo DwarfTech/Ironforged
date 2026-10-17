@@ -213,24 +213,37 @@ local function build(f, w, h)
     UI.ScheduleRefresh()
   end)
   f.list:SetPoint("TOPLEFT", 0, -28)
+  f.list:SetPoint("BOTTOMLEFT", 0, 2)
 
   local panel = CreateFrame("Frame", nil, f, "BackdropTemplate")
-  panel:SetPoint("TOPLEFT", leftW + 8, -28)
+  panel:SetPoint("TOPLEFT", f.list, "TOPRIGHT", 8, 0)
   panel:SetPoint("BOTTOMRIGHT", 0, 0)
   UI.Backdrop(panel, true)
   f.panel = panel
   local pw = w - leftW - 8
+  -- text lines are as wide as the panel less a margin; kept current as the window resizes
+  local wide = {}
+  local function track(fs, margin) wide[#wide + 1] = { fs, margin } end
+  f:HookScript("OnSizeChanged", function(_, fw)
+    if fw and fw > 0 then f.list:SetWidth(math.max(160, math.floor(fw * leftW / w + 0.5))) end
+  end)
+  panel:HookScript("OnSizeChanged", function(_, panelW)
+    if not panelW or panelW <= 0 then return end
+    for _, e in ipairs(wide) do e[1]:SetWidth(math.max(40, panelW - e[2])) end
+  end)
 
   -- Each line sits under the one above, so a long name or a wrapped line pushes the rest down.
   local function line(fs, anchor, gap)
     fs:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -(gap or 4))
     fs:SetWidth(pw - 24)
+    track(fs, 24)
     fs:SetJustifyV("TOP")
     return fs
   end
   panel.who = UI.Label(panel, "", "GameFontNormalLarge")
   panel.who:SetPoint("TOPLEFT", 12, -10)
   panel.who:SetWidth(pw - 24)
+  track(panel.who, 24)
   panel.who:SetWordWrap(false)
   panel.title = line(UI.Label(panel, "", "GameFontNormal"), panel.who, 6)
   panel.title:SetWordWrap(false)
@@ -250,6 +263,7 @@ local function build(f, w, h)
     if i == 1 then c:SetPoint("TOPLEFT", panel.progress, "BOTTOMLEFT", -2, -4)
     else c:SetPoint("TOPLEFT", panel.checks[i - 1], "BOTTOMLEFT", 0, 0) end
     c.label:SetWidth(pw - 50)
+    track(c.label, 50)
     c.label:SetWordWrap(false)
     panel.checks[i] = c
   end
@@ -266,6 +280,7 @@ local function build(f, w, h)
     end
   end)
   promote:SetPoint("BOTTOMLEFT", 8, 38)
+  promote:SetPoint("BOTTOMRIGHT", -12, 38)
   promote:Hide()
   panel.promote = promote
 
@@ -275,6 +290,7 @@ local function build(f, w, h)
     if key and Data.Get("progress", key) then UI.ClearTrial(key) end
   end)
   panel.finishButton:SetPoint("BOTTOMLEFT", 8, 38)
+  panel.finishButton:SetPoint("BOTTOMRIGHT", -12, 38)
   panel.finishButton:Hide()
 
   panel.saveButton = UI.Button(panel, "Save progress", 104, 22, function()

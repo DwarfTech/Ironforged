@@ -214,7 +214,7 @@ ns.On("DATA_READY", function()
   if C_Timer then C_Timer.After(10, function() pcall(P.ScanSkills) end) else P.ScanSkills() end
 end)
 ns.RegisterEvent("SKILL_LINES_CHANGED", function() later("s", P.ScanSkills) end)
-for _, ev in ipairs({ "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED", "TRADE_SKILL_UPDATE" }) do
+for _, ev in ipairs({ "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED" }) do
   ns.RegisterEvent(ev, function() later("r", P.ScanRecipes) end)
 end
 

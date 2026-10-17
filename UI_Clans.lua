@@ -215,11 +215,13 @@ local function build(f, w, h)
     { title = "Motto", width = 260 },
   }, function(id) showClan(id) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 2)
   f.apps = UI.List(f, w, h - 30, {
     { title = "Applicant", width = 130 }, { title = "Rank", width = 90 }, { title = "Clan", width = 130 },
     { title = "Asked", width = 80 }, { title = "Note", width = 150 },
   }, function(key) showApplication(key) end)
   f.apps:SetPoint("TOPLEFT", 0, -28)
+  f.apps:SetPoint("BOTTOMRIGHT", 0, 2)
   f.apps:Hide()
 end
 

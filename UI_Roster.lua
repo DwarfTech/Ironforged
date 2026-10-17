@@ -175,6 +175,7 @@ local function build(f, w, h)
     { title = "Race", width = 44 }, { title = "Seen", width = 62 },
   }, function(name) UI.ShowMember(name) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 2)
 end
 
 -- Roster cell: the member's challenges under way (completed ones in green).

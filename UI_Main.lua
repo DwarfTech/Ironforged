@@ -12,6 +12,10 @@ function UI.RegisterTab(id, label, build, refresh, headerOnly)
 end
 
 local CONTENT_W, CONTENT_H = 640, 452
+local DEFAULT_W, DEFAULT_H = CONTENT_W + 170, CONTENT_H + 88
+local MIN_W, MIN_H = 720, 480
+local MAX_W, MAX_H = 1500, 1100
+local NAV_BASE = 156 -- width of the side list at the default window size
 
 -- Sections of the side list. Tabs not named here go just above Settings.
 local NAV_SECTIONS = {
@@ -68,6 +72,38 @@ function UI.UpdateLanguageButton()
 end
 ns.On("LANGUAGE", function() UI.UpdateLanguageButton() end)
 
+-- keep the subtitle clear of the header buttons
+local function fitSubtitle()
+  if not main then return end
+  local left = main.gambleButton:GetLeft()
+  local x0 = main.subtitle:GetLeft()
+  if left and x0 and left - x0 - 10 > 60 then main.subtitle:SetWidth(left - x0 - 10) else main.subtitle:SetWidth(300) end
+end
+
+local function saveSize()
+  if not main or not ns.db then return end
+  ns.db.mainSize = { w = math.floor((main:GetWidth() or DEFAULT_W) + 0.5), h = math.floor((main:GetHeight() or DEFAULT_H) + 0.5) }
+end
+
+-- The side list grows with the window; content fills the rest.
+local function layoutNav(w)
+  if not main then return end
+  local navW = math.floor(math.max(NAV_BASE - 12, math.min(NAV_BASE * 1.5, NAV_BASE * (w or DEFAULT_W) / DEFAULT_W)) + 0.5)
+  for _, e in ipairs(main.navLines or {}) do
+    e.line:ClearAllPoints()
+    e.line:SetPoint("TOPLEFT", main, "TOPLEFT", 16, e.y)
+    e.line:SetPoint("TOPRIGHT", main, "TOPLEFT", navW - 12, e.y)
+  end
+  for _, e in ipairs(main.navButtons or {}) do
+    e.b:ClearAllPoints()
+    e.b:SetPoint("TOPLEFT", main, "TOPLEFT", 14, e.y)
+    e.b:SetPoint("TOPRIGHT", main, "TOPLEFT", navW - 10, e.y)
+  end
+  main.content:ClearAllPoints()
+  main.content:SetPoint("TOPLEFT", main, "TOPLEFT", navW, -72)
+  main.content:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", -14, 16)
+end
+
 local function updateHeader()
   if not main then return end
   UI.ApplyEmblem(main.emblem, main.shield, true)
@@ -84,16 +120,19 @@ local function updateHeader()
   local online = 0
   for _, i in pairs(ns.roster) do if i.online then online = online + 1 end end
   main.subtitle:SetText(string.format("%s  |cff999999-  %d of %d online|r", status, online, #ns.rosterList))
-  -- keep the subtitle clear of the header buttons
-  local left = main.gambleButton:GetLeft()
-  local x0 = main.subtitle:GetLeft()
-  if left and x0 and left - x0 - 10 > 60 then main.subtitle:SetWidth(left - x0 - 10) else main.subtitle:SetWidth(300) end
+  fitSubtitle()
 end
 
 local function build()
   main = CreateFrame("Frame", "IronforgedMainFrame", UIParent, "BackdropTemplate")
-  main:SetSize(CONTENT_W + 170, CONTENT_H + 88)
+  local sz = ns.db and ns.db.mainSize
+  local startW = math.max(MIN_W, math.min(MAX_W, tonumber(sz and sz.w) or DEFAULT_W))
+  local startH = math.max(MIN_H, math.min(MAX_H, tonumber(sz and sz.h) or DEFAULT_H))
+  main:SetSize(startW, startH)
   main:SetPoint("CENTER")
+  main:SetResizable(true)
+  if main.SetResizeBounds then main:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
+  elseif main.SetMinResize then main:SetMinResize(MIN_W, MIN_H); if main.SetMaxResize then main:SetMaxResize(MAX_W, MAX_H) end end
   main:SetFrameStrata("HIGH")
   main:SetToplevel(true)
   main:EnableMouse(true)
@@ -172,8 +211,7 @@ local function build()
   main.headerTabs = { gamble = gamble }
 
   main.content = CreateFrame("Frame", nil, main)
-  main.content:SetSize(CONTENT_W, CONTENT_H)
-  main.content:SetPoint("TOPRIGHT", -14, -72)
+  main.navLines, main.navButtons = {}, {}
 
   -- Side list in sections: guild management, in-game tools, roleplay, then settings.
   local byId, placed = {}, {}
@@ -200,8 +238,7 @@ local function build()
         local line = main:CreateTexture(nil, "ARTWORK")
         line:SetColorTexture(0.72, 0.55, 0.2, 0.6)
         line:SetHeight(1)
-        line:SetPoint("TOPLEFT", 16, y - 16)
-        line:SetWidth(128)
+        main.navLines[#main.navLines + 1] = { line = line, y = y - 16 }
         main.navHeaders[#main.navHeaders + 1] = h
         y = y - 20
       else
@@ -209,17 +246,57 @@ local function build()
       end
       for _, t in ipairs(sec.tabs) do
         local b = UI.Button(main, t.label, 132, 24, function() selectTab(t.id) end)
-        b:SetPoint("TOPLEFT", 14, y)
+        main.navButtons[#main.navButtons + 1] = { b = b, y = y }
         t.button = b
         y = y - 27
       end
       y = y - 4
     end
   end
+  -- The window may not shrink past the last side button (Settings) and the version label.
+  local minH = math.max(MIN_H, math.floor(-y + 24))
+  if main.SetResizeBounds then main:SetResizeBounds(MIN_W, minH, MAX_W, MAX_H)
+  elseif main.SetMinResize then main:SetMinResize(MIN_W, minH) end
+  if (main:GetHeight() or 0) < minH then main:SetHeight(minH) end
   -- header buttons that open a page highlight like a tab button
   for _, t in ipairs(tabs) do
     if t.headerOnly and main.headerTabs and main.headerTabs[t.id] then t.button = main.headerTabs[t.id] end
   end
+
+  layoutNav(startW)
+
+  -- Resize by dragging any edge or corner.
+  local function grip(sizePoint, setup)
+    local g = CreateFrame("Frame", nil, main)
+    g:SetFrameLevel((main:GetFrameLevel() or 1) + 10)
+    setup(g)
+    g:EnableMouse(true)
+    g:SetScript("OnMouseDown", function(_, btn) if btn == "LeftButton" then main:StartSizing(sizePoint) end end)
+    g:SetScript("OnMouseUp", function() main:StopMovingOrSizing(); saveSize() end)
+    return g
+  end
+  grip("LEFT", function(g) g:SetWidth(6); g:SetPoint("TOPLEFT", 0, -40); g:SetPoint("BOTTOMLEFT", 0, 16) end)
+  grip("RIGHT", function(g) g:SetWidth(6); g:SetPoint("TOPRIGHT", 0, -40); g:SetPoint("BOTTOMRIGHT", 0, 16) end)
+  grip("TOP", function(g) g:SetHeight(6); g:SetPoint("TOPLEFT", 16, 0); g:SetPoint("TOPRIGHT", -40, 0) end)
+  grip("BOTTOM", function(g) g:SetHeight(6); g:SetPoint("BOTTOMLEFT", 16, 0); g:SetPoint("BOTTOMRIGHT", -16, 0) end)
+  grip("TOPLEFT", function(g) g:SetSize(16, 16); g:SetPoint("TOPLEFT", 0, 0) end)
+  grip("BOTTOMLEFT", function(g) g:SetSize(16, 16); g:SetPoint("BOTTOMLEFT", 0, 0) end)
+  local corner = grip("BOTTOMRIGHT", function(g) g:SetSize(18, 18); g:SetPoint("BOTTOMRIGHT", -2, 2) end)
+  corner:SetFrameLevel((main:GetFrameLevel() or 1) + 12)
+  local gripTex = corner:CreateTexture(nil, "OVERLAY")
+  gripTex:SetAllPoints()
+  gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  corner:SetScript("OnEnter", function() gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight") end)
+  corner:SetScript("OnLeave", function() gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up") end)
+
+  local fitPending = false
+  main:SetScript("OnSizeChanged", function(_, w)
+    layoutNav(w)
+    if fitPending then return end
+    fitPending = true
+    local function fit() fitPending = false; fitSubtitle() end
+    if C_Timer then C_Timer.After(0, fit) else fit() end
+  end)
 
   main.footer = UI.Label(main, "", "GameFontDisableSmall")
   main.footer:SetPoint("BOTTOMLEFT", 16, 12)

@@ -7,13 +7,14 @@ local Data = ns.Data
 local function build(f, w, h)
   f.mine = UI.Label(f, "", "GameFontHighlight")
   f.mine:SetPoint("TOPLEFT", 6, -7)
-  f.mine:SetWidth(w - 12)
+  f.mine:SetPoint("TOPRIGHT", -6, -7)
   f.mine:SetWordWrap(false)
   f.list = UI.List(f, w, h - 52, {
     { title = "#", width = 30 }, { title = "Dwarf", width = 250 },
     { title = "Horde slain", width = 110 }, { title = "Elves slain", width = 110 }, { title = "Avenged", width = 100 },
   }, function(name) UI.ShowMember(name, { noManage = true }) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 24)
   -- hover a column title for how it's counted
   local function explain(col, title, r, g, b, text)
     local hb = f.list.headers[col]
@@ -31,7 +32,7 @@ local function build(f, w, h)
   explain(5, "Avenged", 1, 0.82, 0.25, ns.Blood.AVENGED_RULES)
   f.note = UI.Label(f, "Hover a column title to see how it's counted.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 4)
-  f.note:SetWidth(w - 8)
+  f.note:SetPoint("BOTTOMRIGHT", -4, 4)
 end
 
 local function refresh(f)

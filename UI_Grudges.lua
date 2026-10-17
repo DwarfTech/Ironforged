@@ -133,6 +133,7 @@ local function build(f, w, h)
     { title = "What they did", width = 200 }, { title = "Status", width = 140 },
   }, function(key) showGrudge(key) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 2)
 end
 
 local function refresh(f)

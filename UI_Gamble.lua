@@ -153,7 +153,7 @@ local function build(f, w, h)
 
   f.status = UI.Label(f, "", "GameFontHighlightSmall")
   f.status:SetPoint("TOPLEFT", 6, -36)
-  f.status:SetWidth(w - 12)
+  f.status:SetPoint("TOPRIGHT", -6, -36)
   f.status:SetJustifyV("TOP")
   f.status:SetSpacing(2)
 
@@ -176,13 +176,19 @@ local function build(f, w, h)
     end
   end)
   f.players:SetPoint("TOPLEFT", 0, -102)
+  f.players:SetPoint("BOTTOMLEFT", 0, 30)
 
   local hall = UI.Label(f, "Hall of Fortune (all recorded games)", "GameFontNormalSmall")
-  hall:SetPoint("TOPLEFT", listW + 12, -88)
+  hall:SetPoint("BOTTOMLEFT", f.players, "TOPRIGHT", 12, 4)
   f.board = UI.List(f, w - listW - 8, h - 132, {
     { title = "Dwarf", width = 160 }, { title = "Net gold", width = 100 }, { title = "Games", width = 80 },
   }, function(name) UI.ShowMember(name, { noManage = true }) end)
-  f.board:SetPoint("TOPLEFT", listW + 8, -102)
+  f.board:SetPoint("TOPLEFT", f.players, "TOPRIGHT", 8, 0)
+  f.board:SetPoint("BOTTOMRIGHT", 0, 30)
+  -- the two lists keep their proportions as the window is resized
+  f:HookScript("OnSizeChanged", function(_, fw)
+    if fw and fw > 0 then f.players:SetWidth(math.max(120, math.floor(fw * listW / w + 0.5))) end
+  end)
 
   f.note = UI.Label(f, "Rolls happen in the host's raid. Highest roll wins; lowest pays the winner the difference. Pay up by trade. Host: click a player to remove them.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 6)

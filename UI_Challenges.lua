@@ -105,10 +105,11 @@ local function build(f, w, h)
     { title = "Level now", width = 80 }, { title = "Status", width = 100 },
   }, function(key) showChallenge(key) end)
   f.list:SetPoint("TOPLEFT", 0, -34)
+  f.list:SetPoint("BOTTOMRIGHT", 0, 24)
 
   f.note = UI.Label(f, "Your challenges. Guildmates' challenges show on the roster and their tooltips. Ready-made ones are enforced by the addon.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 6)
-  f.note:SetWidth(w - 8)
+  f.note:SetPoint("BOTTOMRIGHT", -4, 6)
 end
 
 UI.RegisterTab("challenges", "Challenges", build, refresh)
