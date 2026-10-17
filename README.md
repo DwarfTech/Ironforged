@@ -61,7 +61,6 @@ Every list can be sorted: click a column title to sort by it, and click again to
 
 **Challenges.** Press **Take on a challenge** and pick a ready-made one or write your own. You can start at any level; the level you started at is recorded and shown. The tab lists your own challenges. Your own challenges run on your honor, and an officer marks them completed (or failed) from your roster record, under **Challenges**. No one can mark their own challenge completed. The ready-made ones are enforced by the addon and complete themselves at max level:
 - **Slayer:** no chest or shoulder armor, no shirt, and you stay flagged for PvP. Chest or shoulder armor or a shirt you put on goes straight back into your bags. Blizzard only lets players switch PvP on themselves, so whenever you're not flagged (including right after you start, or if you turn it off) you get a warning to type /pvp, and if you're still not flagged a minute later, the challenge fails. `/hold pvp` shows whether you count as flagged.
-- **Stone-Skin:** no armor at all. Weapons, rings, necklace, trinkets, shirt and tabard only. Armor goes straight back into your bags.
 - **Self-Made:** no auction house, trading or mail. They close as soon as they open.
 - **One Life:** die once and the challenge is over.
 - **Dwarf Found:** trade and group only with dwarves. Trades with anyone else are cancelled, invites from guildmates known not to be dwarves are turned down, and if a non-dwarf joins your group you get 15 seconds to remove them before you leave the group.

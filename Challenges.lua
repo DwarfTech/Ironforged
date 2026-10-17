@@ -18,8 +18,6 @@ C.SLOT_NAMES = { [1] = "Head", [3] = "Shoulder", [4] = "Shirt", [5] = "Chest", [
 C.PRESETS = {
   slayer = { name = "Slayer", noSlots = { 3, 4, 5 }, pvp = true,
     rules = "No chest or shoulder armor, no shirt, and stay flagged for PvP all the way to max level." },
-  stoneskin = { name = "Stone-Skin", noSlots = { 1, 3, 5, 6, 7, 8, 9, 10, 15 },
-    rules = "Wear no armor at all: weapons, rings, necklace, trinkets, shirt and tabard only." },
   selfmade = { name = "Self-Made", noAH = true, noTrade = true, noMail = true,
     rules = "No auction house, no trading and no mail. Everything you have, you earned." },
   onelife = { name = "One Life", oneLife = true,
@@ -27,7 +25,7 @@ C.PRESETS = {
   dwarffound = { name = "Dwarf Found", dwarfOnly = true,
     rules = "Trade and group only with dwarves. Everyone else is a stranger." },
 }
-C.ORDER = { "slayer", "stoneskin", "selfmade", "onelife", "dwarffound" }
+C.ORDER = { "slayer", "selfmade", "onelife", "dwarffound" }
 
 C.STATUS = {
   active = "|cffffd040Under way|r", completed = "|cff40ff40Completed|r",
