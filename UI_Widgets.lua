@@ -143,7 +143,70 @@ function UI.MultiLine(parent, width, height, maxLetters)
 end
 
 -- Show a pick list next to `owner`. options = { {text=, value=}, ... }
+-- A picker with a search box, for long lists such as the guild roster.
+local picker
+local function buildPicker()
+  if picker then return picker end
+  picker = CreateFrame("Frame", "IronforgedPicker", UIParent, "BackdropTemplate")
+  picker:SetSize(280, 360)
+  picker:SetFrameStrata("FULLSCREEN_DIALOG")
+  picker:SetToplevel(true)
+  picker:EnableMouse(true)
+  picker:SetClampedToScreen(true)
+  UI.Backdrop(picker)
+  tinsert(UISpecialFrames, "IronforgedPicker")
+  picker.title = UI.Label(picker, "", "GameFontNormal")
+  picker.title:SetPoint("TOPLEFT", 12, -10)
+  local close = CreateFrame("Button", nil, picker, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", -2, -2)
+  picker.search = UI.EditBox(picker, 250, 40)
+  picker.search:SetPoint("TOPLEFT", 16, -32)
+  picker.hint = UI.Label(picker.search, "Type to search", "GameFontDisableSmall")
+  picker.hint:SetPoint("LEFT", 4, 0)
+  picker.list = UI.List(picker, 268, 300, { { title = "", width = 230, noSort = true } }, function(i)
+    local opt = picker.options and picker.options[i]
+    if opt then picker:Hide(); picker.onPick(opt.value, opt.text) end
+  end)
+  picker.list:SetPoint("TOPLEFT", 6, -54)
+  local function filter()
+    local q = (picker.search:GetText() or ""):lower()
+    picker.hint:SetShown(q == "")
+    local items = {}
+    for i, opt in ipairs(picker.options or {}) do
+      local t = tostring(opt.text or "")
+      if q == "" or t:lower():find(q, 1, true) then items[#items + 1] = { data = i, cols = { t } } end
+    end
+    picker.matches = items
+    picker.list.offset = 0
+    picker.list:SetItems(items, "No one by that name.")
+  end
+  picker.search:SetScript("OnTextChanged", filter)
+  picker.search:SetScript("OnEnterPressed", function()
+    local first = picker.matches and picker.matches[1]
+    if first then local opt = picker.options[first.data]; picker:Hide(); picker.onPick(opt.value, opt.text) end
+  end)
+  picker.search:SetScript("OnEscapePressed", function() picker:Hide() end)
+  picker.filter = filter
+  picker:Hide()
+  return picker
+end
+
+function UI.SearchPick(owner, options, onPick, title)
+  local p = buildPicker()
+  p.options, p.onPick = options, onPick
+  p.title:SetText(title or "Pick one")
+  p:ClearAllPoints()
+  if owner then p:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, -2) else p:SetPoint("CENTER") end
+  p.search:SetText("")
+  p.filter()
+  p:Show()
+  p.search:SetFocus()
+  return p
+end
+
 function UI.Pick(owner, options, onPick, title)
+  -- long lists (the roster) get a picker with a search box
+  if #options > 15 then UI.SearchPick(owner, options, onPick, title); return end
   if MenuUtil and MenuUtil.CreateContextMenu then
     MenuUtil.CreateContextMenu(owner, function(_, root)
       if title and root.CreateTitle then root:CreateTitle(title) end

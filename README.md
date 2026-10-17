@@ -45,7 +45,7 @@ Like Leatrix Plus: when a guildmate whispers you **inv**, you invite them to you
 
 The side list is split into three sections: **Guild Management** (Roster, Clans, Promotions, Events), **In Game** (Looking for Dwarf, Professions, Challenges) and **Roleplay** (Book of Grudges, War Hall, Titles, Backstory), with Settings at the bottom.
 
-Every list can be sorted: click a column title to sort by it, and click again to reverse.
+Every list can be sorted: click a column title to sort by it, and click again to reverse. Any pick-a-dwarf list with more than 15 names (inviting to a clan, giving a trial, awarding a title and so on) opens with a search box: type part of a name, then click it or press Enter for the first match.
 
 **Roster.** Every guildmate with rank, level, clan, title, race check and when they were last seen. Tick "Rule problems" to list only non-dwarves, and members flagged "(shamed)" for inviting a non-dwarf. "Scan races" looks up members who don't have the addon. Click a name for the full record: clan, titles, alts, who invited them, attendance, trials and backstory. Officers can edit the record and press **Manage**, which gives the `/gpromote`, `/gdemote` or `/gremove` command to copy and paste into chat.
 

@@ -843,6 +843,23 @@ check(not gbar:IsShown(), "no greeting bar for a non-dwarf")
 K.target = nil
 H.fire(K, "PLAYER_TARGET_CHANGED")
 
+-- Search picker for long lists
+local picked
+local many = {}
+for i = 1, 30 do many[#many + 1] = { text = "Dwarf" .. i, value = "v" .. i } end
+many[#many + 1] = { text = "Muradin", value = "Muradin-Forever" }
+A.ns.UI.Pick(nil, many, function(v) picked = v end, "Pick a dwarf")
+local pk = A.env.IronforgedPicker
+check(pk and pk:IsShown() and #pk.list.items == 31, "long lists open a picker with a search box")
+pk.search:SetText("mura"); pk.search.__scripts.OnTextChanged(pk.search)
+check(#pk.list.items == 1, "search narrows the list")
+pk.list.rows[1].__scripts.OnClick(pk.list.rows[1], "LeftButton")
+check(picked == "Muradin-Forever" and not pk:IsShown(), "clicking a match picks it")
+A.ns.UI.Pick(nil, many, function(v) picked = v end, "Pick a dwarf")
+pk.search:SetText("dwarf3"); pk.search.__scripts.OnTextChanged(pk.search)
+pk.search.__scripts.OnEnterPressed(pk.search)
+check(picked == "v3", "Enter picks the first match")
+
 -- Invite from whispers
 K.invites = {}
 H.fire(K, "CHAT_MSG_WHISPER", " INV ", "Dagna-Forever")
