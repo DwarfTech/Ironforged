@@ -2,7 +2,7 @@
 ## Title: |cffd4a017Ironforged|r
 ## Notes: Dwarven guild management and roleplay: roster, clans, promotion trials, events, backstories, the Book of Grudges, a profession directory and Looking for Dwarf. Syncs between guildmates.
 ## Author: Firebird Bronze
-## Version: 2.11.2
+## Version: 2.11.3
 ## SavedVariables: IronforgedDB
 ## IconTexture: Interface\AddOns\Ironforged\Media\Hammer64
 ## AddonCompartmentFunc: Ironforged_OnAddonCompartmentClick

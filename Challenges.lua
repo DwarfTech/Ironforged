@@ -238,14 +238,14 @@ function C.Enforce()
         warned[slot] = nil
       end
     end
-    if p.pvp then C.KeepFlagged(p.name) end
+    if p.pvp then C.KeepFlagged(p.name, c.key) end
   end
 end
 
 -- Slayer: PvP stays on. Turning it off (/pvp, the portrait menu, anything) is undone at once.
 -- "Desired" is the setting the game remembers; the flag itself lingers for a few minutes after
 -- it's turned off, so the setting is what gets checked.
-local lastFlagMsg, lastAskMsg = 0, 0
+local lastFlagMsg = 0
 C.pvpLog = {} -- what the last attempts did, for /hold pvp
 
 local function isFlagged()
@@ -278,36 +278,52 @@ function C.TurnPvPOn(knownOff)
   return nil
 end
 
-function C.KeepFlagged(name)
+-- PvP counts as on when the setting is on (or, if the game won't say, when the flag is up).
+local function pvpOn()
   local desired, flagged = isFlagged()
-  if desired and flagged ~= false then return end
-  if desired == nil and flagged then return end -- can't read the setting; the flag is on, so leave it
-  while #C.pvpLog > 12 do table.remove(C.pvpLog, 1) end
-  local used = C.TurnPvPOn(desired == false or (desired == nil and flagged == false))
+  if desired ~= nil then return desired and true or false end
+  return flagged and true or false
+end
+C.PVP_GRACE = 60
+local unflaggedSince
+
+function C.KeepFlagged(name, key)
+  if pvpOn() then unflaggedSince = nil; return end
+  if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return end
   local now = GetTime and GetTime() or 0
-  -- check a moment later whether it took; if not, ask them to do it by hand
-  if C_Timer then
-    C_Timer.After(1.5, function()
-      local d2, f2 = isFlagged()
-      if d2 or f2 then
-        if now - lastFlagMsg > 30 or lastFlagMsg == 0 then
-          lastFlagMsg = now
-          ns.Print("|cffd4a017" .. name .. ":|r your PvP flag stays on for the whole challenge.")
-        end
-        return
-      end
-      C.pvpLog[#C.pvpLog + 1] = (used or "nothing") .. " did not turn PvP on"
-      local t = GetTime and GetTime() or 0
-      if t - lastAskMsg > 60 or lastAskMsg == 0 then
-        lastAskMsg = t
-        ns.Print("|cffff4040" .. name .. ":|r the game won't let the addon flag you. Type |cffffd040/pvp|r now and keep it on.")
-        if ns.UI and ns.UI.Notice then
-          ns.UI.Notice({ id = "pvp", icon = "Interface\\Icons\\Ability_DualWield", title = name .. ": PvP",
-            text = "You must stay flagged for PvP.\nType |cffffd040/pvp|r in chat to turn it on.", buttons = { { text = "OK" } } })
-        end
-      end
-    end)
+  -- out of time: the challenge fails
+  if unflaggedSince and now - unflaggedSince >= C.PVP_GRACE then
+    unflaggedSince = nil
+    if key then C.Fail(key, "Wasn't flagged for PvP at level " .. level() .. ".") end
+    return
   end
+  while #C.pvpLog > 12 do table.remove(C.pvpLog, 1) end
+  local desired, flagged = isFlagged()
+  local used = C.TurnPvPOn(desired == false or (desired == nil and flagged == false))
+  if not C_Timer then return end
+  C_Timer.After(1.5, function()
+    if pvpOn() then
+      unflaggedSince = nil
+      if now - lastFlagMsg > 30 or lastFlagMsg == 0 then
+        lastFlagMsg = now
+        ns.Print("|cffd4a017" .. name .. ":|r your PvP flag stays on for the whole challenge.")
+      end
+      return
+    end
+    C.pvpLog[#C.pvpLog + 1] = (used or "nothing") .. " did not turn PvP on"
+    if unflaggedSince then return end -- already warned; the timer is running
+    unflaggedSince = GetTime and GetTime() or 0
+    ns.Print("|cffff4040" .. name .. ":|r you're not flagged for PvP. Type |cffffd040/pvp|r within " .. C.PVP_GRACE ..
+      " seconds or the challenge fails.")
+    if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
+    if ns.UI and ns.UI.Notice then
+      ns.UI.Notice({ id = "pvp", icon = "Interface\\Icons\\Ability_DualWield", title = name .. ": flag for PvP",
+        text = "Type |cffffd040/pvp|r in chat within " .. C.PVP_GRACE .. " seconds, or the " .. name .. " challenge fails.",
+        buttons = { { text = "OK" } }, timeout = C.PVP_GRACE })
+    end
+    -- come back when the time is up
+    C_Timer.After(C.PVP_GRACE + 1, function() pcall(C.Enforce) end)
+  end)
 end
 
 -- /hold pvp: what the PvP functions report on this server.
@@ -336,7 +352,7 @@ ns.RegisterEvent("ADDON_ACTION_FORBIDDEN", function(addon, fn) if addon == ADDON
 
 local function pvpChanged()
   for _, c in ipairs(C.MyEnforced()) do
-    if c.preset.pvp then C.KeepFlagged(c.preset.name); return end
+    if c.preset.pvp then C.KeepFlagged(c.preset.name, c.key); return end
   end
 end
 if hooksecurefunc then

@@ -681,10 +681,14 @@ check(K.pvp == true, "/pvp can't turn it off either")
 local realSet = K.env.SetPVP
 K.env.SetPVP = function() end
 K.pvp = false
-K.ns.Challenges.KeepFlagged("Slayer"); H.run(3)
+K.ns.Challenges.Enforce(); H.run(3)
 local asked = false
-for _, m in ipairs(K.chat) do if m:find("Type |cffffd040/pvp|r", 1, true) then asked = true end end
+for _, m in ipairs(K.chat) do if m:find("Type |cffffd040/pvp|r within", 1, true) then asked = true end end
 check(asked, "asks for /pvp when the addon can't flag")
+check(K.ns.Data.Get("challenges", slayer2).status == "active", "a minute to flag before failing")
+H.run(70)
+local s2 = K.ns.Data.Get("challenges", slayer2)
+check(s2.status == "failed" and s2.reason:find("PvP", 1, true), "Slayer fails if not flagged within a minute")
 K.env.SetPVP = realSet
 K.env.SlashCmdList.IRONFORGED("pvp"); H.run(3)
 check(K.pvp == true, "/hold pvp flags and reports")
