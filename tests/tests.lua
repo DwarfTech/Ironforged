@@ -716,33 +716,32 @@ K.env.SlashCmdList.IRONFORGED("pvp")
 check(pvpCalls == 0, "/hold pvp only reports")
 K.env.SetPVP, K.env.TogglePVP = realSet, realToggle
 
--- audit: experience gained while Ironforged was off flags the challenge
+-- audit: experience gained while Ironforged was off leaves a quiet note on the challenge
 K.level, K.xp = 20, 100
 local ak = CK.Start(nil, "Audit Me", "Play fair.")
 H.run(2)
 CK.SaveSnapshot()
+local chatBefore = #A.chat
 K.xp = 900 -- played with the addon off: no events seen
 CK.Audit(true); H.run(2)
 local ad = D.ns.Data.Get("challenges", ak)
-check(ad.flags == 1 and ad.audit:find("level 20 to 20", 1, true), "XP gained with the addon off flags the challenge")
-check(A.ns.Challenges.Label(ad):find("FLAGGED", 1, true), "flag shows on the tooltip label")
-local toldOfficer = false
-for _, m in ipairs(A.chat) do if m:find("Challenge audit", 1, true) and m:find("Kurdran", 1, true) then toldOfficer = true end end
-check(toldOfficer, "guildmates told about the flag")
+check(ad.flags == 1 and ad.audit:find("level 20 to 20", 1, true), "XP gained with the addon off leaves a note")
+local announced = false
+for i = chatBefore + 1, #A.chat do if A.chat[i]:find("Audit Me", 1, true) or A.chat[i]:find("without Ironforged", 1, true) then announced = true end end
+check(not announced, "nothing is announced")
+check(not A.ns.Challenges.Label(ad):find("FLAG", 1, true), "nothing on the tooltip")
 CK.Audit(true); H.run(2)
-check(D.ns.Data.Get("challenges", ak).flags == 1, "no new flag when nothing was missed")
-check(not K.ns.Challenges.ClearFlag(ak), "can't clear your own flag")
-check(A.ns.Challenges.ClearFlag(ak), "an officer clears the flag"); H.run(2)
-check(D.ns.Data.Get("challenges", ak).flags == 0, "flag cleared everywhere")
+check(D.ns.Data.Get("challenges", ak).flags == 1, "no new note when nothing was missed")
 -- another computer (no snapshot here): XP within the same level isn't counted, a new level is
 K.ns.db.xpSnap = nil
 K.xp = 1500
 CK.Audit(true); H.run(2)
-check(D.ns.Data.Get("challenges", ak).flags == 0, "same level on another computer: not flagged")
+check(D.ns.Data.Get("challenges", ak).flags == 1, "same level on another computer: no note")
 K.ns.db.xpSnap = nil
 K.level = 22
 CK.Audit(true); H.run(2)
-check(D.ns.Data.Get("challenges", ak).flags == 1, "levels gained with the addon off: flagged")
+local ad2 = D.ns.Data.Get("challenges", ak)
+check(ad2.flags == 2 and ad2.audit:find("level 20 to 22", 1, true), "levels gained with the addon off: noted")
 CK.Abandon(ak); H.run(1)
 K.level, K.xp = 1, 0
 

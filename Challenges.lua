@@ -158,8 +158,7 @@ function C.Showing(member)
 end
 
 function C.Label(d)
-  return d.name .. " (from level " .. tostring(d.startLevel or "?") .. (d.status == "completed" and ", completed" or "") .. ")" ..
-    (C.Flagged(d) and " |cffff4040FLAGGED|r" or "")
+  return d.name .. " (from level " .. tostring(d.startLevel or "?") .. (d.status == "completed" and ", completed" or "") .. ")"
 end
 
 function C.Abandon(key)
@@ -428,7 +427,7 @@ end)
 -- Experience only goes up by playing, so each character keeps a snapshot of its level and XP:
 -- on this computer (saved when you log out) and in the synced challenge record (every few minutes
 -- and at each level). If you log in with more XP than the addon last saw, you played without it,
--- and every challenge under way is flagged for the officers.
+-- and a note is added to each challenge under way. Nothing is announced.
 ----------------------------------------------------------------------
 local function xpNow() return level(), (UnitXP and UnitXP("player")) or 0 end
 
@@ -480,21 +479,16 @@ function C.Audit(force)
         refLv, refXp, exact = tonumber(d.lvl), tonumber(d.xp), false -- another computer: go by level
       end
       if refLv and (lv > refLv or (exact and lv == refLv and xp > (refXp or 0))) then
+        -- a quiet note on the challenge itself; nothing is announced
         local note = "Played without Ironforged: level " .. refLv .. " to " .. lv .. " (" .. ns.FormatDate(ns.Now()) .. ")."
-        update(k, { flags = (tonumber(d.flags) or 0) + 1, audit = note, lvl = lv, xp = xp, seen = ns.Now() })
-        ns.Print("|cffff4040Challenge audit:|r you gained experience on " .. d.name ..
-          " while Ironforged was off. It's flagged for the officers.")
+        local notes = (type(d.audit) == "string" and d.audit ~= "") and (d.audit .. "\n" .. note) or note
+        if #notes > 400 then notes = notes:sub(-400) end
+        update(k, { flags = (tonumber(d.flags) or 0) + 1, audit = notes, lvl = lv, xp = xp, seen = ns.Now() })
       end
     end
   end
   C.SaveSnapshot()
   pushProgress(true)
-end
-
--- Officers clear a flag once they're satisfied.
-function C.ClearFlag(key)
-  if not ns.IAmOfficer() or Data.SplitKey(key) == ns.PlayerName() then return false end
-  return update(key, { flags = 0, audit = "" })
 end
 
 function C.Flagged(d) return (tonumber(d.flags) or 0) > 0 end
@@ -528,19 +522,9 @@ end)
 -- Tell the guild (addon users) when a challenge starts, fails or is completed. No chat.
 ----------------------------------------------------------------------
 local lastStatus = {}
-local lastFlags = {}
 ns.On("DATA_CHANGED", function(coll, key)
   if coll ~= "challenges" or not key then return end
-  local fd = Data.Get("challenges", key)
-  if fd then
-    local n = tonumber(fd.flags) or 0
-    local member = Data.SplitKey(key)
-    local fresh = lastFlags[key] == nil and ns.Now() - (tonumber(fd.seen) or 0) < 600
-    if n > 0 and (fresh or (lastFlags[key] and n > lastFlags[key])) and member ~= ns.PlayerName() then
-      ns.Print("|cffff4040Challenge audit:|r " .. ns.ShortName(member) .. " played " .. fd.name .. " with Ironforged off. " .. (fd.audit or ""))
-    end
-    lastFlags[key] = n
-  end
+
   local d = Data.Get("challenges", key)
   local member = Data.SplitKey(key)
   if d and member == ns.PlayerName() and lastStatus[key] == "active" and d.status ~= "active" and d.judgedBy and d.judgedBy ~= member then

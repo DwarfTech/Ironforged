@@ -52,7 +52,7 @@ local function showChallenge(key)
   }
   if d.ended then lines[#lines + 1] = "|cffd4a017Ended:|r " .. ns.FormatDate(d.ended) end
   if d.reason and d.reason ~= "" then lines[#lines + 1] = "|cffd4a017Why:|r " .. d.reason end
-  if C.Flagged(d) then lines[#lines + 1] = "|cffff4040Flagged:|r " .. (d.audit or "Played with Ironforged turned off.") end
+  if C.Flagged(d) and d.audit and d.audit ~= "" then lines[#lines + 1] = "|cffd4a017Note:|r " .. d.audit end
   -- ready-made challenges show today's rules (older records saved "Start at level 1")
   local rules = (d.preset and C.PRESETS[d.preset] and C.PRESETS[d.preset].rules) or d.rules
   if rules and rules ~= "" then lines[#lines + 1] = " "; lines[#lines + 1] = rules end
@@ -90,7 +90,7 @@ local function refresh(f)
       items[#items + 1] = {
         data = c.key,
         keys = { [2] = d.ts or 0, [3] = d.startLevel or 0, [4] = d.lvl or 0 },
-        cols = { (C.Flagged(d) and "|cffff4040!|r " or "") .. d.name .. (d.preset and " |cff999999(enforced)|r" or ""), ns.FormatDate(d.ts),
+        cols = { d.name .. (d.preset and " |cff999999(enforced)|r" or ""), ns.FormatDate(d.ts),
           d.startLevel or "", d.lvl or "", C.STATUS[d.status] or "" },
       }
     end
