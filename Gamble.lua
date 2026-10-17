@@ -58,7 +58,7 @@ local function broadcast()
     if not g then return end
     ns.Comm.Send({ op = "XS", id = g.id, amount = g.amount, channel = g.channel, phase = g.phase,
       order = g.order, rolls = g.rolls, tie = g.tie, tieRolls = g.tieRolls,
-      high = g.high, low = g.low, owed = g.owed }, "GUILD")
+      high = g.high, low = g.low, owed = g.owed, kw = g.kw }, "GUILD")
   end
   if C_Timer then C_Timer.After(0.3, run) else run() end
 end
@@ -84,6 +84,11 @@ function G.Open(amount, channel)
   G.game = { id = string.format("%x", ns.Hash(me .. ns.Now()) % 0xFFFFFF), host = me, amount = amount, channel = channel,
     phase = "open", players = {}, order = {}, rolls = {}, tie = {}, tieRolls = {} }
   say("Ironforged Cross Gambling: " .. amount .. "g! Type 1 to join, -1 to leave.", channel)
+  -- tell the guild how to get into the raid
+  local word = ns.AutoInvite and ns.AutoInvite.Word() or "inv"
+  G.game.kw = word
+  say("Ironforged Cross Gambling: " .. amount .. "g in " .. ns.CharName(me, false) .. "'s raid! Whisper " ..
+    ns.CharName(me, false) .. " \"" .. word .. "\" for an invite, then type 1 in raid chat to join.", "GUILD")
   changed()
 end
 
@@ -280,6 +285,19 @@ function G.Roll()
   end
 end
 
+-- Not in the host's raid yet: whisper the host their invite keyword.
+function G.AskInvite()
+  local g = G.game
+  if not g or not g.host then return end
+  local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+  local target = ns.CharName(g.host)
+  if send and pcall(send, g.kw or "inv", "WHISPER", nil, target) then
+    ns.Print("Asked " .. first(g.host) .. " for an invite. Type 1 in raid chat once you're in.")
+  else
+    ns.Print("Whisper " .. first(g.host) .. " \"" .. (g.kw or "inv") .. "\" for an invite.")
+  end
+end
+
 function G.IAmIn()
   local g = G.game
   if not g then return false end
@@ -322,7 +340,8 @@ ns.On("GAMBLE_STATE", function(host, msg)
   local fresh = not G.game or G.game.id ~= msg.id
   G.game = { id = msg.id, host = host, amount = tonumber(msg.amount) or 0, channel = "RAID",
     phase = msg.phase, order = msg.order, rolls = msg.rolls, tie = msg.tie or {}, tieRolls = msg.tieRolls or {},
-    high = msg.high, low = msg.low, owed = msg.owed, players = {} }
+    high = msg.high, low = msg.low, owed = msg.owed, players = {},
+    kw = type(msg.kw) == "string" and msg.kw:sub(1, 20) or "inv" }
   for _, n in ipairs(msg.order) do G.game.players[n] = true end
   ns.Fire("GAMBLE", fresh)
 end)

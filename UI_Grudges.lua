@@ -171,17 +171,15 @@ UI.RegisterTab("grudges", "Book of Grudges", build, refresh)
 ----------------------------------------------------------------------
 local doom
 
--- A unit token for the foe right now, if they are targeted, moused over or on a nameplate.
-local function findFoeUnit(foe)
-  local key = ns.NameKey(foe)
-  local units = { "target", "mouseover", "focus" }
-  for i = 1, 40 do units[#units + 1] = "nameplate" .. i end
-  for _, u in ipairs(units) do
-    if UnitExists and UnitExists(u) then
-      local n = ns.UnitDisplayName(u)
-      if n and ns.NameKey(n) == key then return u end
-    end
-  end
+-- Blizzard blocks addons from doing emotes themselves, so the /doom button is a secure macro
+-- button: the click is yours, and the game runs "/doom Name" as if you typed it. Secure buttons
+-- can't be changed, shown or hidden in combat, so a sighting in combat waits until combat ends.
+local hidePending, pendingDoom = false, nil
+local function inCombat() return InCombatLockdown and InCombatLockdown() end
+
+local function hideDoom()
+  if not doom then return end
+  if inCombat() then hidePending = true else doom:Hide() end
 end
 
 local function buildDoom()
@@ -212,29 +210,48 @@ local function buildDoom()
   doom.sub:SetMaxLines(3)
   local close = CreateFrame("Button", nil, doom, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -4, -4)
-  doom.go = UI.Button(doom, "/doom them", 120, 26, function()
-    local foe = doom.foe
-    if foe and DoEmote then
-      local unit = findFoeUnit(foe)
-      pcall(DoEmote, "DOOM", unit or ns.ShortName(foe):match("^(%S+)"))
-    end
-    doom:Hide()
-  end)
-  doom.go:SetPoint("BOTTOMLEFT", 18, 16)
-  doom.no = UI.Button(doom, "Not now", 96, 26, function() doom:Hide() end)
+  close:SetScript("OnClick", hideDoom)
+  local go = CreateFrame("Button", "IronforgedDoomButton", doom, "SecureActionButtonTemplate,BackdropTemplate")
+  UI.StyleButton(go)
+  go:SetSize(120, 26)
+  go:SetText("/doom them")
+  go:RegisterForClicks("AnyUp", "AnyDown")
+  go:SetAttribute("type", "macro")
+  go:SetScript("PostClick", function() hideDoom() end)
+  go:SetPoint("BOTTOMLEFT", 18, 16)
+  doom.go = go
+  doom.no = UI.Button(doom, "Not now", 96, 26, hideDoom)
   doom.no:SetPoint("LEFT", doom.go, "RIGHT", 8, 0)
   doom:Hide()
   return doom
 end
 
-ns.On("GRUDGE_NEAR", function(foe, deed, count)
-  if not ns.settings or ns.settings.doomPopup == false then return end
+local function showDoom(foe, deed, count)
   local d = buildDoom()
   d.foe = foe
+  -- the emote finds them by their character name
+  local who = ns.CharName(foe, false)
+  d.go:SetAttribute("macrotext", "/doom " .. who)
   d.sub:SetText("|cffff8060" .. foe .. "|r" .. ((deed and deed ~= "") and (": " .. deed) or "") ..
     ((count or 1) > 1 and ("  |cff999999(+" .. (count - 1) .. " more)|r") or ""))
   d:Show()
   d.shownAt = GetTime and GetTime() or 0
   local at = d.shownAt
-  if C_Timer then C_Timer.After(30, function() if d.shownAt == at then d:Hide() end end) end
+  if C_Timer then C_Timer.After(30, function() if d.shownAt == at then hideDoom() end end) end
+end
+
+ns.On("GRUDGE_NEAR", function(foe, deed, count)
+  if not ns.settings or ns.settings.doomPopup == false then return end
+  if inCombat() then
+    pendingDoom = { foe = foe, deed = deed, count = count, at = GetTime and GetTime() or 0 }
+    return
+  end
+  showDoom(foe, deed, count)
+end)
+
+ns.RegisterEvent("PLAYER_REGEN_ENABLED", function()
+  if hidePending and doom then hidePending = false; doom:Hide() end
+  local p = pendingDoom
+  pendingDoom = nil
+  if p and (GetTime and GetTime() or 0) - p.at < 60 then showDoom(p.foe, p.deed, p.count) end
 end)

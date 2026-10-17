@@ -110,7 +110,7 @@ function C.Start(presetId, name, rules)
   end
   local key = me .. "#" .. string.format("%x", ns.Stamp())
   local ok = Data.Put("challenges", key, { name = name, rules = rules, preset = presetId, ts = ns.Now(),
-    startLevel = level(), lvl = level(), status = "active" })
+    startLevel = level(), lvl = level(), xp = (UnitXP and UnitXP("player")) or 0, seen = ns.Now(), status = "active" })
   if ok then
     ns.Print("|cffd4a017Challenge accepted:|r " .. name .. ". " .. (preset and "The addon will hold you to it." or "On your honor."))
     if preset then C.Enforce() end
@@ -158,7 +158,8 @@ function C.Showing(member)
 end
 
 function C.Label(d)
-  return d.name .. " (from level " .. tostring(d.startLevel or "?") .. (d.status == "completed" and ", completed" or "") .. ")"
+  return d.name .. " (from level " .. tostring(d.startLevel or "?") .. (d.status == "completed" and ", completed" or "") .. ")" ..
+    (C.Flagged(d) and " |cffff4040FLAGGED|r" or "")
 end
 
 function C.Abandon(key)
@@ -415,11 +416,95 @@ ns.RegisterEvent("PLAYER_LEVEL_UP", function(newLevel)
       if d.preset and lvl >= C.MaxLevel() then
         C.Complete(k, lvl)
       else
-        update(k, { lvl = lvl })
+        update(k, { lvl = lvl, xp = 0, seen = ns.Now() })
       end
     end
   end
+  C.SaveSnapshot()
 end)
+
+----------------------------------------------------------------------
+-- Audit: playing a challenge with Ironforged turned off.
+-- Experience only goes up by playing, so each character keeps a snapshot of its level and XP:
+-- on this computer (saved when you log out) and in the synced challenge record (every few minutes
+-- and at each level). If you log in with more XP than the addon last saw, you played without it,
+-- and every challenge under way is flagged for the officers.
+----------------------------------------------------------------------
+local function xpNow() return level(), (UnitXP and UnitXP("player")) or 0 end
+
+-- Level and XP at the moment of logging in, before anything this session could change them.
+local loginLv, loginXp
+local audited = false
+ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
+  if not loginLv and level() > 0 then loginLv, loginXp = xpNow() end
+end)
+
+function C.SaveSnapshot()
+  if not audited then return end -- keep last session's snapshot until it has been checked
+  local me = ns.PlayerName()
+  if not me or not ns.db then return end
+  ns.db.xpSnap = ns.db.xpSnap or {}
+  local lv, xp = xpNow()
+  ns.db.xpSnap[me] = { lv = lv, xp = xp, t = ns.Now() }
+end
+
+local lastPush = 0
+local function pushProgress(force)
+  local now = GetTime and GetTime() or 0
+  if not force and now - lastPush < 300 then return end
+  lastPush = now
+  local me = ns.PlayerName()
+  local lv, xp = xpNow()
+  for k, d in Data.Each("challenges") do
+    if Data.SplitKey(k) == me and d.status == "active" and (d.lvl ~= lv or d.xp ~= xp) then
+      update(k, { lvl = lv, xp = xp, seen = ns.Now() })
+    end
+  end
+end
+
+function C.Audit(force)
+  if audited and not force then return end
+  local me = ns.PlayerName()
+  if not me or not Data.Ready() or level() < 1 then return end
+  audited = true
+  local lv, xp = loginLv, loginXp
+  if force or not lv then lv, xp = xpNow() end
+  local snap = ns.db and ns.db.xpSnap and ns.db.xpSnap[me]
+  for k, d in Data.Each("challenges") do
+    if Data.SplitKey(k) == me and d.status == "active" then
+      -- compare with whichever the addon saw last: this computer's snapshot or the synced record
+      local refLv, refXp, exact
+      if snap and (snap.t or 0) >= (tonumber(d.seen or d.ts) or 0) then
+        refLv, refXp, exact = snap.lv, snap.xp, true
+      else
+        refLv, refXp, exact = tonumber(d.lvl), tonumber(d.xp), false -- another computer: go by level
+      end
+      if refLv and (lv > refLv or (exact and lv == refLv and xp > (refXp or 0))) then
+        local note = "Played without Ironforged: level " .. refLv .. " to " .. lv .. " (" .. ns.FormatDate(ns.Now()) .. ")."
+        update(k, { flags = (tonumber(d.flags) or 0) + 1, audit = note, lvl = lv, xp = xp, seen = ns.Now() })
+        ns.Print("|cffff4040Challenge audit:|r you gained experience on " .. d.name ..
+          " while Ironforged was off. It's flagged for the officers.")
+      end
+    end
+  end
+  C.SaveSnapshot()
+  pushProgress(true)
+end
+
+-- Officers clear a flag once they're satisfied.
+function C.ClearFlag(key)
+  if not ns.IAmOfficer() or Data.SplitKey(key) == ns.PlayerName() then return false end
+  return update(key, { flags = 0, audit = "" })
+end
+
+function C.Flagged(d) return (tonumber(d.flags) or 0) > 0 end
+
+ns.RegisterEvent("PLAYER_XP_UPDATE", function(unit)
+  if unit and unit ~= "player" then return end
+  C.SaveSnapshot()
+  pushProgress(false)
+end)
+ns.RegisterEvent("PLAYER_LOGOUT", function() C.SaveSnapshot() end)
 
 -- Records saved before challenges could start at any level say "Start at level 1." in their rules.
 -- Each member's client rewrites its own to today's wording.
@@ -436,14 +521,26 @@ end
 ns.On("DATA_READY", function()
   if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(10, function() pcall(C.Enforce); pcall(C.CheckGroup) end) end
   if C_Timer then C_Timer.After(15, function() pcall(C.RefreshOldRules) end) end
+  if C_Timer then C_Timer.After(20, function() pcall(C.Audit) end) end
 end)
 
 ----------------------------------------------------------------------
 -- Tell the guild (addon users) when a challenge starts, fails or is completed. No chat.
 ----------------------------------------------------------------------
 local lastStatus = {}
+local lastFlags = {}
 ns.On("DATA_CHANGED", function(coll, key)
   if coll ~= "challenges" or not key then return end
+  local fd = Data.Get("challenges", key)
+  if fd then
+    local n = tonumber(fd.flags) or 0
+    local member = Data.SplitKey(key)
+    local fresh = lastFlags[key] == nil and ns.Now() - (tonumber(fd.seen) or 0) < 600
+    if n > 0 and (fresh or (lastFlags[key] and n > lastFlags[key])) and member ~= ns.PlayerName() then
+      ns.Print("|cffff4040Challenge audit:|r " .. ns.ShortName(member) .. " played " .. fd.name .. " with Ironforged off. " .. (fd.audit or ""))
+    end
+    lastFlags[key] = n
+  end
   local d = Data.Get("challenges", key)
   local member = Data.SplitKey(key)
   if d and member == ns.PlayerName() and lastStatus[key] == "active" and d.status ~= "active" and d.judgedBy and d.judgedBy ~= member then

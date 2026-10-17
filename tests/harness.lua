@@ -186,7 +186,13 @@ local function makeClient(shortName, race, fullName)
       table.insert(H.bus, { from = H.charName(client.full), prefix = prefix, text = text, channel = channel, target = target })
       return 0
     end,
-    SendChatMessage = function(text, channel)
+    SendChatMessage = function(text, channel, lang, target)
+      if channel == "WHISPER" then
+        assert(not target:find(" "), "chat whisper to a name with a space: " .. target)
+        H.whisperBus = H.whisperBus or {}
+        table.insert(H.whisperBus, { from = H.charName(client.full), to = target, text = text })
+        return
+      end
       table.insert(client.guildChat, text)
       if channel == "GUILD" then H.guildBus = H.guildBus or {}; table.insert(H.guildBus, { from = client.full, text = text }) end
       if channel == "RAID" and client.inRaid then H.raidBus = H.raidBus or {}; table.insert(H.raidBus, { from = client.full, text = text }) end
@@ -239,6 +245,8 @@ local function makeClient(shortName, race, fullName)
   }
   client.level, client.equip, client.pvp, client.closed = 1, {}, false, {}
   env.UnitLevel = function(u) if u == "player" then return client.level end return 1 end
+  client.xp = 0
+  env.UnitXP = function(u) return client.xp end
   env.GetInventoryItemID = function(u, slot) return client.equip[slot] end
   env.ClearCursor = function() client.cursor = nil end
   env.CursorHasItem = function() return client.cursor ~= nil end
@@ -258,8 +266,10 @@ local function makeClient(shortName, race, fullName)
   client.inRaid = false
   env.IsInGroup = function() return client.inGroup or client.inRaid end
   env.IsInRaid = function() return client.inRaid end
+  env.UnitIsGroupLeader = function(u) return client.leader and true or false end
   env.UnitExists = env.UnitExists or function(u) return client.units[u] ~= nil end
   env.LeaveParty = function() client.left = true end -- the game drops the group a moment later
+  env.C_PartyInfo = env.C_PartyInfo or {}
   env.DeclineGroup = function() client.declined = true end
   client.rollQueue = {}
   client.emotes = {}
@@ -333,6 +343,11 @@ function H.step(dt)
   H.guildBus = {}
   for _, m in ipairs(gb) do
     for _, c in pairs(H.clients) do H.fire(c, "CHAT_MSG_GUILD", m.text, m.from) end
+  end
+  local wb = H.whisperBus or {}
+  H.whisperBus = {}
+  for _, m in ipairs(wb) do
+    for full, c in pairs(H.clients) do if H.charName(full) == m.to then H.fire(c, "CHAT_MSG_WHISPER", m.text, m.from) end end
   end
   local raidb = H.raidBus or {}
   H.raidBus = {}

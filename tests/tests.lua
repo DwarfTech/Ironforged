@@ -321,9 +321,10 @@ for _, m in ipairs(D.chat) do if m:find("Kurdran sees Grubnak in Arathi Highland
 check(nearMsg, "alert when you see a grudged foe")
 local doomF = K.env.IronforgedDoomFrame
 check(doomF ~= nil and doomF:IsShown(), "doom popup when a grudged foe is near")
-if doomF then doomF.go.__scripts.OnClick(doomF.go) end
-check(#K.emotes == 1 and K.emotes[1].token == "DOOM" and K.emotes[1].target == "nameplate1", "/doom aimed at the foe")
-check(doomF and not doomF:IsShown(), "doom popup closes after emoting")
+check(doomF.go:GetAttribute("type") == "macro" and doomF.go:GetAttribute("macrotext") == "/doom Grubnak", "/doom is a secure macro aimed at the foe")
+if doomF then doomF.go.__scripts.PostClick(doomF.go) end
+check(#K.emotes == 0, "the addon never emotes by itself (Blizzard blocks it)")
+check(doomF and not doomF:IsShown(), "doom popup closes after the click")
 check(guildMsg, "guild told who spotted the foe and where")
 local function countMsgs(chat, needle) local n = 0; for _, m in ipairs(chat) do if m:find(needle, 1, true) then n = n + 1 end end; return n end
 H.run(400)
@@ -459,11 +460,28 @@ check(afterCount == beforeCount + 2 and #A.guildChat > 0 and A.guildChat[#A.guil
 check(D.ns.Gamble._parseRoll("Kurdran rolls 57 (1-100)") == "Kurdran", "roll message parsed")
 A.ns.Gamble.Open(100)
 check(not A.ns.Gamble.game, "no game outside a raid")
-A.inRaid, K.inRaid, D.inRaid, M.inRaid = true, true, true, true
+A.inRaid, K.inRaid, D.inRaid, M.inRaid = true, true, true, false
+A.leader = true
+A.invites = {}
+A.ns.settings.autoInvite = false -- hosting overrides it
 A.ns.Gamble.Open(100)
 H.run(2)
-check(A.guildChat[#A.guildChat]:find("Type 1 to join", 1, true), "game opened in raid chat")
-check(not (Hh.env.IronforgedGambleFrame and Hh.env.IronforgedGambleFrame:IsShown()), "no popup for guildmates outside the raid")
+local raidPost, guildPost = false, false
+for _, m in ipairs(A.guildChat) do
+  if m:find("Type 1 to join", 1, true) then raidPost = true end
+  if m:find("Whisper Thorin \"inv\" for an invite", 1, true) then guildPost = true end
+end
+check(raidPost, "game opened in raid chat")
+check(guildPost, "guild told to whisper inv to get into the raid")
+local mpop = M.env.IronforgedGambleFrame
+check(mpop and mpop:IsShown() and mpop.ask:IsShown() and not mpop.join:IsShown(), "outside the raid: popup offers Ask for invite")
+mpop.ask.__scripts.OnClick(mpop.ask)
+H.run(2)
+check(A.invites[#A.invites] == "Muradin-Forever", "asking whispers inv and the host invites")
+M.inRaid = true
+H.fire(M, "GROUP_ROSTER_UPDATE")
+check(mpop.join:IsShown() and not mpop.ask:IsShown(), "in the raid: popup offers Join")
+A.ns.settings.autoInvite = true
 check(K.env.IronforgedGambleFrame and K.env.IronforgedGambleFrame:IsShown(), "guildmates get the gambling popup")
 K.ns.Gamble.Join(); D.ns.Gamble.Join(); M.ns.Gamble.Join(); A.ns.Gamble.Join()
 H.run(2)
@@ -697,6 +715,36 @@ check(pvpCalls == 0, "still no protected calls")
 K.env.SlashCmdList.IRONFORGED("pvp")
 check(pvpCalls == 0, "/hold pvp only reports")
 K.env.SetPVP, K.env.TogglePVP = realSet, realToggle
+
+-- audit: experience gained while Ironforged was off flags the challenge
+K.level, K.xp = 20, 100
+local ak = CK.Start(nil, "Audit Me", "Play fair.")
+H.run(2)
+CK.SaveSnapshot()
+K.xp = 900 -- played with the addon off: no events seen
+CK.Audit(true); H.run(2)
+local ad = D.ns.Data.Get("challenges", ak)
+check(ad.flags == 1 and ad.audit:find("level 20 to 20", 1, true), "XP gained with the addon off flags the challenge")
+check(A.ns.Challenges.Label(ad):find("FLAGGED", 1, true), "flag shows on the tooltip label")
+local toldOfficer = false
+for _, m in ipairs(A.chat) do if m:find("Challenge audit", 1, true) and m:find("Kurdran", 1, true) then toldOfficer = true end end
+check(toldOfficer, "guildmates told about the flag")
+CK.Audit(true); H.run(2)
+check(D.ns.Data.Get("challenges", ak).flags == 1, "no new flag when nothing was missed")
+check(not K.ns.Challenges.ClearFlag(ak), "can't clear your own flag")
+check(A.ns.Challenges.ClearFlag(ak), "an officer clears the flag"); H.run(2)
+check(D.ns.Data.Get("challenges", ak).flags == 0, "flag cleared everywhere")
+-- another computer (no snapshot here): XP within the same level isn't counted, a new level is
+K.ns.db.xpSnap = nil
+K.xp = 1500
+CK.Audit(true); H.run(2)
+check(D.ns.Data.Get("challenges", ak).flags == 0, "same level on another computer: not flagged")
+K.ns.db.xpSnap = nil
+K.level = 22
+CK.Audit(true); H.run(2)
+check(D.ns.Data.Get("challenges", ak).flags == 1, "levels gained with the addon off: flagged")
+CK.Abandon(ak); H.run(1)
+K.level, K.xp = 1, 0
 
 -- old records that said "Start at level 1" get today's wording
 local oldKey = "Kurdran-Forever#old1"

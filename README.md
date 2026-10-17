@@ -15,7 +15,7 @@ Officers press **Call for Cheers!** at the top of the window, or type `/hold che
 ## Cross Gambling
 
 The **Gambling** button at the top of the window, beside Call for Cheers!, opens Cross Gambling. Games are raid only: the game itself shows every raid member's /roll to everyone in the raid, so no one can report a roll they didn't make. To gamble with a few friends, make your party a raid.
-1. A host in a raid sets the gold amount and presses **Open game**. The game is posted in raid chat, and guildmates in the raid with the addon get a popup.
+1. A host in a raid sets the gold amount and presses **Open game**. The game is posted in raid chat, and guild chat is told to whisper the host **inv** (the host's invite keyword) for an invite. While a game is open, the host invites any guildmate who whispers it, even with auto-invite turned off. Guildmates with the addon get a popup: outside the raid it has an **Ask for invite** button that sends the whisper for them.
 2. Players type **1** in raid chat to join, or **-1** to leave (addon users can press Join). The host can post a **Last call**.
 3. The host presses **Start rolling**. Everyone rolls 1 to the amount (`/roll 500`, or the Roll button).
 4. The highest roll wins, and the lowest roll pays the winner the difference between their rolls. Ties for highest or lowest roll again among the tied players.
@@ -65,12 +65,14 @@ Every list can be sorted: click a column title to sort by it, and click again to
 - **One Life:** die once and the challenge is over.
 - **Dwarf Found:** trade and group only with dwarves. Trades with anyone else are cancelled, invites from guildmates known not to be dwarves are turned down, and if a non-dwarf joins your group you get 15 seconds to remove them before you leave the group.
 
+**Audit.** Experience only goes up by playing, so the addon remembers each character's level and experience: on your computer when you log out, and in the synced challenge record every few minutes and at each level. If you log in with more experience than the addon last saw, you played with Ironforged turned off, and every challenge you have under way is **flagged**. A flag shows as a red ! in the roster, FLAGGED on the tooltip and record, and with the details on the challenge. Guildmates with the addon are told. An officer can clear the flag from your roster record (**Challenges**, then **Clear flag**), or mark the challenge failed. If you play on a second computer, only levels gained without the addon count there.
+
 If forbidden armor can't come off (your bags are full), you get a warning and one minute to remove it before the challenge fails. Everyone's challenges under way or completed show in the roster's Challenge column and on their tooltip, for example "Challenge: Slayer (from level 12)", and in full on their roster record. Guildmates with the addon are told when a challenge starts, fails or is completed. Officers can remove any challenge.
 
 **Book of Grudges.** Anyone can write a grudge against someone outside the guild: who, their side (Horde or Alliance), where, and what they did. "Grudge my target" fills in your target's first and last name, their side, and the zone you're in. Guildmates can't be grudged. Everyone can read the book, with unavenged grudges listed first.
 - A **Horde** grudge is avenged automatically when a guildmate with the addon gets an honorable kill on that foe, or sees them dead. The whole guild is told who avenged it.
 - An **Alliance** grudge is avenged by an officer with **Mark avenged**, choosing who gets the credit. Officers can also mark a Horde grudge by hand, or reopen one.
-- The first time a grudged foe shows up on your nameplates, target or mouseover, you get a raid-warning alert and a sound, and the guild is told who spotted them and where. Each grudge alerts only once. A popup also offers to **/doom** them: press the button and you threaten the foe with the wrath of doom (the game's /doom emote, aimed at them). Their tooltip always shows a red "GRUDGE" line with what they did. You can turn alerts or the /doom popup off in Settings.
+- The first time a grudged foe shows up on your nameplates, target or mouseover, you get a raid-warning alert and a sound, and the guild is told who spotted them and where. Each grudge alerts only once. A popup also offers to **/doom** them: press the button and you threaten the foe with the wrath of doom (the game's /doom emote, aimed at them). If you're in combat, the popup waits until the fight is over. Their tooltip always shows a red "GRUDGE" line with what they did. You can turn alerts or the /doom popup off in Settings.
 - Avenged grudges are stamped **AVENGED** in the book, with who avenged them and when.
 - Only officers can strike a grudge out.
 

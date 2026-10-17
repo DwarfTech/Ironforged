@@ -24,6 +24,12 @@ local function canInvite()
   return true
 end
 
+-- The first keyword, for telling people what to whisper.
+function AI.Word()
+  local raw = (ns.settings and ns.settings.inviteKeyword) or "inv"
+  return raw:match("[^,%s]+") or "inv"
+end
+
 function AI.Keywords()
   local raw = (ns.settings and ns.settings.inviteKeyword) or "inv"
   local out = {}
@@ -32,7 +38,10 @@ function AI.Keywords()
 end
 
 function AI.OnWhisper(text, sender)
-  if not ns.settings or ns.settings.autoInvite == false then return end
+  if not ns.settings then return end
+  -- while I'm hosting Cross Gambling, guildmates who whisper the keyword are always invited
+  local hosting = ns.Gamble and ns.Gamble.IsHost() and ns.Gamble.Active()
+  if ns.settings.autoInvite == false and not hosting then return end
   if type(text) ~= "string" or type(sender) ~= "string" then return end
   if issecretvalue and (issecretvalue(text) or issecretvalue(sender)) then return end
   local msg = ns.Trim(text):lower()

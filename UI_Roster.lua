@@ -61,19 +61,21 @@ end
 function UI.JudgeChallenges(name)
   local opts = {}
   for _, ch in ipairs(ns.Challenges.Of(name)) do
-    if ch.data.status == "active" then
-      opts[#opts + 1] = { text = ch.data.name .. " (from level " .. tostring(ch.data.startLevel or "?") .. ")", value = ch.key }
+    if ch.data.status == "active" or ns.Challenges.Flagged(ch.data) then
+      opts[#opts + 1] = { text = ch.data.name .. " (from level " .. tostring(ch.data.startLevel or "?") .. ")" ..
+        (ns.Challenges.Flagged(ch.data) and " FLAGGED" or ""), value = ch.key }
     end
   end
   if #opts == 0 then return end
   UI.OpenForm({
     title = ns.ShortName(name) .. "'s challenges",
-    width = 480,
+    width = 560,
     fields = {
-      { type = "info", value = "Mark a challenge completed when they've earned it, or failed if they broke its rules." },
+      { type = "info", value = "Mark a challenge completed when they've earned it, or failed if they broke its rules. A flagged challenge was played with Ironforged turned off; clear the flag once you're satisfied." },
       { key = "key", label = "Challenge", type = "choice", value = opts[1].value, options = opts },
     },
     buttons = {
+      { text = "Clear flag", onClick = function(v) if v.key then ns.Challenges.ClearFlag(v.key) end end },
       { text = "Mark failed", onClick = function(v) if v.key then ns.Challenges.Judge(v.key, "failed", "Marked failed by an officer.") end end },
       { text = "Mark completed", onClick = function(v) if v.key then ns.Challenges.Judge(v.key, "completed") end end },
     },
@@ -152,9 +154,13 @@ function UI.ShowMember(name, opts)
   add("Titles", table.concat(tl, ", "))
   local cl = {}
   for _, ch in ipairs(ns.Challenges.Of(name)) do
-    cl[#cl + 1] = ch.data.name .. " |cff999999(from level " .. tostring(ch.data.startLevel or "?") .. ")|r " .. (ns.Challenges.STATUS[ch.data.status] or "")
+    cl[#cl + 1] = ch.data.name .. " |cff999999(from level " .. tostring(ch.data.startLevel or "?") .. ")|r " .. (ns.Challenges.STATUS[ch.data.status] or "") ..
+      (ns.Challenges.Flagged(ch.data) and " |cffff4040FLAGGED|r" or "")
   end
   add("Challenges", table.concat(cl, ", "))
+  for _, ch in ipairs(ns.Challenges.Of(name)) do
+    if ns.Challenges.Flagged(ch.data) then add("|cffff4040Audit|r", ch.data.name .. ": " .. (ch.data.audit or "")) end
+  end
   if m.main then add("Alt of", ns.ShortName(m.main)) end
   local alts = {}
   for other, om in Data.Each("members") do
@@ -190,7 +196,9 @@ function UI.ShowMember(name, opts)
     if hasAwarded then buttons[#buttons + 1] = { text = "Strip title", onClick = function() UI.StripTitle(name) end } end
     buttons[#buttons + 1] = { text = "Award title", onClick = function() UI.AwardTitle(name) end }
     local judgeable = false
-    for _, ch in ipairs(ns.Challenges.Of(name)) do if ch.data.status == "active" then judgeable = true end end
+    for _, ch in ipairs(ns.Challenges.Of(name)) do
+      if ch.data.status == "active" or ns.Challenges.Flagged(ch.data) then judgeable = true end
+    end
     if judgeable and name ~= ns.PlayerName() then
       buttons[#buttons + 1] = { text = "Challenges", onClick = function() UI.JudgeChallenges(name) end }
     end
@@ -253,7 +261,9 @@ local function challengeCell(name)
   local list = ns.Challenges.Showing(name)
   if #list == 0 then return "" end
   local first = list[1].data
-  local text = (first.status == "completed" and "|cff40ff40" or "|cffffd040") .. first.name .. "|r"
+  local flagged = false
+  for _, ch in ipairs(list) do if ns.Challenges.Flagged(ch.data) then flagged = true end end
+  local text = (flagged and "|cffff4040!|r " or "") .. (first.status == "completed" and "|cff40ff40" or "|cffffd040") .. first.name .. "|r"
   if #list > 1 then text = text .. " |cff999999+" .. (#list - 1) .. "|r" end
   return text
 end

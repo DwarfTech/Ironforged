@@ -74,8 +74,10 @@ local function buildPopup()
   pop.join:SetPoint("BOTTOMLEFT", 18, 18)
   pop.roll = UI.Button(pop, "Roll", 96, 26, function() G.Roll() end)
   pop.roll:SetPoint("LEFT", pop.join, "RIGHT", 8, 0)
+  pop.ask = UI.Button(pop, "Ask for invite", 120, 26, function() G.AskInvite() end)
+  pop.ask:SetPoint("BOTTOMLEFT", 18, 18)
   pop.open = UI.Button(pop, "Open tab", 96, 26, function() ns.ToggleMain("gamble") end)
-  pop.open:SetPoint("LEFT", pop.roll, "RIGHT", 8, 0)
+  pop.open:SetPoint("BOTTOMRIGHT", -18, 18)
   pop:Hide()
   return pop
 end
@@ -85,9 +87,17 @@ local function refreshPopup()
   local g = G.game
   if not g or g.phase == "done" or g.phase == "cancelled" then
     if g and g.phase == "done" then pop.sub:SetText(statusText()) end
-    pop.join:Hide(); pop.roll:Hide()
+    pop.join:Hide(); pop.roll:Hide(); pop.ask:Hide()
     return
   end
+  local inRaid = IsInRaid and IsInRaid()
+  if not inRaid then
+    pop.sub:SetText(first(g.host) .. " is gambling " .. g.amount .. "g in their raid. Ask for an invite, then type 1 in raid chat to join.")
+    pop.join:Hide(); pop.roll:Hide()
+    pop.ask:SetShown(g.phase == "open")
+    return
+  end
+  pop.ask:Hide()
   pop.sub:SetText(first(g.host) .. " is gambling " .. g.amount .. "g in " .. G.CHANNELS[g.channel] .. " chat. " ..
     #g.order .. (#g.order == 1 and " player" or " players") .. " in.")
   local inGame = G.IAmIn()
@@ -98,11 +108,14 @@ local function refreshPopup()
   pop.roll:SetShown(mustRoll)
 end
 
+-- joining the raid changes what the popup offers
+ns.RegisterEvent("GROUP_ROSTER_UPDATE", function() refreshPopup(); if UI.ScheduleRefresh then UI.ScheduleRefresh() end end)
+
 ns.On("GAMBLE", function(fresh)
   local g = G.game
-  -- only raid members can play, so only they get the popup
   local inRaid = IsInRaid and IsInRaid()
-  if fresh and g and g.phase == "open" and not G.IsHost() and inRaid and ns.settings and ns.settings.gamblePopup ~= false then
+  -- everyone gets the popup when a game opens; those outside the raid can ask for an invite
+  if fresh and g and g.phase == "open" and not G.IsHost() and ns.settings and ns.settings.gamblePopup ~= false then
     buildPopup():Show()
   end
   -- bring the popup back when it's my turn to roll
