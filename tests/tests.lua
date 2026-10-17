@@ -654,11 +654,11 @@ check(late and K.ns.Data.Get("challenges", late).startLevel == 5, "challenges ca
 check(A.ns.Challenges.Label(K.ns.Data.Get("challenges", late)) == "Slayer (from level 5)", "start level shown")
 CK.Abandon(late)
 K.level = 1
-K.equip[5] = 6125; K.equip[3] = 1000; K.equip[4] = 45; K.equip[16] = 25
+K.equip[5] = 6125; K.equip[3] = 1000; K.equip[4] = 45; K.equip[19] = 5976; K.equip[16] = 25
 K.pvp = true
 local slayerKey = CK.Start("slayer")
 H.run(2)
-check(slayerKey and K.equip[5] == nil and K.equip[3] == nil and K.equip[4] == nil and K.equip[16] == 25, "Slayer takes off chest, shoulders and shirt, leaves the weapon")
+check(slayerKey and K.equip[5] == nil and K.equip[3] == nil and K.equip[4] == nil and K.equip[19] == nil and K.equip[16] == 25, "Slayer takes off chest, shoulders, shirt and tabard, leaves the weapon")
 check(D.ns.Data.Get("challenges", slayerKey) and D.ns.Data.Get("challenges", slayerKey).status == "active", "challenge shared with the guild")
 -- bags full: a chest piece that can't come off fails the challenge after a minute
 local savedBags = K.bags
