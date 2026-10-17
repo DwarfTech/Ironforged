@@ -14,7 +14,7 @@ local function build(f, w, h)
     { title = "Horde slain", width = 96 }, { title = "Elves slain", width = 96 }, { title = "Avenged", width = 90 },
   }, function(name) UI.ShowMember(name, { noManage = true }) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
-  f.note = UI.Label(f, "Horde slain is each dwarf's lifetime honorable kills. Elves slain counts honorable kills on elves the addon saw. Click a column title to sort.", "GameFontDisableSmall")
+  f.note = UI.Label(f, "Horde slain is each dwarf's lifetime honorable kills. Elves slain: honorable kills on elves plus duels won against any elf, each elf once an hour.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 4)
   f.note:SetWidth(w - 8)
 end
