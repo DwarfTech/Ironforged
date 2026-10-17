@@ -1,0 +1,40 @@
+## Interface: 16001
+## Title: |cffd4a017Ironforged|r
+## Notes: Dwarven guild management and roleplay: roster, clans, promotion trials, events, backstories, the Book of Grudges, a profession directory and Looking for Dwarf. Syncs between guildmates.
+## Author: Firebird Bronze
+## Version: 2.10.1
+## SavedVariables: IronforgedDB
+## IconTexture: Interface\AddOns\Ironforged\Media\Hammer64
+## AddonCompartmentFunc: Ironforged_OnAddonCompartmentClick
+## Category: Guild
+
+Serializer.lua
+Core.lua
+Data.lua
+Comm.lua
+Gear.lua
+Flavor.lua
+Language.lua
+Blood.lua
+Gamble.lua
+Titles.lua
+Professions.lua
+LookingForDwarf.lua
+AutoInvite.lua
+Challenges.lua
+UI_Widgets.lua
+UI_Minimap.lua
+Cheers.lua
+UI_Main.lua
+UI_Roster.lua
+UI_Clans.lua
+UI_Trials.lua
+UI_Events.lua
+UI_LFD.lua
+UI_Professions.lua
+UI_Challenges.lua
+UI_Grudges.lua
+UI_Blood.lua
+UI_Gamble.lua
+UI_Profile.lua
+UI_Settings.lua

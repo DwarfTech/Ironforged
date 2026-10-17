@@ -1,0 +1,7 @@
+package-as: Ironforged
+
+ignore:
+  - tests
+  - .github
+  - .gitignore
+  - .pkgmeta
