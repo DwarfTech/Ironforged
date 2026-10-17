@@ -380,6 +380,28 @@ H.fire(K, "CHAT_MSG_SYSTEM", "Kurdran has defeated Aelindra in a duel")
 H.run(12)
 check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 2, "duels don't count")
 K.target = nil
+-- Elfbane rules: in a party the elf must be your target; in a raid elf kills don't count
+K.units.nameplate3 = { name = "Vaelith", race = "BloodElf", faction = "Horde" }
+H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate3")
+K.units.nameplate4 = { name = "Seryn", race = "BloodElf", faction = "Horde" }
+H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate4")
+K.inGroup = true
+H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Vaelith dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
+H.run(12)
+check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 2, "party kill on an elf you didn't target doesn't count")
+K.target = { name = "Seryn", race = "BloodElf" }
+H.fire(K, "PLAYER_TARGET_CHANGED")
+H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Seryn dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
+H.run(12)
+check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 3, "party kill on your target counts")
+K.inGroup, K.inRaid = false, true
+H.clock = H.clock + 3700; H.server = H.server + 3700
+H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Seryn dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
+H.run(12)
+check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 3, "elf kills in a raid don't count")
+K.inRaid = false
+K.target = nil
+check(K.ns.Blood.ELF_RULES:find("raid", 1, true), "Elfbane rules written for the tooltip")
 -- witnessed death avenges too
 check(Hh.ns.Data.Put("grudges", "Hilda-Forever#h2", { against = "Zug", faction = "Horde", deed = "Ganked lowbies", ts = 4 }), "second Horde grudge")
 H.run(5)

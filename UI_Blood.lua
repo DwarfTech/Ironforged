@@ -14,7 +14,18 @@ local function build(f, w, h)
     { title = "Horde slain", width = 96 }, { title = "Elves slain", width = 96 }, { title = "Avenged", width = 90 },
   }, function(name) UI.ShowMember(name, { noManage = true }) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
-  f.note = UI.Label(f, "Horde slain is each dwarf's lifetime honorable kills. Elves slain counts honorable kills on Horde elves, each elf once an hour.", "GameFontDisableSmall")
+  -- hover the Elves slain title for the rules
+  local eh = f.list.headers[5]
+  if eh then
+    eh:SetScript("OnEnter", function(self)
+      GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+      GameTooltip:AddLine("Elves slain", 0.5, 1, 0.37)
+      GameTooltip:AddLine(ns.Blood.ELF_RULES, 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    eh:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  end
+  f.note = UI.Label(f, "Horde slain is each dwarf's lifetime honorable kills. Hover Elves slain for how elf kills count.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 4)
   f.note:SetWidth(w - 8)
 end

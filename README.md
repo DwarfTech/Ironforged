@@ -78,7 +78,7 @@ If forbidden armor can't come off (your bags are full), you get a warning and on
 
 **Greeting dwarves.** When you target another dwarf, a small bar under their portrait offers **Hail**, **Salute** and **Cheer**; press one to do that emote at them. It waits until you're out of combat, and you can turn it off in Settings.
 
-**War Hall.** A leaderboard of every dwarf's Horde slain (their lifetime honorable kills), elves slain, and grudges avenged, ranked by Horde slain. Elves slain counts honorable kills on Horde elves. The same elf counts at most once an hour, so farming one player doesn't work. Click a column title to sort by another. The most elves slain is highlighted in green. The tally also shows on each member's roster record. Clicking a dwarf here shows their record without the management buttons.
+**War Hall.** A leaderboard of every dwarf's Horde slain (their lifetime honorable kills), elves slain, and grudges avenged, ranked by Horde slain. Elves slain counts honorable kills on Horde elves: solo, every elf kill counts; in a party, only if the elf was your target when they died; in a raid, elf kills don't count. The same elf counts at most once an hour. Hover the Elves slain column title in the War Hall for these rules. Click a column title to sort by another. The most elves slain is highlighted in green. The tally also shows on each member's roster record. Clicking a dwarf here shows their record without the management buttons.
 
 **Titles.** Every title in the hold. The automatic titles come first, with who holds each one now and their count; then every title an officer has awarded, with who awarded it, why and when. Officers press **Award a title** to give one, and click an awarded title to strip it.
 

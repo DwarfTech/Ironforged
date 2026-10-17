@@ -1,7 +1,8 @@
 -- Ironforged: the Blood Tally and the hunt for grudged foes.
 --   * Horde slain: your lifetime honorable kills, from the game's own PvP stats.
 --   * Elves slain: honorable kills on Horde elves. The victim's race comes from what the addon
---     saw on their nameplate, target or tooltip. The same elf counts at most once an hour.
+--     saw on their nameplate, target or tooltip. Solo kills count; in a party the elf must have
+--     been your target; in a raid they don't count. The same elf counts at most once an hour.
 --   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
 --     foe, or sees them fall. Alliance grudges are avenged by an officer.
 --   * Grudged foes get a red warning on their tooltip. The first time a grudged foe is spotted,
@@ -189,9 +190,40 @@ local function findFoe(name)
 end
 Blood.FindFoe = findFoe
 
+-- Who I've had targeted lately, so a kill can be checked against it.
+local targetedAt = {}
+ns.RegisterEvent("PLAYER_TARGET_CHANGED", function()
+  local n = UnitExists and UnitExists("target") and ns.UnitDisplayName("target")
+  if n then targetedAt[Data.FoeKey(n)] = GetTime() end
+end)
+
+-- Did I have this player targeted when (or just before) they died?
+local function wasMyTarget(victim, key)
+  local first = Data.FoeKey(victim):match("^(%S+)")
+  local cur = UnitExists and UnitExists("target") and ns.UnitDisplayName("target")
+  if cur and Data.FoeKey(cur):match("^(%S+)") == first then return true end
+  local t = targetedAt[key] or targetedAt[Data.FoeKey(victim)]
+  return t ~= nil and GetTime() - t < 15
+end
+
+-- Elfbane rules, to keep raid zergs from farming the count:
+--   solo: every elf kill counts; in a party: only if the elf was your target;
+--   in a raid: elf kills don't count.
+Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves.\n" ..
+  "- Solo: every elf kill counts.\n- In a party: only if the elf was your target when they died.\n" ..
+  "- In a raid: elf kills don't count.\n- The same elf counts at most once an hour."
+
 function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)
   if not foe or not Blood.IsElf(foe.race) then return false end
+  if IsInRaid and IsInRaid() then
+    ns.Print("|cff999999" .. ns.ShortName(victim) .. " falls, but elf kills don't count toward Elfbane in a raid.|r")
+    return false
+  end
+  if IsInGroup and IsInGroup() and not wasMyTarget(victim, key) then
+    ns.Print("|cff999999" .. ns.ShortName(victim) .. " falls, but in a party an elf only counts if they were your target.|r")
+    return false
+  end
   ns.db.elfCounted = ns.db.elfCounted or {}
   local last = ns.db.elfCounted[key]
   local now = ns.Now()
