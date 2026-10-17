@@ -610,14 +610,11 @@ check(A.ns.Challenges.Label(K.ns.Data.Get("challenges", late)) == "Slayer (from 
 CK.Abandon(late)
 K.level = 1
 K.equip[5] = 6125; K.equip[3] = 1000; K.equip[4] = 45; K.equip[16] = 25
+K.pvp = true
 local slayerKey = CK.Start("slayer")
 H.run(2)
 check(slayerKey and K.equip[5] == nil and K.equip[3] == nil and K.equip[4] == nil and K.equip[16] == 25, "Slayer takes off chest, shoulders and shirt, leaves the weapon")
-check(K.pvp == true, "Slayer keeps you flagged for PvP")
 check(D.ns.Data.Get("challenges", slayerKey) and D.ns.Data.Get("challenges", slayerKey).status == "active", "challenge shared with the guild")
-K.pvp = false
-H.fire(K, "PLAYER_FLAGS_CHANGED", "player")
-check(K.pvp == true, "PvP flag turned back on")
 -- bags full: a chest piece that can't come off fails the challenge after a minute
 local savedBags = K.bags
 K.bags = {}
@@ -670,31 +667,28 @@ K.units.party1, K.units.party2 = nil, nil
 H.fire(K, "PARTY_INVITE_REQUEST", "Hilda-Forever")
 check(K.declined, "declines invites from non-dwarf guildmates")
 CK.Abandon(dfKey)
--- Slayer: turning PvP off is undone at once
-local slayer2 = CK.Start("slayer")
-check(K.pvp == true, "Slayer flags you for PvP")
-K.env.SetPVP(0)
-check(K.pvp == true, "turning PvP off is undone")
-K.env.TogglePVP()
-check(K.pvp == true, "/pvp can't turn it off either")
--- when the game refuses, the member is asked to type /pvp
-local realSet = K.env.SetPVP
-K.env.SetPVP = function() end
+-- Slayer: the addon never touches the PvP flag itself (Blizzard blocks that); it warns and fails
+local pvpCalls = 0
+local realSet, realToggle = K.env.SetPVP, K.env.TogglePVP
+K.env.SetPVP = function(...) pvpCalls = pvpCalls + 1; return realSet(...) end
+K.env.TogglePVP = function(...) pvpCalls = pvpCalls + 1; return realToggle(...) end
 K.pvp = false
-K.ns.Challenges.Enforce(); H.run(3)
+local slayer2 = CK.Start("slayer"); H.run(3)
 local asked = false
 for _, m in ipairs(K.chat) do if m:find("Type |cffffd040/pvp|r within", 1, true) then asked = true end end
-check(asked, "asks for /pvp when the addon can't flag")
-check(K.ns.Data.Get("challenges", slayer2).status == "active", "a minute to flag before failing")
-H.run(70)
+check(asked and K.env.IronforgedNotice:IsShown() and K.env.IronforgedNotice.id == "pvp", "not flagged: told to type /pvp")
+check(pvpCalls == 0, "the addon never calls the protected PvP functions")
+K.pvp = true; H.fire(K, "PLAYER_FLAGS_CHANGED", "player"); H.run(70)
+check(K.ns.Data.Get("challenges", slayer2).status == "active", "flagging in time keeps the challenge")
+K.pvp = false; H.fire(K, "PLAYER_FLAGS_CHANGED", "player"); H.run(30)
+check(K.ns.Data.Get("challenges", slayer2).status == "active", "a minute to flag again before failing")
+H.run(40)
 local s2 = K.ns.Data.Get("challenges", slayer2)
 check(s2.status == "failed" and s2.reason:find("PvP", 1, true), "Slayer fails if not flagged within a minute")
-K.env.SetPVP = realSet
-K.env.SlashCmdList.IRONFORGED("pvp"); H.run(3)
-check(K.pvp == true, "/hold pvp flags and reports")
-CK.Abandon(slayer2)
-K.env.SetPVP(0)
-check(K.pvp == false, "free to turn it off once the challenge ends")
+check(pvpCalls == 0, "still no protected calls")
+K.env.SlashCmdList.IRONFORGED("pvp")
+check(pvpCalls == 0, "/hold pvp only reports")
+K.env.SetPVP, K.env.TogglePVP = realSet, realToggle
 
 -- start form shows rules for a ready-made pick, and name/rules boxes only for your own
 K.ns.UI.StartChallengeForm("slayer")

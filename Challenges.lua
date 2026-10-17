@@ -242,11 +242,13 @@ function C.Enforce()
   end
 end
 
--- Slayer: PvP stays on. Turning it off (/pvp, the portrait menu, anything) is undone at once.
--- "Desired" is the setting the game remembers; the flag itself lingers for a few minutes after
--- it's turned off, so the setting is what gets checked.
-local lastFlagMsg = 0
-C.pvpLog = {} -- what the last attempts did, for /hold pvp
+-- Slayer: PvP stays on. Blizzard only lets the player switch PvP on or off (an addon that tries is
+-- blocked), so the addon watches instead: when you're not flagged it warns you, and if you're
+-- still not flagged a minute later the challenge fails. "Desired" is the setting the game
+-- remembers; the flag itself lingers for a few minutes after it's turned off, so the setting
+-- is what gets checked.
+C.PVP_GRACE = 60
+local unflaggedSince
 
 local function isFlagged()
   local desired = GetPVPDesired and GetPVPDesired()
@@ -254,110 +256,55 @@ local function isFlagged()
   return desired, flagged
 end
 
--- Try every way the game offers to switch the PvP flag on. Returns the one that was called.
--- TogglePVP flips the setting, so it's only used when the setting is known to be off.
-function C.TurnPvPOn(knownOff)
-  local P = C_PvP or {}
-  if SetPVP then
-    local ok, err = pcall(SetPVP, 1)
-    C.pvpLog[#C.pvpLog + 1] = "SetPVP(1): " .. (ok and "called" or ("error " .. tostring(err)))
-    if ok then return "SetPVP" end
-  end
-  if P.SetPVP then
-    local ok, err = pcall(P.SetPVP, true)
-    C.pvpLog[#C.pvpLog + 1] = "C_PvP.SetPVP(true): " .. (ok and "called" or ("error " .. tostring(err)))
-    if ok then return "C_PvP.SetPVP" end
-  end
-  local toggle = TogglePVP or P.TogglePVP
-  if toggle and knownOff then
-    local ok, err = pcall(toggle)
-    C.pvpLog[#C.pvpLog + 1] = "TogglePVP(): " .. (ok and "called" or ("error " .. tostring(err)))
-    if ok then return "TogglePVP" end
-  end
-  C.pvpLog[#C.pvpLog + 1] = "no PvP function found"
-  return nil
-end
-
--- PvP counts as on when the setting is on (or, if the game won't say, when the flag is up).
 local function pvpOn()
   local desired, flagged = isFlagged()
   if desired ~= nil then return desired and true or false end
   return flagged and true or false
 end
-C.PVP_GRACE = 60
-local unflaggedSince
+C.PvPOn = pvpOn
 
 function C.KeepFlagged(name, key)
-  if pvpOn() then unflaggedSince = nil; return end
-  if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return end
-  local now = GetTime and GetTime() or 0
-  -- out of time: the challenge fails
-  if unflaggedSince and now - unflaggedSince >= C.PVP_GRACE then
+  if pvpOn() then
+    if unflaggedSince then ns.Print("|cffd4a017" .. name .. ":|r flagged for PvP. Keep it that way.") end
     unflaggedSince = nil
-    if key then C.Fail(key, "Wasn't flagged for PvP at level " .. level() .. ".") end
+    if ns.UI and ns.UI.HideNotice then ns.UI.HideNotice("pvp") end
     return
   end
-  while #C.pvpLog > 12 do table.remove(C.pvpLog, 1) end
-  local desired, flagged = isFlagged()
-  local used = C.TurnPvPOn(desired == false or (desired == nil and flagged == false))
-  if not C_Timer then return end
-  C_Timer.After(1.5, function()
-    if pvpOn() then
+  if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return end
+  local now = GetTime and GetTime() or 0
+  if unflaggedSince then
+    if now - unflaggedSince >= C.PVP_GRACE then
       unflaggedSince = nil
-      if now - lastFlagMsg > 30 or lastFlagMsg == 0 then
-        lastFlagMsg = now
-        ns.Print("|cffd4a017" .. name .. ":|r your PvP flag stays on for the whole challenge.")
-      end
-      return
+      if key then C.Fail(key, "Wasn't flagged for PvP at level " .. level() .. ".") end
     end
-    C.pvpLog[#C.pvpLog + 1] = (used or "nothing") .. " did not turn PvP on"
-    if unflaggedSince then return end -- already warned; the timer is running
-    unflaggedSince = GetTime and GetTime() or 0
-    ns.Print("|cffff4040" .. name .. ":|r you're not flagged for PvP. Type |cffffd040/pvp|r within " .. C.PVP_GRACE ..
-      " seconds or the challenge fails.")
-    if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
-    if ns.UI and ns.UI.Notice then
-      ns.UI.Notice({ id = "pvp", icon = "Interface\\Icons\\Ability_DualWield", title = name .. ": flag for PvP",
-        text = "Type |cffffd040/pvp|r in chat within " .. C.PVP_GRACE .. " seconds, or the " .. name .. " challenge fails.",
-        buttons = { { text = "OK" } }, timeout = C.PVP_GRACE })
-    end
-    -- come back when the time is up
-    C_Timer.After(C.PVP_GRACE + 1, function() pcall(C.Enforce) end)
-  end)
+    return
+  end
+  unflaggedSince = now
+  ns.Print("|cffff4040" .. name .. ":|r you're not flagged for PvP. Type |cffffd040/pvp|r within " .. C.PVP_GRACE ..
+    " seconds or the challenge fails.")
+  if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
+  if ns.UI and ns.UI.Notice then
+    ns.UI.Notice({ id = "pvp", icon = "Interface\\Icons\\Ability_DualWield", title = name .. ": flag for PvP",
+      text = "Type |cffffd040/pvp|r in chat within " .. C.PVP_GRACE .. " seconds, or the " .. name .. " challenge fails.",
+      buttons = { { text = "OK" } }, timeout = C.PVP_GRACE })
+  end
+  if C_Timer then C_Timer.After(C.PVP_GRACE + 1, function() pcall(C.Enforce) end) end
 end
 
--- /hold pvp: what the PvP functions report on this server.
+-- /hold pvp: what the game reports about your PvP flag. It only reads; it never changes anything.
 function C.PvPReport()
-  local function yes(v) return v and "yes" or "no" end
   local desired, flagged = isFlagged()
-  local P = C_PvP or {}
-  ns.Print("PvP check: SetPVP " .. yes(SetPVP) .. ", TogglePVP " .. yes(TogglePVP) .. ", C_PvP.SetPVP " .. yes(P.SetPVP) ..
-    ", C_PvP.TogglePVP " .. yes(P.TogglePVP) .. ", GetPVPDesired " .. yes(GetPVPDesired) .. ", UnitIsPVP " .. yes(UnitIsPVP))
-  ns.Print("Right now: setting on = " .. tostring(desired) .. ", flagged = " .. tostring(flagged))
-  local used = C.TurnPvPOn(desired == false or (desired == nil and flagged == false))
-  ns.Print("Tried to flag you with: " .. tostring(used))
-  if C_Timer then
-    C_Timer.After(1.5, function()
-      local d2, f2 = isFlagged()
-      ns.Print("A moment later: setting on = " .. tostring(d2) .. ", flagged = " .. tostring(f2))
-      for _, line in ipairs(C.pvpLog) do ns.Print("  " .. line) end
-      if C.blocked then ns.Print("|cffff4040Blocked by the game:|r " .. C.blocked) end
-    end)
-  end
+  ns.Print("PvP: setting on = " .. tostring(desired) .. ", flagged right now = " .. tostring(flagged) ..
+    ". Slayer counts you as " .. (pvpOn() and "|cff40ff40flagged|r." or "|cffff4040not flagged|r. Type /pvp."))
 end
 
--- The game reports when it refuses a protected call from an addon.
-ns.RegisterEvent("ADDON_ACTION_BLOCKED", function(addon, fn) if addon == ADDON then C.blocked = tostring(fn) end end)
-ns.RegisterEvent("ADDON_ACTION_FORBIDDEN", function(addon, fn) if addon == ADDON then C.blocked = tostring(fn) end end)
-
+-- Notice at once when the player turns PvP off. Hooks only watch; they never call anything protected.
 local function pvpChanged()
-  for _, c in ipairs(C.MyEnforced()) do
-    if c.preset.pvp then C.KeepFlagged(c.preset.name, c.key); return end
-  end
+  if C_Timer then C_Timer.After(0.5, function() pcall(C.Enforce) end) else pcall(C.Enforce) end
 end
 if hooksecurefunc then
   if TogglePVP then hooksecurefunc("TogglePVP", pvpChanged) end
-  if SetPVP then hooksecurefunc("SetPVP", function(v) if not v or v == 0 then pvpChanged() end end) end
+  if SetPVP then hooksecurefunc("SetPVP", pvpChanged) end
 end
 
 local function forbids(field)
