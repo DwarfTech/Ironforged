@@ -20,7 +20,7 @@ local PHASE_TEXT = {
 local function statusText()
   local g = G.game
   if not g then return "No game running. Set an amount and open one." end
-  local s = "|cffd4a017" .. g.amount .. "g|r in " .. G.CHANNELS[g.channel] .. " chat, hosted by " .. first(g.host) .. ".  " .. (PHASE_TEXT[g.phase] or "")
+  local s = "|cffd4a017" .. g.amount .. "g|r hosted by " .. first(g.host) .. ".  " .. (PHASE_TEXT[g.phase] or "")
   if g.phase == "done" and g.high then
     if (g.owed or 0) > 0 then
       s = s .. "\n|cff40ff40" .. first(g.low) .. " owes " .. first(g.high) .. " " .. g.owed .. "g.|r Settle it by trade."
@@ -75,7 +75,7 @@ local function buildPopup()
   pop.roll = UI.Button(pop, "Roll", 96, 26, function() G.Roll() end)
   pop.roll:SetPoint("LEFT", pop.join, "RIGHT", 8, 0)
   pop.ask = UI.Button(pop, "Ask for invite", 120, 26, function() G.AskInvite() end)
-  pop.ask:SetPoint("BOTTOMLEFT", 18, 18)
+  pop.ask:SetPoint("LEFT", pop.join, "RIGHT", 8, 0)
   pop.open = UI.Button(pop, "Open tab", 96, 26, function() ns.ToggleMain("gamble") end)
   pop.open:SetPoint("BOTTOMRIGHT", -18, 18)
   pop:Hide()
@@ -91,21 +91,18 @@ local function refreshPopup()
     return
   end
   local inRaid = IsInRaid and IsInRaid()
-  if not inRaid then
-    pop.sub:SetText(first(g.host) .. " is gambling " .. g.amount .. "g in their raid. Ask for an invite, then type 1 in raid chat to join.")
-    pop.join:Hide(); pop.roll:Hide()
-    pop.ask:SetShown(g.phase == "open")
-    return
-  end
-  pop.ask:Hide()
-  pop.sub:SetText(first(g.host) .. " is gambling " .. g.amount .. "g in " .. G.CHANNELS[g.channel] .. " chat. " ..
-    #g.order .. (#g.order == 1 and " player" or " players") .. " in.")
   local inGame = G.IAmIn()
-  pop.join:SetShown(g.phase == "open")
-  pop.join:SetText(inGame and "Leave" or "Join")
   local mustRoll = false
   for _, n in ipairs(G.Waiting()) do if n == ns.PlayerName() then mustRoll = true end end
-  pop.roll:SetShown(mustRoll)
+  local text = first(g.host) .. " is gambling " .. g.amount .. "g. " .. #g.order .. (#g.order == 1 and " player" or " players") .. " in."
+  if not inRaid and (g.phase == "open" or inGame) then
+    text = text .. "\nRolls happen in " .. first(g.host) .. "'s raid. Ask for an invite" .. (inGame and " to roll." or ", then join.")
+  end
+  pop.sub:SetText(text)
+  pop.join:SetShown(g.phase == "open")
+  pop.join:SetText(inGame and "Leave" or "Join")
+  pop.roll:SetShown(mustRoll and inRaid)
+  pop.ask:SetShown(not inRaid and (g.phase == "open" or mustRoll))
 end
 
 -- joining the raid changes what the popup offers
@@ -119,7 +116,7 @@ ns.On("GAMBLE", function(fresh)
     buildPopup():Show()
   end
   -- bring the popup back when it's my turn to roll
-  if g and pop and not pop:IsShown() and not G.IsHost() and inRaid then
+  if g and pop and not pop:IsShown() and not G.IsHost() then
     for _, n in ipairs(G.Waiting()) do
       if n == ns.PlayerName() and ns.settings.gamblePopup ~= false then pop:Show() end
     end
@@ -134,12 +131,15 @@ end)
 local function build(f, w, h)
   local amountLabel = UI.Label(f, "Gold:", "GameFontNormalSmall")
   amountLabel:SetPoint("TOPLEFT", 6, -8)
+  f.amountLabel = amountLabel
+  f.hostNote = UI.Label(f, "Nobles and above can host Cross Gambling.", "GameFontDisableSmall")
+  f.hostNote:SetPoint("TOPLEFT", 6, -10)
   f.amount = UI.EditBox(f, 70, 7)
   f.amount:SetPoint("LEFT", amountLabel, "RIGHT", 10, 0)
   f.amount:SetNumeric(true)
   f.amount:SetText(state.amount)
   f.amount:SetScript("OnTextChanged", function(self) state.amount = self:GetText() end)
-  f.channel = UI.Label(f, "in raid chat", "GameFontHighlightSmall")
+  f.channel = UI.Label(f, "rolls in your raid", "GameFontHighlightSmall")
   f.channel:SetPoint("LEFT", f.amount, "RIGHT", 8, 0)
 
   f.openB = UI.Button(f, "Open game", 96, 22, function() G.Open(state.amount) end)
@@ -161,6 +161,8 @@ local function build(f, w, h)
   f.joinB:SetPoint("TOPLEFT", 4, -74)
   f.rollB = UI.Button(f, "Roll", 80, 22, function() G.Roll() end)
   f.rollB:SetPoint("LEFT", f.joinB, "RIGHT", 4, 0)
+  f.askB = UI.Button(f, "Ask for invite", 110, 22, function() G.AskInvite() end)
+  f.askB:SetPoint("LEFT", f.joinB, "RIGHT", 4, 0)
 
   local listW = 260
   f.players = UI.List(f, listW, h - 132, {
@@ -182,7 +184,7 @@ local function build(f, w, h)
   }, function(name) UI.ShowMember(name) end)
   f.board:SetPoint("TOPLEFT", listW + 8, -102)
 
-  f.note = UI.Label(f, "Raid only. Highest roll wins; lowest pays the winner the difference. Pay up by trade. Host: click a player to remove them.", "GameFontDisableSmall")
+  f.note = UI.Label(f, "Rolls happen in the host's raid. Highest roll wins; lowest pays the winner the difference. Pay up by trade. Host: click a player to remove them.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 6)
 end
 
@@ -190,8 +192,11 @@ local function refresh(f)
   local g = G.game
   local host = G.IsHost()
   local active = G.Active()
+  local canHost = G.CanHost()
   f.openB:SetEnabled(not active or host)
-  f.openB:SetShown(not active)
+  f.openB:SetShown(not active and canHost)
+  f.amount:SetShown(canHost); f.amountLabel:SetShown(canHost); f.channel:SetShown(canHost)
+  f.hostNote:SetShown(not canHost and not active)
   f.lastB:SetShown(host and g.phase == "open")
   f.rollNowB:SetShown(host and g.phase == "open")
   f.cancelB:SetShown(host and active)
@@ -201,7 +206,9 @@ local function refresh(f)
   f.joinB:SetText(G.IAmIn() and "Leave" or "Join")
   local mustRoll = false
   for _, n in ipairs(G.Waiting()) do if n == ns.PlayerName() then mustRoll = true end end
-  f.rollB:SetShown(mustRoll)
+  local inRaid = IsInRaid and IsInRaid()
+  f.rollB:SetShown(mustRoll and inRaid)
+  f.askB:SetShown(g ~= nil and not host and not inRaid and (g.phase == "open" or mustRoll))
 
   local items = {}
   if g then

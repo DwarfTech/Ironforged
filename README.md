@@ -14,10 +14,10 @@ Officers press **Call for Cheers!** at the top of the window, or type `/hold che
 
 ## Cross Gambling
 
-The **Gambling** button at the top of the window, beside Call for Cheers!, opens Cross Gambling. Games are raid only: the game itself shows every raid member's /roll to everyone in the raid, so no one can report a roll they didn't make. To gamble with a few friends, make your party a raid.
-1. A host in a raid sets the gold amount and presses **Open game**. The game is posted in raid chat, and guild chat is told to whisper the host **inv** (the host's invite keyword) for an invite. While a game is open, the host invites any guildmate who whispers it, even with auto-invite turned off. Guildmates with the addon get a popup: outside the raid it has an **Ask for invite** button that sends the whisper for them.
-2. Players type **1** in raid chat to join, or **-1** to leave (addon users can press Join). The host can post a **Last call**.
-3. The host presses **Start rolling**. Everyone rolls 1 to the amount (`/roll 500`, or the Roll button).
+The **Gambling** button at the top of the window, beside Call for Cheers!, opens Cross Gambling. Nobles and above (and the guild master) can host. The rolling happens in the host's raid: the game itself shows every raid member's /roll to everyone in the raid, so no one can report a roll they didn't make.
+1. The host sets the gold amount and presses **Open game**, in a raid or not. Guild chat is told the game is open, to type 1 to join, and to whisper the host **inv** (the host's invite keyword) for a raid invite. If the host is already in a raid, raid chat is told too. While a game is open, the host invites any guildmate who whispers it, even with auto-invite turned off. Guildmates with the addon get a popup with **Join** and, outside the raid, **Ask for invite**, which sends the whisper for them.
+2. Players type **1** in guild or raid chat to join, or **-1** to leave. The host can post a **Last call**.
+3. The host makes the group a raid (if it isn't one) and presses **Start rolling**. Anyone who joined but isn't in the raid yet is named in guild chat and told to get an invite. Everyone rolls 1 to the amount (`/roll 500`, or the Roll button, which appears once you're in the raid).
 4. The highest roll wins, and the lowest roll pays the winner the difference between their rolls. Ties for highest or lowest roll again among the tied players.
 5. The result is posted in raid chat. Gold changes hands by trade; the addon only keeps score.
 

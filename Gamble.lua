@@ -1,6 +1,7 @@
 -- Ironforged: Cross Gambling, in the style of the CrossGambling addon.
---   1. A host in a raid opens a game for an amount of gold. Games are raid only.
---   2. Players join by typing 1 in raid chat (or -1 to leave), or with the Join button.
+--   1. A Noble or higher opens a game for an amount of gold, in or out of a raid.
+--   2. Players join by typing 1 in guild or raid chat (or -1 to leave), or with the Join button.
+--      The rolling happens in the host's raid, so players are told to join it (whisper "inv").
 --   3. The host starts the rolling; everyone rolls 1 to the amount.
 --   4. Highest roll wins. Lowest roll pays the winner the difference between the two rolls.
 --      Ties for highest or lowest roll again among the tied players.
@@ -13,8 +14,27 @@ local G = {}
 ns.Gamble = G
 
 local Data = ns.Data
-local CHANNELS = { RAID = "Raid" }
+local CHANNELS = { RAID = "Raid", GUILD = "Guild" }
 G.CHANNELS = CHANNELS
+
+-- Where the host's game messages go: the raid once there is one, guild chat before that.
+local function chan()
+  return (IsInRaid and IsInRaid()) and "RAID" or "GUILD"
+end
+
+-- Nobles and above (and the guild master) can host.
+function G.CanHost(name)
+  name = name or ns.PlayerName()
+  return name ~= nil and (ns.IsGuildMaster(name) or ns.RankAtLeast(name, ns.RankSetting("nobleRank")))
+end
+
+-- Is this player in my raid right now? (Only meaningful on the host.)
+function G.InMyRaid(name)
+  if name == ns.PlayerName() then return IsInRaid and IsInRaid() end
+  if not (IsInRaid and IsInRaid()) or not UnitInRaid then return false end
+  local ok, r = pcall(UnitInRaid, ns.CharName(name, false))
+  return ok and r ~= nil
+end
 local MAX_AMOUNT = 1000000
 
 local function isSecret(v) return issecretvalue and issecretvalue(v) end
@@ -74,27 +94,25 @@ end
 function G.Open(amount, channel)
   amount = math.floor(tonumber(amount) or 0)
   if amount < 2 or amount > MAX_AMOUNT then ns.Print("Pick an amount from 2 to " .. MAX_AMOUNT .. " gold."); return end
-  channel = "RAID"
-  if not (IsInRaid and IsInRaid()) then
-    ns.Print("Cross Gambling is raid only, so every roll is seen by the game itself. Form a raid first (make your party a raid).")
-    return
-  end
+  if not G.CanHost() then ns.Print("Only Nobles and above can host Cross Gambling."); return end
+  channel = chan()
   if G.Active() and not G.IsHost() then ns.Print(first(G.game.host) .. " is already running a game."); return end
   local me = ns.PlayerName()
   G.game = { id = string.format("%x", ns.Hash(me .. ns.Now()) % 0xFFFFFF), host = me, amount = amount, channel = channel,
     phase = "open", players = {}, order = {}, rolls = {}, tie = {}, tieRolls = {} }
-  say("Ironforged Cross Gambling: " .. amount .. "g! Type 1 to join, -1 to leave.", channel)
-  -- tell the guild how to get into the raid
   local word = ns.AutoInvite and ns.AutoInvite.Word() or "inv"
   G.game.kw = word
-  say("Ironforged Cross Gambling: " .. amount .. "g in " .. ns.CharName(me, false) .. "'s raid! Whisper " ..
-    ns.CharName(me, false) .. " \"" .. word .. "\" for an invite, then type 1 in raid chat to join.", "GUILD")
+  local host = ns.CharName(me, false)
+  if channel == "RAID" then say("Ironforged Cross Gambling: " .. amount .. "g! Type 1 to join, -1 to leave.", "RAID") end
+  -- the guild is told to type 1 and get into the raid, where the rolling happens
+  say("Ironforged Cross Gambling: " .. amount .. "g hosted by " .. host .. "! Type 1 to join. Rolls happen in " .. host ..
+    "'s raid: whisper " .. host .. " \"" .. word .. "\" for an invite.", "GUILD")
   changed()
 end
 
 function G.LastCall()
   if not G.IsHost() or G.game.phase ~= "open" then return end
-  say("Last call to join for " .. G.game.amount .. "g! Type 1 to join.", G.game.channel)
+  say("Last call to join for " .. G.game.amount .. "g! Type 1 to join.", chan())
 end
 
 local function rollNames(list)
@@ -107,14 +125,25 @@ function G.StartRolling()
   local g = G.game
   if not G.IsHost() or g.phase ~= "open" then return end
   if #g.order < 2 then ns.Print("At least two players must join first."); return end
+  if not (IsInRaid and IsInRaid()) then
+    ns.Print("Rolls only count in a raid. Make your group a raid and invite the players, then start rolling.")
+    return
+  end
   g.phase = "rolling"
-  say("Rolling for " .. g.amount .. "g! " .. #g.order .. " players: " .. rollNames(g.order) .. ". Type /roll " .. g.amount .. " now.", g.channel)
+  local missing = {}
+  for _, n in ipairs(g.order) do if not G.InMyRaid(n) then missing[#missing + 1] = n end end
+  if #missing > 0 then
+    local host = ns.CharName(g.host, false)
+    say("Rolling has started! " .. rollNames(missing) .. ": join " .. host .. "'s raid to roll. Whisper " .. host ..
+      " \"" .. (g.kw or "inv") .. "\" for an invite.", "GUILD")
+  end
+  say("Rolling for " .. g.amount .. "g! " .. #g.order .. " players: " .. rollNames(g.order) .. ". Type /roll " .. g.amount .. " now.", chan())
   changed()
 end
 
 function G.Cancel()
   if not G.IsHost() then return end
-  if G.Active() then say("Cross Gambling cancelled.", G.game.channel) end
+  if G.Active() then say("Cross Gambling cancelled.", chan()) end
   G.game.phase = "cancelled"
   changed()
 end
@@ -150,9 +179,9 @@ local function finish()
   g.owed = (g.highRoll or 0) - (g.lowRoll or 0)
   g.phase = "done"
   if g.owed <= 0 or g.high == g.low then
-    say("Everyone rolled the same. No gold changes hands.", g.channel)
+    say("Everyone rolled the same. No gold changes hands.", chan())
   else
-    say(first(g.low) .. " owes " .. first(g.high) .. " " .. g.owed .. "g! (" .. g.highRoll .. " to " .. g.lowRoll .. ")", g.channel)
+    say(first(g.low) .. " owes " .. first(g.high) .. " " .. g.owed .. "g! (" .. g.highRoll .. " to " .. g.lowRoll .. ")", chan())
     local order = {}
     for _, n in ipairs(g.order) do order[#order + 1] = n end
     Data.Put("gambles", g.host .. "#" .. g.id, { amount = g.amount, high = g.high, low = g.low, owed = g.owed,
@@ -166,7 +195,7 @@ local function startTie(kind, names)
   g.phase = kind
   g.tie = names
   g.tieRolls = {}
-  say((kind == "tiehigh" and "Tie for high" or "Tie for low") .. " between " .. rollNames(names) .. "! Roll again: /roll " .. g.amount, g.channel)
+  say((kind == "tiehigh" and "Tie for high" or "Tie for low") .. " between " .. rollNames(names) .. "! Roll again: /roll " .. g.amount, chan())
   changed()
 end
 
@@ -226,7 +255,7 @@ end
 function G.OnChat(channel, text, sender)
   local g = G.game
   if not G.IsHost() or not g or g.phase ~= "open" then return end
-  if channel ~= g.channel or type(text) ~= "string" or isSecret(text) or isSecret(sender) then return end
+  if (channel ~= "GUILD" and channel ~= "RAID") or type(text) ~= "string" or isSecret(text) or isSecret(sender) then return end
   local name = ns.FullName(sender)
   if not name then return end
   text = ns.Trim(text)
@@ -251,9 +280,9 @@ function G.Kick(name)
   local inTie = false
   for i, n in ipairs(g.tie) do if n == name then table.remove(g.tie, i); inTie = true; break end end
   g.tieRolls[name] = nil
-  say(first(name) .. " has been removed from the game.", g.channel)
+  say(first(name) .. " has been removed from the game.", chan())
   if g.phase ~= "open" and #g.order < 2 then
-    say("Not enough players left. Cross Gambling cancelled.", g.channel)
+    say("Not enough players left. Cross Gambling cancelled.", chan())
     g.phase = "cancelled"
     changed()
     return
@@ -272,8 +301,8 @@ end
 ----------------------------------------------------------------------
 -- Player actions (any guildmate, including the host)
 ----------------------------------------------------------------------
-function G.Join() if G.game then say("1", G.game.channel) end end
-function G.Leave() if G.game then say("-1", G.game.channel) end end
+function G.Join() if G.game then say("1", chan()) end end
+function G.Leave() if G.game then say("-1", chan()) end end
 
 function G.Roll()
   local g = G.game
@@ -328,17 +357,17 @@ ns.RegisterEvent("CHAT_MSG_SYSTEM", function(text)
   if G.IsHost() then G.OnRoll(who, roll, lo, hi) end
 end)
 
-for _, ev in ipairs({ "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER" }) do
+for _, ev in ipairs({ "CHAT_MSG_GUILD", "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER" }) do
   local channel = ev:match("CHAT_MSG_(%u+)")
   ns.RegisterEvent(ev, function(text, sender) G.OnChat(channel, text, sender) end)
 end
 
 -- State from a host
 ns.On("GAMBLE_STATE", function(host, msg)
-  if G.IsHost() then return end
+  if G.IsHost() and G.Active() then return end -- my own finished game doesn't block someone else's
   if type(msg.order) ~= "table" or type(msg.rolls) ~= "table" then return end
   local fresh = not G.game or G.game.id ~= msg.id
-  G.game = { id = msg.id, host = host, amount = tonumber(msg.amount) or 0, channel = "RAID",
+  G.game = { id = msg.id, host = host, amount = tonumber(msg.amount) or 0, channel = CHANNELS[msg.channel] and msg.channel or "RAID",
     phase = msg.phase, order = msg.order, rolls = msg.rolls, tie = msg.tie or {}, tieRolls = msg.tieRolls or {},
     high = msg.high, low = msg.low, owed = msg.owed, players = {},
     kw = type(msg.kw) == "string" and msg.kw:sub(1, 20) or "inv" }

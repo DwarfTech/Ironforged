@@ -458,8 +458,27 @@ check(afterCount == beforeCount + 2 and #A.guildChat > 0 and A.guildChat[#A.guil
 
 -- Cross Gambling
 check(D.ns.Gamble._parseRoll("Kurdran rolls 57 (1-100)") == "Kurdran", "roll message parsed")
-A.ns.Gamble.Open(100)
-check(not A.ns.Gamble.game, "no game outside a raid")
+K.ns.Gamble.Open(100)
+check(not K.ns.Gamble.game, "only Nobles and above can host")
+-- a game can open outside a raid; the rolling has to happen in one
+D.ns.Gamble.Open(20); H.run(2)
+check(D.ns.Gamble.game and K.ns.Gamble.game and K.ns.Gamble.game.host == "Dagna-Forever", "a Noble opens a game outside a raid")
+local gpost = false
+for _, m in ipairs(D.guildChat) do if m:find("Rolls happen in Dagna's raid", 1, true) then gpost = true end end
+check(gpost, "guild told to type 1 and get into the raid")
+K.ns.Gamble.Join(); M.ns.Gamble.Join(); H.run(2)
+check(#D.ns.Gamble.game.order == 2, "join by typing 1 in guild chat")
+D.ns.Gamble.StartRolling()
+check(D.ns.Gamble.game.phase == "open", "rolling waits until the host is in a raid")
+D.inRaid, K.inRaid = true, true
+D.ns.Gamble.StartRolling(); H.run(2)
+local prompt = false
+for _, m in ipairs(D.guildChat) do if m:find("Muradin: join Dagna's raid to roll", 1, true) then prompt = true end end
+check(D.ns.Gamble.game.phase == "rolling" and prompt, "players outside the raid are told to join it to roll")
+local mp = M.env.IronforgedGambleFrame
+check(mp and mp:IsShown() and mp.ask:IsShown() and not mp.roll:IsShown(), "outside the raid: Ask for invite, no Roll")
+D.ns.Gamble.Cancel(); H.run(2)
+D.inRaid, K.inRaid = false, false
 A.inRaid, K.inRaid, D.inRaid, M.inRaid = true, true, true, false
 A.leader = true
 A.invites = {}
@@ -469,18 +488,18 @@ H.run(2)
 local raidPost, guildPost = false, false
 for _, m in ipairs(A.guildChat) do
   if m:find("Type 1 to join", 1, true) then raidPost = true end
-  if m:find("Whisper Thorin \"inv\" for an invite", 1, true) then guildPost = true end
+  if m:find("whisper Thorin \"inv\" for an invite", 1, true) then guildPost = true end
 end
 check(raidPost, "game opened in raid chat")
 check(guildPost, "guild told to whisper inv to get into the raid")
 local mpop = M.env.IronforgedGambleFrame
-check(mpop and mpop:IsShown() and mpop.ask:IsShown() and not mpop.join:IsShown(), "outside the raid: popup offers Ask for invite")
+check(mpop and mpop:IsShown() and mpop.ask:IsShown(), "outside the raid: popup offers Ask for invite")
 mpop.ask.__scripts.OnClick(mpop.ask)
 H.run(2)
 check(A.invites[#A.invites] == "Muradin-Forever", "asking whispers inv and the host invites")
 M.inRaid = true
 H.fire(M, "GROUP_ROSTER_UPDATE")
-check(mpop.join:IsShown() and not mpop.ask:IsShown(), "in the raid: popup offers Join")
+check(mpop.join:IsShown() and not mpop.ask:IsShown(), "in the raid: no need to ask")
 A.ns.settings.autoInvite = true
 check(K.env.IronforgedGambleFrame and K.env.IronforgedGambleFrame:IsShown(), "guildmates get the gambling popup")
 K.ns.Gamble.Join(); D.ns.Gamble.Join(); M.ns.Gamble.Join(); A.ns.Gamble.Join()
@@ -891,7 +910,7 @@ check(ok and A.env.SLASH_IRONFORGED3 == "/if", "slash commands, including /if")
 
 local anyGuild = 0
 for _, c in pairs(H.clients) do
-  for _, m in ipairs(c.guildChat) do if not (m:find("CHEERS!", 1, true) or m:find(" chugs ", 1, true) or m:find("Gambling", 1, true) or m:find("^%-?1$") or m:find(" owes ", 1, true) or m:find("Rolling for", 1, true) or m:find("Tie for", 1, true) or m:find("Last call", 1, true) or m:find("removed from the game", 1, true) or m:find("Not enough players", 1, true)) then anyGuild = anyGuild + 1; print("GUILDCHAT: " .. m) end end
+  for _, m in ipairs(c.guildChat) do if not (m:find("CHEERS!", 1, true) or m:find(" chugs ", 1, true) or m:find("Gambling", 1, true) or m:find("^%-?1$") or m:find(" owes ", 1, true) or m:find("Rolling for", 1, true) or m:find("Tie for", 1, true) or m:find("Last call", 1, true) or m:find("removed from the game", 1, true) or m:find("Not enough players", 1, true) or m:find("Rolling has started", 1, true)) then anyGuild = anyGuild + 1; print("GUILDCHAT: " .. m) end end
 end
 check(anyGuild == 0, "only Cheers and Cross Gambling post to guild chat")
 print("buttons clicked: " .. tostring(CLICKS))

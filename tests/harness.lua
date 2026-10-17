@@ -27,7 +27,7 @@ local ROSTER = {
   { "Nobody-Forever", "Ironguard", 9, 5, "Mage", "MAGE" },
   { "Frugo-Mega", "Thane", 0, 60, "Warrior", "WARRIOR" },
   { "Bruni-Mega", "Longbeard", 2, 60, "Priest", "PRIEST" },
-  { "Buttercup Clamstone-Forever", "Veteran", 7, 40, "Rogue", "ROGUE" }, -- Forever first + last name
+  { "Buttercup Clamstone-Forever", "Noble", 5, 40, "Rogue", "ROGUE" }, -- Forever first + last name
 }
 H.RACES_BY_NAME = {}
 H.ROSTER = ROSTER
@@ -267,6 +267,14 @@ local function makeClient(shortName, race, fullName)
   env.IsInGroup = function() return client.inGroup or client.inRaid end
   env.IsInRaid = function() return client.inRaid end
   env.UnitIsGroupLeader = function(u) return client.leader and true or false end
+  -- UnitInRaid by character name: in my raid if we're both in the (single) test raid
+  env.UnitInRaid = function(n)
+    if not client.inRaid then return nil end
+    for full, c in pairs(H.clients) do
+      if c.inRaid and H.charName(full):match("^[^%-]+") == n then return 1 end
+    end
+    return nil
+  end
   env.UnitExists = env.UnitExists or function(u) return client.units[u] ~= nil end
   env.LeaveParty = function() client.left = true end -- the game drops the group a moment later
   env.C_PartyInfo = env.C_PartyInfo or {}
