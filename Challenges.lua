@@ -10,12 +10,12 @@ local Data = ns.Data
 local C = {}
 ns.Challenges = C
 
-C.SLOT_NAMES = { [1] = "Head", [3] = "Shoulder", [5] = "Chest", [6] = "Waist", [7] = "Legs", [8] = "Feet",
+C.SLOT_NAMES = { [1] = "Head", [3] = "Shoulder", [4] = "Shirt", [5] = "Chest", [6] = "Waist", [7] = "Legs", [8] = "Feet",
   [9] = "Wrist", [10] = "Hands", [15] = "Back" }
 
 C.PRESETS = {
-  slayer = { name = "Slayer", noSlots = { 3, 5 }, pvp = true,
-    rules = "Start at level 1. No chest or shoulder armor, and stay flagged for PvP all the way to max level." },
+  slayer = { name = "Slayer", noSlots = { 3, 4, 5 }, pvp = true,
+    rules = "Start at level 1. No chest or shoulder armor, no shirt, and stay flagged for PvP all the way to max level." },
   stoneskin = { name = "Stone-Skin", noSlots = { 1, 3, 5, 6, 7, 8, 9, 10, 15 },
     rules = "Start at level 1. Wear no armor at all: weapons, rings, necklace, trinkets, shirt and tabard only." },
   selfmade = { name = "Self-Made", noAH = true, noTrade = true, noMail = true,
@@ -189,17 +189,18 @@ function C.Enforce()
     for _, slot in ipairs(p.noSlots or {}) do
       if worn(slot) then
         local slotName = C.SLOT_NAMES[slot] or "that"
+        local what = slot == 4 and "shirt" or (slotName:lower() .. " armor")
         if unequip(slot) then
-          ns.Print("|cffd4a017" .. p.name .. ":|r no " .. slotName:lower() .. " armor. It's back in your bags.")
+          ns.Print("|cffd4a017" .. p.name .. ":|r no " .. what .. ". It's back in your bags.")
           wornSince[slot] = nil
         else
           wornSince[slot] = wornSince[slot] or now
           if not warned[slot] then
             warned[slot] = true
-            ns.Print("|cffff4040" .. p.name .. ":|r take off your " .. slotName:lower() .. " armor within a minute or the challenge fails" ..
+            ns.Print("|cffff4040" .. p.name .. ":|r take off your " .. what .. " within a minute or the challenge fails" ..
               ((freeBagSlot() == nil) and " (your bags are full)." or "."))
           end
-          if now - wornSince[slot] >= GRACE then C.Fail(c.key, "Wore " .. slotName:lower() .. " armor at level " .. level() .. ".") end
+          if now - wornSince[slot] >= GRACE then C.Fail(c.key, "Wore " .. (slot == 4 and "a shirt" or (slotName:lower() .. " armor")) .. " at level " .. level() .. ".") end
         end
       else
         wornSince[slot] = nil

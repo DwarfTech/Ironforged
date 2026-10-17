@@ -606,10 +606,10 @@ local CK = K.ns.Challenges
 K.level = 5
 check(not CK.Start("slayer"), "ready-made challenges start at level 1")
 K.level = 1
-K.equip[5] = 6125; K.equip[3] = 1000; K.equip[16] = 25
+K.equip[5] = 6125; K.equip[3] = 1000; K.equip[4] = 45; K.equip[16] = 25
 local slayerKey = CK.Start("slayer")
 H.run(2)
-check(slayerKey and K.equip[5] == nil and K.equip[3] == nil and K.equip[16] == 25, "Slayer takes off chest and shoulders, leaves the weapon")
+check(slayerKey and K.equip[5] == nil and K.equip[3] == nil and K.equip[4] == nil and K.equip[16] == 25, "Slayer takes off chest, shoulders and shirt, leaves the weapon")
 check(K.pvp == true, "Slayer keeps you flagged for PvP")
 check(D.ns.Data.Get("challenges", slayerKey) and D.ns.Data.Get("challenges", slayerKey).status == "active", "challenge shared with the guild")
 K.pvp = false
