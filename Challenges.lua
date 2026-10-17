@@ -421,8 +421,21 @@ ns.RegisterEvent("PLAYER_LEVEL_UP", function(newLevel)
   end
 end)
 
+-- Records saved before challenges could start at any level say "Start at level 1." in their rules.
+-- Each member's client rewrites its own to today's wording.
+function C.RefreshOldRules()
+  local me = ns.PlayerName()
+  if not me then return end
+  for k, d in Data.Each("challenges") do
+    if Data.SplitKey(k) == me and d.preset and C.PRESETS[d.preset] and type(d.rules) == "string" and d.rules:find("level 1", 1, true) then
+      update(k, { rules = C.PRESETS[d.preset].rules })
+    end
+  end
+end
+
 ns.On("DATA_READY", function()
   if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(10, function() pcall(C.Enforce); pcall(C.CheckGroup) end) end
+  if C_Timer then C_Timer.After(15, function() pcall(C.RefreshOldRules) end) end
 end)
 
 ----------------------------------------------------------------------

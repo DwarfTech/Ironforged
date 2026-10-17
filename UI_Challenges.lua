@@ -52,7 +52,9 @@ local function showChallenge(key)
   }
   if d.ended then lines[#lines + 1] = "|cffd4a017Ended:|r " .. ns.FormatDate(d.ended) end
   if d.reason and d.reason ~= "" then lines[#lines + 1] = "|cffd4a017Why:|r " .. d.reason end
-  if d.rules and d.rules ~= "" then lines[#lines + 1] = " "; lines[#lines + 1] = d.rules end
+  -- ready-made challenges show today's rules (older records saved "Start at level 1")
+  local rules = (d.preset and C.PRESETS[d.preset] and C.PRESETS[d.preset].rules) or d.rules
+  if rules and rules ~= "" then lines[#lines + 1] = " "; lines[#lines + 1] = rules end
   local buttons = {}
   if mine and d.status == "active" then
     buttons[#buttons + 1] = { text = "Give up", onClick = function()

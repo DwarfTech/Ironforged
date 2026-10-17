@@ -690,6 +690,12 @@ K.env.SlashCmdList.IRONFORGED("pvp")
 check(pvpCalls == 0, "/hold pvp only reports")
 K.env.SetPVP, K.env.TogglePVP = realSet, realToggle
 
+-- old records that said "Start at level 1" get today's wording
+local oldKey = "Kurdran-Forever#old1"
+K.ns.Data.Put("challenges", oldKey, { name = "One Life", preset = "onelife", rules = "Start at level 1. Die once and the challenge is over.", ts = 1, startLevel = 1, lvl = 1, status = "failed" })
+K.ns.Challenges.RefreshOldRules(); H.run(2)
+check(not D.ns.Data.Get("challenges", oldKey).rules:find("level 1", 1, true), "old level-1 wording replaced")
+
 -- start form shows rules for a ready-made pick, and name/rules boxes only for your own
 K.ns.UI.StartChallengeForm("slayer")
 local dlg = K.env.IronforgedDialog
