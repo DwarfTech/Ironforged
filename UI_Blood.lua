@@ -10,22 +10,26 @@ local function build(f, w, h)
   f.mine:SetWidth(w - 12)
   f.mine:SetWordWrap(false)
   f.list = UI.List(f, w, h - 52, {
-    { title = "#", width = 30 }, { title = "Dwarf", width = 180 }, { title = "Rank", width = 100 },
-    { title = "Horde slain", width = 96 }, { title = "Elves slain", width = 96 }, { title = "Avenged", width = 90 },
+    { title = "#", width = 30 }, { title = "Dwarf", width = 250 },
+    { title = "Horde slain", width = 110 }, { title = "Elves slain", width = 110 }, { title = "Avenged", width = 100 },
   }, function(name) UI.ShowMember(name, { noManage = true }) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
-  -- hover the Elves slain title for the rules
-  local eh = f.list.headers[5]
-  if eh then
-    eh:SetScript("OnEnter", function(self)
+  -- hover a column title for how it's counted
+  local function explain(col, title, r, g, b, text)
+    local hb = f.list.headers[col]
+    if not hb then return end
+    hb:SetScript("OnEnter", function(self)
       GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-      GameTooltip:AddLine("Elves slain", 0.5, 1, 0.37)
-      GameTooltip:AddLine(ns.Blood.ELF_RULES, 1, 1, 1, true)
+      GameTooltip:AddLine(title, r, g, b)
+      GameTooltip:AddLine(text, 1, 1, 1, true)
       GameTooltip:Show()
     end)
-    eh:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    hb:SetScript("OnLeave", function() GameTooltip:Hide() end)
   end
-  f.note = UI.Label(f, "Horde slain is each dwarf's lifetime honorable kills. Hover Elves slain for how elf kills count.", "GameFontDisableSmall")
+  explain(3, "Horde slain", 1, 0.38, 0.25, "Your lifetime honorable kills, straight from the game's own PvP stats.")
+  explain(4, "Elves slain", 0.5, 1, 0.37, ns.Blood.ELF_RULES)
+  explain(5, "Avenged", 1, 0.82, 0.25, ns.Blood.AVENGED_RULES)
+  f.note = UI.Label(f, "Hover a column title to see how it's counted.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 4)
   f.note:SetWidth(w - 8)
 end
@@ -52,9 +56,9 @@ local function refresh(f)
     local medal = (i == 1 and "|cffffd700") or (i == 2 and "|cffc0c0c0") or (i == 3 and "|cffcd7f32") or "|cffffffff"
     items[#items + 1] = {
       data = r.name,
-      keys = { [2] = ns.NameKey(r.name), [4] = r.hk, [5] = r.elves, [6] = r.avenged },
+      keys = { [2] = ns.NameKey(r.name), [3] = r.hk, [4] = r.elves, [5] = r.avenged },
       cols = { medal .. i .. "|r", ns.ColorName(r.name) .. (r.name == me and " |cff999999(you)|r" or ""),
-        (ns.roster[r.name] and ns.roster[r.name].rankName) or "", r.hk,
+        r.hk,
         (topElves > 0 and r.elves == topElves) and ("|cff7fff5f" .. r.elves .. "|r") or r.elves, r.avenged },
     }
   end

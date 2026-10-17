@@ -213,6 +213,11 @@ Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves.\n" ..
   "- Solo: every elf kill counts.\n- In a party: only if the elf was your target when they died.\n" ..
   "- In a raid: elf kills don't count.\n- The same elf counts at most once an hour."
 
+Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
+  "- Get an honorable kill on a Horde player with an open grudge against them, or\n" ..
+  "- see that player dead (on a nameplate, your target or mouseover) before anyone else does.\n" ..
+  "Each open grudge counts once. Alliance grudges are marked avenged by an officer and don't add to this count."
+
 function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)
   if not foe or not Blood.IsElf(foe.race) then return false end
