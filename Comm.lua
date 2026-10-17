@@ -41,7 +41,9 @@ end
 local function rawSend(item)
   if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return "drop" end
   if item.channel == "WHISPER" and not targetOnline(item.target) then return "drop" end
-  local ok, result = pcall(C_ChatInfo.SendAddonMessage, ns.PREFIX, item.text, item.channel, item.target)
+  local target = item.target
+  if item.channel == "WHISPER" then target = ns.CharName(target) end -- never "First Surname-Realm"
+  local ok, result = pcall(C_ChatInfo.SendAddonMessage, ns.PREFIX, item.text, item.channel, target)
   if not ok then return "drop" end
   if result == nil or result == true then return "ok" end
   if result == false then return "drop" end

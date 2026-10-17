@@ -45,7 +45,7 @@ function AI.OnWhisper(text, sender)
     return
   end
   local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-  if fn and pcall(fn, sender) then
+  if fn and pcall(fn, ns.CharName(sender)) then
     ns.Print("Invited " .. ns.ShortName(sender) .. " (they whispered \"" .. msg .. "\").")
   end
 end

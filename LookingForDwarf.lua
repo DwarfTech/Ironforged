@@ -108,11 +108,11 @@ end
 -- Invite a guildmate to my group. Falls back to a command to copy if the game refuses.
 function L.Invite(member)
   local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-  local ok = fn and pcall(fn, member)
+  local ok = fn and pcall(fn, ns.CharName(member))
   if ok then
     ns.Print("Invited " .. ns.ShortName(member) .. ".")
   elseif ns.UI and ns.UI.CopyCommand then
-    ns.UI.CopyCommand("/invite " .. ns.ShortName(member), "Invite " .. ns.ShortName(member))
+    ns.UI.CopyCommand("/invite " .. ns.CharName(member, false), "Invite " .. ns.ShortName(member))
   end
   return ok
 end

@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.11.6"
+ns.VERSION = "2.11.7"
 ns.PROTOCOL = 11
 ns.PREFIX = "IRONFORGED"
 ns.COLOR = "ffd4a017"
@@ -126,6 +126,18 @@ function ns.ShortName(name)
   local stripped = name:gsub("%-[^%s%-]+$", "")
   if stripped ~= "" then return stripped end
   return name
+end
+
+-- The name the game server knows a character by, for whispers, invites and slash commands.
+-- Forever shows first and last names ("Buttercup Clamstone-ClassicBetaPvP"), but the character's
+-- actual name is the first one: "Buttercup-ClassicBetaPvP". withRealm=false drops the realm too.
+function ns.CharName(name, withRealm)
+  if type(name) ~= "string" then return name end
+  local base, realm = name:match("^(.-)%-([^%s%-]+)$")
+  base = base or name
+  local first = base:match("^(%S+)") or base
+  if realm and withRealm ~= false then return first .. "-" .. realm end
+  return first
 end
 
 -- Your own roster name, matched by character ID first (exact), then by name.

@@ -50,9 +50,9 @@ function UI.ManageInGuildWindow(name)
     fields = { { type = "info", value = "|cffd4a017" .. short .. "|r  (" .. (info.rankName or "?") .. ", level " .. tostring(info.level or "?") .. ")" ..
       "\n\nBlizzard only lets you promote, demote or remove someone with a command you type yourself, or from its own guild window. Pick one and the addon gives you the command to copy." } },
     buttons = {
-      { text = "Remove", onClick = function() UI.CopyCommand("/gremove " .. short, "Remove " .. short) end },
-      { text = "Demote", onClick = function() UI.CopyCommand("/gdemote " .. short, "Demote " .. short) end },
-      { text = "Promote", onClick = function() UI.CopyCommand("/gpromote " .. short, "Promote " .. short) end },
+      { text = "Remove", onClick = function() UI.CopyCommand("/gremove " .. ns.CharName(name, false), "Remove " .. short) end },
+      { text = "Demote", onClick = function() UI.CopyCommand("/gdemote " .. ns.CharName(name, false), "Demote " .. short) end },
+      { text = "Promote", onClick = function() UI.CopyCommand("/gpromote " .. ns.CharName(name, false), "Promote " .. short) end },
     },
   })
 end

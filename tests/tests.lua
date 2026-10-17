@@ -784,6 +784,26 @@ for _, coll in ipairs(AD.COLLECTIONS) do
 end
 check(F.ns.PlayerName() == "Frugo-Mega" and F.ns.IAmOfficer(), "matched by character ID")
 
+-- A guildmate with a Forever surname: whispers go to their real character name
+local Bc = H.makeClient("Buttercup", nil, "Buttercup Clamstone-Forever"); Bc.guidOverride = "Player-Buttercup Clamstone-Forever"
+H.boot(Bc)
+H.run(90)
+check(Bc.ns.PlayerName() == "Buttercup Clamstone-Forever", "surnamed member recognised")
+check(Bc.ns.Data.Digest("grudges") == AD.Digest("grudges"), "surnamed member syncs (whispered records arrive)")
+check(A.ns.CharName("Buttercup Clamstone-Forever") == "Buttercup-Forever" and A.ns.CharName("Buttercup Clamstone-Forever", false) == "Buttercup", "real character name")
+A.ns.Gamble.Open(100, "GUILD"); H.run(2)
+Bc.ns.Gamble.Join(); K.ns.Gamble.Join(); H.run(2)
+A.ns.Gamble.StartRolling(); H.run(2)
+Bc.rollQueue = { 86 }; K.rollQueue = { 12 }
+Bc.ns.Gamble.Roll(); K.ns.Gamble.Roll(); H.run(4)
+check(A.ns.Gamble.game.rolls["Buttercup Clamstone-Forever"] == 86 and A.ns.Gamble.game.phase == "done", "surnamed player's roll reaches the host outside a group")
+Bc.ns.Gamble.Open(50, "GUILD"); H.run(2)
+K.ns.Gamble.Join(); D.ns.Gamble.Join(); H.run(2)
+Bc.ns.Gamble.StartRolling(); H.run(2)
+K.rollQueue = { 40 }; D.rollQueue = { 7 }
+K.ns.Gamble.Roll(); D.ns.Gamble.Roll(); H.run(4)
+check(Bc.ns.Gamble.game.phase == "done" and Bc.ns.Gamble.game.rolls["Kurdran-Forever"] == 40, "rolls reach a surnamed host")
+
 -- UI smoke test for every role
 for _, client in ipairs({ A, M, D, K, Hh, B, F }) do
   local cns = client.ns

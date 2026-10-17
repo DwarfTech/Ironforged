@@ -6,6 +6,12 @@ for line in io.lines(ADDON_DIR .. "/Ironforged.toc") do
 end
 
 local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000 }
+-- "Buttercup Clamstone-Forever" -> "Buttercup-Forever"
+function H.charName(full)
+  local base, realm = full:match("^(.-)%-([^%-]+)$")
+  base = base or full
+  return (base:match("^(%S+)") or base) .. (realm and ("-" .. realm) or "")
+end
 
 local ROSTER = {
   { "Thorin-Forever", "Thane", 0, 60, "Warrior", "WARRIOR" },
@@ -21,6 +27,7 @@ local ROSTER = {
   { "Nobody-Forever", "Ironguard", 9, 5, "Mage", "MAGE" },
   { "Frugo-Mega", "Thane", 0, 60, "Warrior", "WARRIOR" },
   { "Bruni-Mega", "Longbeard", 2, 60, "Priest", "PRIEST" },
+  { "Buttercup Clamstone-Forever", "Veteran", 7, 40, "Rogue", "ROGUE" }, -- Forever first + last name
 }
 H.RACES_BY_NAME = {}
 H.ROSTER = ROSTER
@@ -174,7 +181,9 @@ local function makeClient(shortName, race, fullName)
       assert(#prefix <= 16, "prefix too long")
       assert(#text <= 255, "addon message too long: " .. #text)
       assert(not text:find("%z"), "null byte in addon message")
-      table.insert(H.bus, { from = client.full, prefix = prefix, text = text, channel = channel, target = target })
+      if channel == "WHISPER" then assert(not target:find(" "), "whisper to a name with a space: " .. target) end
+      -- the server knows a character by its first name; that's who whispers come from and go to
+      table.insert(H.bus, { from = H.charName(client.full), prefix = prefix, text = text, channel = channel, target = target })
       return 0
     end,
     SendChatMessage = function(text, channel)
@@ -330,7 +339,7 @@ function H.step(dt)
   H.bus = {}
   for _, m in ipairs(bus) do
     for full, c in pairs(H.clients) do
-      if full ~= m.from and (m.channel == "GUILD" or (m.channel == "WHISPER" and m.target == full)) then
+      if H.charName(full) ~= m.from and (m.channel == "GUILD" or (m.channel == "WHISPER" and m.target == H.charName(full))) then
         H.fire(c, "CHAT_MSG_ADDON", m.prefix, m.text, m.channel, m.from)
       end
     end
