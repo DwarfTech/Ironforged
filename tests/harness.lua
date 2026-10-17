@@ -6,12 +6,9 @@ for line in io.lines(ADDON_DIR .. "/Ironforged.toc") do
 end
 
 local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000 }
--- "Buttercup Clamstone-Forever" -> "Buttercup-Forever"
-function H.charName(full)
-  local base, realm = full:match("^(.-)%-([^%-]+)$")
-  base = base or full
-  return (base:match("^(%S+)") or base) .. (realm and ("-" .. realm) or "")
-end
+-- the server knows a character by its full "First Surname" name; the realm is dropped when whispering
+function H.charName(full) return full end
+function H.baseName(n) return (n:match("^(.-)%-[^%s%-]+$")) or n end
 
 local ROSTER = {
   { "Thorin-Forever", "Thane", 0, 60, "Warrior", "WARRIOR" },
@@ -181,14 +178,11 @@ local function makeClient(shortName, race, fullName)
       assert(#prefix <= 16, "prefix too long")
       assert(#text <= 255, "addon message too long: " .. #text)
       assert(not text:find("%z"), "null byte in addon message")
-      if channel == "WHISPER" then assert(not target:find(" "), "whisper to a name with a space: " .. target) end
-      -- the server knows a character by its first name; that's who whispers come from and go to
       table.insert(H.bus, { from = H.charName(client.full), prefix = prefix, text = text, channel = channel, target = target })
       return 0
     end,
     SendChatMessage = function(text, channel, lang, target)
       if channel == "WHISPER" then
-        assert(not target:find(" "), "chat whisper to a name with a space: " .. target)
         H.whisperBus = H.whisperBus or {}
         table.insert(H.whisperBus, { from = H.charName(client.full), to = target, text = text })
         return
@@ -271,7 +265,7 @@ local function makeClient(shortName, race, fullName)
   env.UnitInRaid = function(n)
     if not client.inRaid then return nil end
     for full, c in pairs(H.clients) do
-      if c.inRaid and H.charName(full):match("^[^%-]+") == n then return 1 end
+      if c.inRaid and H.baseName(full) == n then return 1 end
     end
     return nil
   end
@@ -355,7 +349,7 @@ function H.step(dt)
   local wb = H.whisperBus or {}
   H.whisperBus = {}
   for _, m in ipairs(wb) do
-    for full, c in pairs(H.clients) do if H.charName(full) == m.to then H.fire(c, "CHAT_MSG_WHISPER", m.text, m.from) end end
+    for full, c in pairs(H.clients) do if H.baseName(full) == H.baseName(m.to) then H.fire(c, "CHAT_MSG_WHISPER", m.text, m.from) end end
   end
   local raidb = H.raidBus or {}
   H.raidBus = {}
@@ -374,7 +368,7 @@ function H.step(dt)
   H.bus = {}
   for _, m in ipairs(bus) do
     for full, c in pairs(H.clients) do
-      if H.charName(full) ~= m.from and (m.channel == "GUILD" or (m.channel == "WHISPER" and m.target == H.charName(full))) then
+      if H.charName(full) ~= m.from and (m.channel == "GUILD" or (m.channel == "WHISPER" and H.baseName(m.target) == H.baseName(full))) then
         H.fire(c, "CHAT_MSG_ADDON", m.prefix, m.text, m.channel, m.from)
       end
     end

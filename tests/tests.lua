@@ -533,7 +533,7 @@ local mpop = M.env.IronforgedGambleFrame
 check(mpop and mpop:IsShown() and mpop.ask:IsShown(), "outside the raid: popup offers Ask for invite")
 mpop.ask.__scripts.OnClick(mpop.ask)
 H.run(2)
-check(A.invites[#A.invites] == "Muradin-Forever", "asking whispers inv and the host invites")
+check(A.invites[#A.invites] == "Muradin", "asking whispers inv and the host invites")
 M.inRaid = true
 H.fire(M, "GROUP_ROSTER_UPDATE")
 check(mpop.join:IsShown() and not mpop.ask:IsShown(), "in the raid: no need to ask")
@@ -900,17 +900,17 @@ check(picked == "v3", "Enter picks the first match")
 -- Invite from whispers
 K.invites = {}
 H.fire(K, "CHAT_MSG_WHISPER", " INV ", "Dagna-Forever")
-check(K.invites[1] == "Dagna-Forever", "guildmate whispering inv gets invited")
+check(K.invites[1] == "Dagna", "guildmate whispering inv gets invited")
 H.fire(K, "CHAT_MSG_WHISPER", "can you inv me later", "Dagna-Forever")
 H.fire(K, "CHAT_MSG_WHISPER", "inv", "Grubnak-Forever")
 check(#K.invites == 1, "only the keyword, and only guildmates by default")
 K.ns.settings.inviteAnyone = true
 H.fire(K, "CHAT_MSG_WHISPER", "inv", "Grubnak-Forever")
-check(K.invites[2] == "Grubnak-Forever", "anyone can be invited when allowed")
+check(K.invites[2] == "Grubnak", "anyone can be invited when allowed")
 K.ns.settings.inviteAnyone = false
 K.ns.settings.inviteKeyword = "inv, 123"
 H.fire(K, "CHAT_MSG_WHISPER", "123", "Muradin-Forever")
-check(K.invites[3] == "Muradin-Forever", "custom keywords work")
+check(K.invites[3] == "Muradin", "custom keywords work")
 K.ns.settings.autoInvite = false
 H.fire(K, "CHAT_MSG_WHISPER", "inv", "Muradin-Forever")
 check(#K.invites == 3, "auto invite can be turned off")
@@ -934,7 +934,7 @@ check(K.env.IronforgedNotice:IsShown() and K.env.IronforgedNotice.id == "lfdjoin
 local invB
 for _, b in ipairs(K.env.IronforgedNotice.buttons) do if b.__text == "Invite" then invB = b end end
 invB.__scripts.OnClick(invB)
-check(K.invites[1] == "Dagna-Forever", "leader invites from the popup")
+check(K.invites[1] == "Dagna", "leader invites from the popup")
 check(not M.ns.Data.Put("lfdjoin", postKey .. "#Dagna-Forever", { role = "tank", ts = 1 }, true), "can't sign someone else up")
 check(not M.ns.Data.Put("lfd", "Kurdran-Forever#fake", { what = "x", need = 1, ts = 1 }, true), "can't post in someone else's name")
 M.ns.LFD.Join(postKey, "tank"); H.run(3)
