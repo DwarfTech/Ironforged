@@ -137,4 +137,4 @@ Everyone needs the same version for records to sync. An older copy tells its own
 The addon's code lives in a git repository.
 - `tests/` holds a mock WoW client and the test suite. Run it with Lua 5.1: `cd tests && lua5.1 tests.lua ..`
 - On GitHub, every push and pull request runs the tests automatically (`.github/workflows/tests.yml`).
-- When the version in `Ironforged.toc` changes on `main`, GitHub tags it, builds `Ironforged.zip` and publishes it as a release (`.github/workflows/release.yml`). It can also be run by hand from the Actions tab. Guildmates can download the latest version from the repository's Releases page.
+- When the version in `Ironforged.toc` changes on `main`, GitHub tags it `v<version>` (`.github/workflows/release.yml`). Each `v*` tag, including one pushed by hand with `git tag`, is packaged by `.github/workflows/package.yml`: it builds `Ironforged.zip`, publishes it as a GitHub release, and uploads it to CurseForge (project 1749567). The CurseForge upload needs the repository secret `CF_API_TOKEN`.

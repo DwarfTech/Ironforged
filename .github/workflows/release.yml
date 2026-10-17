@@ -1,39 +1,43 @@
 name: Release
 
-# When the version in Ironforged.toc (or this file) changes on main, build Ironforged.zip and
-# publish it as a GitHub release tagged v<version>. Can also be run by hand from the Actions tab.
+# When the version in Ironforged.toc changes on main, tag it v<version> and start the Package
+# workflow on that tag. (Tags pushed by a workflow don't start other workflows by themselves, so
+# Package is started directly.) Pushing a v* tag by hand also runs Package.
 on:
   push:
     branches: [main]
-    paths: [Ironforged.toc, .github/workflows/release.yml]
+    paths: [Ironforged.toc]
   workflow_dispatch:
 
 jobs:
-  release:
+  tag:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Read the version
         id: version
         run: |
           v=$(sed -n 's/^## Version: *//p' Ironforged.toc | tr -d '\r')
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          if gh release view "v$v" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
-      - name: Build Ironforged.zip
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$v" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Tag it
         if: steps.version.outputs.exists == 'false'
         run: |
-          mkdir -p build/Ironforged
-          rsync -a --exclude .git --exclude .github --exclude tests --exclude build \
-            --exclude .gitignore --exclude .pkgmeta ./ build/Ironforged/
-          cd build && zip -qr ../Ironforged.zip Ironforged
-      - name: Publish the release
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Ironforged ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+      - name: Package the tag
         if: steps.version.outputs.exists == 'false'
-        run: |
-          gh release create "v${{ steps.version.outputs.version }}" Ironforged.zip \
-            --target "$GITHUB_SHA" \
-            --title "Ironforged ${{ steps.version.outputs.version }}" \
-            --notes "Download **Ironforged.zip** below, unzip it, and put the Ironforged folder in your World of Warcraft \`Interface/AddOns\` folder."
+        run: gh workflow run package.yml --ref "${{ steps.version.outputs.tag }}"

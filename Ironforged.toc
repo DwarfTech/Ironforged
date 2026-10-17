@@ -7,6 +7,7 @@
 ## IconTexture: Interface\AddOns\Ironforged\Media\Hammer64
 ## AddonCompartmentFunc: Ironforged_OnAddonCompartmentClick
 ## Category: Guild
+## X-Curse-Project-ID: 1749567
 
 Serializer.lua
 Core.lua
