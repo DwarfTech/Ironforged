@@ -1,8 +1,7 @@
 -- Ironforged: the Blood Tally and the hunt for grudged foes.
 --   * Horde slain: your lifetime honorable kills, from the game's own PvP stats.
---   * Elves slain: honorable kills on elves (only Horde elves give honor), plus duels won
---     against any elf. The victim's race comes from what the addon saw on their nameplate,
---     target or tooltip. The same elf counts at most once an hour.
+--   * Elves slain: honorable kills on Horde elves. The victim's race comes from what the addon
+--     saw on their nameplate, target or tooltip. The same elf counts at most once an hour.
 --   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
 --     foe, or sees them fall. Alliance grudges are avenged by an officer.
 --   * Grudged foes get a red warning on their tooltip. The first time a grudged foe is spotted,
@@ -173,7 +172,7 @@ local function victimFromHonorText(text)
 end
 Blood._victimFromHonorText = victimFromHonorText
 
--- Count an elf, at most once an hour for the same elf (by name). how = "kill" or "duel".
+-- Count an elf kill, at most once an hour for the same elf (by name).
 Blood.ELF_COOLDOWN = 60 * 60
 -- The cached foe for a name. Messages may give just the first name ("Sylvanor") while units give
 -- "First Surname", so fall back to the most recently seen foe with that first name.
@@ -203,11 +202,7 @@ function Blood.CountElf(victim, how)
   ns.db.elfCounted[key] = now
   local p = personal()
   p.elves = (p.elves or 0) + 1
-  if how == "duel" then
-    ns.Print("|cffd4a017An elf humbled.|r " .. ns.ShortName(victim) .. " is the " .. p.elves .. Blood.Ordinal(p.elves) .. " elf to fall to your axe.")
-  else
-    ns.Print("|cffd4a017An elf falls.|r " .. ns.ShortName(victim) .. " is the " .. p.elves .. Blood.Ordinal(p.elves) .. " elf to fall to your axe.")
-  end
+  ns.Print("|cffd4a017An elf falls.|r " .. ns.ShortName(victim) .. " is the " .. p.elves .. Blood.Ordinal(p.elves) .. " elf to fall to your axe.")
   schedulePublish(5)
   return true
 end
@@ -239,36 +234,6 @@ end)
 
 ns.RegisterEvent("PLAYER_PVP_KILLS_CHANGED", function() schedulePublish(10) end)
 
--- Duels: beating an elf in a duel (knocking them out) counts too.
-local duelPattern
-local function duelResult(text)
-  if not duelPattern then
-    local fmt = type(DUEL_WINNER_KNOCKOUT) == "string" and DUEL_WINNER_KNOCKOUT or "%1$s has defeated %2$s in a duel"
-    local p = fmt:gsub("([%(%)%.%+%-%*%?%[%]%^])", "%%%1")
-    local order = {}
-    p = p:gsub("%%(%d)%$s", function(n) order[#order + 1] = tonumber(n); return "(.+)" end)
-    p = p:gsub("%%s", function() order[#order + 1] = #order + 1; return "(.+)" end)
-    duelPattern = { pat = "^" .. p .. "$", order = order }
-  end
-  local a, b = text:match(duelPattern.pat)
-  if not a then return nil end
-  local caps = { a, b }
-  local out = {}
-  for i, n in ipairs(duelPattern.order) do out[n] = caps[i] end
-  return out[1], out[2] -- winner, loser
-end
-Blood._duelResult = duelResult
-
-ns.RegisterEvent("CHAT_MSG_SYSTEM", function(text)
-  if type(text) ~= "string" or isSecret(text) then return end
-  local winner, loser = duelResult(text)
-  if not winner then return end
-  local me = UnitName and UnitName("player")
-  if not me or ns.NameKey(winner):match("^(%S+)") ~= ns.NameKey(me):match("^(%S+)") then return end
-  -- make sure we know the loser's race: they're usually our target
-  learn("target")
-  Blood.CountElf(loser, "duel")
-end)
 
 ----------------------------------------------------------------------
 -- Seeing foes: learn their race, warn about grudged ones, notice when they fall.

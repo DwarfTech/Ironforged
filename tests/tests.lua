@@ -370,25 +370,15 @@ check(hk == 41 and elves == 1 and av == 1, "Blood Tally shared: 41 Horde, 1 elf,
 H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Sylvanor dies, honorable kill Rank: Sentinel (Estimated Honor Points: 12)")
 H.run(12)
 check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 1, "the same elf only counts once an hour")
--- duels: beating an elf in a duel counts, once an hour per elf
-K.target = { name = "Aelindra", surname = "Moonleaf", race = "NightElf" }
-H.fire(K, "CHAT_MSG_SYSTEM", "Kurdran has defeated Aelindra in a duel")
-H.run(12)
-check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 2, "beating an elf in a duel counts")
-H.fire(K, "CHAT_MSG_SYSTEM", "Kurdran has defeated Aelindra in a duel")
-H.run(12)
-check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 2, "a rematch within the hour doesn't")
-K.target = { name = "Brog", race = "Orc" }
-H.fire(K, "CHAT_MSG_SYSTEM", "Kurdran has defeated Brog in a duel")
-H.fire(K, "CHAT_MSG_SYSTEM", "Aelindra has defeated Kurdran in a duel")
-H.run(12)
-check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 2, "non-elves and lost duels don't count")
 H.clock = H.clock + 3700
 H.server = H.server + 3700
-K.target = { name = "Aelindra", surname = "Moonleaf", race = "NightElf" }
+H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Sylvanor dies, honorable kill Rank: Sentinel (Estimated Honor Points: 12)")
+H.run(12)
+check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 2, "an hour later the same elf counts again")
+K.target = { name = "Aelindra", race = "NightElf" }
 H.fire(K, "CHAT_MSG_SYSTEM", "Kurdran has defeated Aelindra in a duel")
 H.run(12)
-check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 3, "an hour later the same elf counts again")
+check(select(2, A.ns.Blood.Tally("Kurdran-Forever")) == 2, "duels don't count")
 K.target = nil
 -- witnessed death avenges too
 check(Hh.ns.Data.Put("grudges", "Hilda-Forever#h2", { against = "Zug", faction = "Horde", deed = "Ganked lowbies", ts = 4 }), "second Horde grudge")
