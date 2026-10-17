@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.15.2"
+ns.VERSION = "2.16.0"
 ns.PROTOCOL = 11
 ns.PREFIX = "IRONFORGED"
 ns.COLOR = "ffd4a017"
@@ -251,6 +251,7 @@ local SETTINGS_DEFAULTS = {
   cheersPopup = true,
   gamblePopup = true,
   doomPopup = true,
+  greetBar = true,
   lfdPopup = true,
   autoInvite = true,
   inviteAnyone = false,

@@ -830,6 +830,19 @@ H.fire(K, "PLAYER_LEVEL_UP", 60); H.run(2)
 check(D.ns.Data.Get("challenges", myKey).status == "completed", "your own challenge completes itself at max level")
 K.level = 1
 
+-- Greeting bar when targeting a dwarf
+K.target = { name = "Dagna", race = "Dwarf" }
+H.fire(K, "PLAYER_TARGET_CHANGED")
+local gbar = K.env.IronforgedGreetBar
+check(gbar and gbar:IsShown(), "greeting bar when targeting a dwarf")
+check(K.env.IronforgedGreetHail:GetAttribute("macrotext") == "/hail" and K.env.IronforgedGreetSalute:GetAttribute("macrotext") == "/salute"
+  and K.env.IronforgedGreetCheer:GetAttribute("macrotext") == "/cheer", "Hail, Salute and Cheer are secure emote buttons")
+K.target = { name = "Hilda", race = "Human" }
+H.fire(K, "PLAYER_TARGET_CHANGED")
+check(not gbar:IsShown(), "no greeting bar for a non-dwarf")
+K.target = nil
+H.fire(K, "PLAYER_TARGET_CHANGED")
+
 -- Invite from whispers
 K.invites = {}
 H.fire(K, "CHAT_MSG_WHISPER", " INV ", "Dagna-Forever")

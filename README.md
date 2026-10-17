@@ -72,9 +72,11 @@ If forbidden armor can't come off (your bags are full), you get a warning and on
 **Book of Grudges.** Anyone can write a grudge against someone outside the guild: who, their side (Horde or Alliance), where, and what they did. "Grudge my target" fills in your target's first and last name, their side, and the zone you're in. Guildmates can't be grudged. Everyone can read the book, with unavenged grudges listed first.
 - A **Horde** grudge is avenged automatically when a guildmate with the addon gets an honorable kill on that foe, or sees them dead. The whole guild is told who avenged it.
 - An **Alliance** grudge is avenged by an officer with **Mark avenged**, choosing who gets the credit. Officers can also mark a Horde grudge by hand, or reopen one.
-- The first time a grudged foe shows up on your nameplates, target or mouseover, you get a raid-warning alert and a sound, and the guild is told who spotted them and where. Each grudge alerts only once. A popup also offers to **/doom** them: press the button and you threaten the foe with the wrath of doom (the game's /doom emote, aimed at them). If you're in combat, the popup waits until the fight is over. Their tooltip always shows a red "GRUDGE" line with what they did. You can turn alerts or the /doom popup off in Settings.
+- The first time a grudged foe shows up on your nameplates, target or mouseover, you get a raid-warning alert and a sound, and the guild is told who spotted them and where. Each grudge alerts only once. A popup also offers to **Threaten** them: press the button and you threaten the foe with the wrath of doom (the game's /doom emote, aimed at them). If you're in combat, the popup waits until the fight is over. Their tooltip always shows a red "GRUDGE" line with what they did. You can turn alerts or the Threaten popup off in Settings.
 - Avenged grudges are stamped **AVENGED** in the book, with who avenged them and when.
 - Only officers can strike a grudge out.
+
+**Greeting dwarves.** When you target another dwarf, a small bar under their portrait offers **Hail**, **Salute** and **Cheer**; press one to do that emote at them. It waits until you're out of combat, and you can turn it off in Settings.
 
 **War Hall.** A leaderboard of every dwarf's Horde slain (their lifetime honorable kills), elves slain, and grudges avenged, ranked by Horde slain. Click a column title to sort by another. The most elves slain is highlighted in green. The tally also shows on each member's roster record. Clicking a dwarf here shows their record without the management buttons.
 
