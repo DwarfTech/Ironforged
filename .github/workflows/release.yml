@@ -1,11 +1,11 @@
 name: Release
 
-# When the version in Ironforged.toc changes on main, tag it (v<version>), build Ironforged.zip
+# When the version in Ironforged.toc (or this file) changes on main, tag it (v<version>), build Ironforged.zip
 # and publish it as a GitHub release. Can also be run by hand from the Actions tab.
 on:
   push:
     branches: [main]
-    paths: [Ironforged.toc]
+    paths: [Ironforged.toc, .github/workflows/release.yml]
   workflow_dispatch:
 
 jobs:
