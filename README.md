@@ -27,7 +27,7 @@ The **Hall of Fortune** beside the table shows every dwarf's net gold and games 
 
 ## Titles
 
-Officers press **Award title** on any member's record to give them a title. They can pick a suggested one (Shieldbreaker, Stoneborn, Keg Champion, Runekeeper, Stonewarden, Oathkeeper, Hammer of the Hold, Deepdelver, Brewmaster, Forgemaster, Ironbrow, Mountain's Shield) or type their own, with an optional reason. The member gets a popup. **Strip title** takes one away. A member can hold any number of titles.
+Officers award titles from the **Titles** tab: press **Award a title**, pick the dwarf, type the title, and add a reason if you like. The member gets a popup. Click an awarded title there to strip it. A member can hold any number of titles.
 
 Some titles are earned automatically and move to whoever holds the record. Ties share the title.
 - **Elfbane:** most elves slain

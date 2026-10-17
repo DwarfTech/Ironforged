@@ -11,12 +11,6 @@ local Data = ns.Data
 local T = {}
 ns.Titles = T
 
--- Suggested titles officers can pick when awarding.
-T.PRESETS = {
-  "Shieldbreaker", "Stoneborn", "Keg Champion", "Runekeeper", "Stonewarden", "Oathkeeper",
-  "Hammer of the Hold", "Deepdelver", "Brewmaster", "Forgemaster", "Ironbrow", "Mountain's Shield",
-}
-
 T.AUTO = {
   { title = "Elfbane", what = "most elves slain" },
   { title = "The Hordebreaker", what = "most Horde slain" },

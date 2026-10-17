@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.15.1"
+ns.VERSION = "2.15.2"
 ns.PROTOCOL = 11
 ns.PREFIX = "IRONFORGED"
 ns.COLOR = "ffd4a017"

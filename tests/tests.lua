@@ -656,6 +656,18 @@ for _, it in ipairs(tt.list.items) do
 end
 check(sawElf and sawKeg, "Titles tab lists automatic and awarded titles")
 check(tt.awardB:IsShown(), "officers can award from the Titles tab")
+check(A.ns.Titles.PRESETS == nil, "no ready-made titles")
+A.ns.UI.AwardTitleForm()
+local tdlg = A.env.IronforgedDialog
+local boxes = {}
+for _, f in ipairs(A.frames) do if f.__kind == "EditBox" and f:GetParent() == tdlg.body then boxes[#boxes + 1] = f end end
+boxes[1]:SetText("Ale-Sworn")
+local awardBtn
+for _, b in ipairs(tdlg.buttons) do if b.__text == "Award" then awardBtn = b end end
+awardBtn.__scripts.OnClick(awardBtn); H.run(2)
+local gotAle = false
+for _, t in ipairs(D.ns.Titles.Of(A.ns.rosterList[1])) do if t.title == "Ale-Sworn" then gotAle = true end end
+check(gotAle, "award form on the Titles tab: pick a dwarf, type a title")
 A.ns.ToggleMain("blood")
 mrow2.__scripts.OnClick(mrow2, "LeftButton")
 local hasManage, hasAward = false, false
@@ -663,7 +675,7 @@ for _, b in ipairs(A.env.IronforgedDialog.buttons) do
   if b.__text == "Manage" or b.__text == "Edit record" then hasManage = true end
   if b.__text == "Award title" then hasAward = true end
 end
-check(not hasManage and hasAward, "no management buttons from the War Hall")
+check(not hasManage and not hasAward, "no management or title buttons from the War Hall")
 local tkey
 for _, t in ipairs(A.ns.Titles.Of("Muradin-Forever")) do if t.key then tkey = t.key end end
 A.ns.Titles.Strip(tkey); H.run(3)

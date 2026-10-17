@@ -5,21 +5,25 @@ local UI = ns.UI
 local Data = ns.Data
 local T = ns.Titles
 
--- Officers: pick a guildmate, then the usual award form.
+-- Officers award a title: who, the title (their own words), and why.
 local function awardForm()
   local opts = UI.RosterOptions(false)
   UI.OpenForm({
     title = "Award a title",
-    width = 440,
-    fields = { { key = "who", label = "To", type = "choice", value = opts[1] and opts[1].value, options = opts } },
-    saveText = "Next",
+    width = 460,
+    fields = {
+      { key = "who", label = "To", type = "choice", value = opts[1] and opts[1].value, options = opts },
+      { key = "title", label = "Title", type = "text", value = "", maxLen = 40 },
+      { key = "reason", label = "For (optional)", type = "text", value = "", maxLen = 120 },
+    },
+    saveText = "Award",
     onSave = function(v)
       if not v.who then return false end
-      UI.AwardTitle(v.who)
-      return false -- the award form replaces this one
+      return T.Award(v.who, v.title, v.reason) and true or false
     end,
   })
 end
+UI.AwardTitleForm = awardForm
 
 local function refresh(f)
   local items = {}

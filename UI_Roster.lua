@@ -57,43 +57,6 @@ function UI.ManageInGuildWindow(name)
   })
 end
 
--- Award a title to a guildmate (officers).
-function UI.AwardTitle(name)
-  local opts = {}
-  for _, t in ipairs(ns.Titles.PRESETS) do opts[#opts + 1] = { text = t, value = t } end
-  opts[#opts + 1] = { text = "Custom (type it below)", value = false }
-  UI.OpenForm({
-    title = "Award a title to " .. ns.ShortName(name),
-    width = 480,
-    fields = {
-      { key = "preset", label = "Title", type = "choice", value = ns.Titles.PRESETS[1], options = opts },
-      { key = "custom", label = "Or a custom title", type = "text", value = "", maxLen = 40 },
-      { key = "reason", label = "For (optional)", type = "text", value = "", maxLen = 120 },
-    },
-    saveText = "Award",
-    onSave = function(v)
-      local title = ns.Trim(v.custom or "") ~= "" and v.custom or v.preset
-      if not title then ns.Print("Pick a title or type one."); return false end
-      return ns.Titles.Award(name, title, v.reason) and true or false
-    end,
-  })
-end
-
-function UI.StripTitle(name)
-  local opts = {}
-  for _, t in ipairs(ns.Titles.Of(name)) do
-    if t.key then opts[#opts + 1] = { text = t.title, value = t.key } end
-  end
-  if #opts == 0 then ns.Print("They hold no awarded titles. Automatic titles move on their own."); return end
-  UI.OpenForm({
-    title = "Strip a title from " .. ns.ShortName(name),
-    width = 440,
-    fields = { { key = "key", label = "Title", type = "choice", value = opts[1].value, options = opts } },
-    saveText = "Strip",
-    onSave = function(v) if v.key then ns.Titles.Strip(v.key) end end,
-  })
-end
-
 -- opts.noManage: leave out Edit record and Manage (used where they don't belong, like the War Hall).
 function UI.ShowMember(name, opts)
   opts = opts or {}
@@ -161,12 +124,6 @@ function UI.ShowMember(name, opts)
   end
 
   local buttons = {}
-  if ns.IAmOfficer() then
-    local hasAwarded = false
-    for _, t in ipairs(ns.Titles.Of(name)) do if t.key then hasAwarded = true end end
-    if hasAwarded then buttons[#buttons + 1] = { text = "Strip title", onClick = function() UI.StripTitle(name) end } end
-    buttons[#buttons + 1] = { text = "Award title", onClick = function() UI.AwardTitle(name) end }
-  end
   if ns.IAmOfficer() and not opts.noManage then
     buttons[#buttons + 1] = { text = "Edit record", onClick = function() UI.EditMember(name) end }
     if name ~= ns.PlayerName() then
