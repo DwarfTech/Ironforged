@@ -457,9 +457,13 @@ check(afterCount == beforeCount + 2 and #A.guildChat > 0 and A.guildChat[#A.guil
 
 -- Cross Gambling
 check(D.ns.Gamble._parseRoll("Kurdran rolls 57 (1-100)") == "Kurdran", "roll message parsed")
-A.ns.Gamble.Open(100, "GUILD")
+A.ns.Gamble.Open(100)
+check(not A.ns.Gamble.game, "no game outside a raid")
+A.inRaid, K.inRaid, D.inRaid, M.inRaid = true, true, true, true
+A.ns.Gamble.Open(100)
 H.run(2)
-check(A.guildChat[#A.guildChat]:find("Type 1 to join", 1, true), "game opened in guild chat")
+check(A.guildChat[#A.guildChat]:find("Type 1 to join", 1, true), "game opened in raid chat")
+check(not (Hh.env.IronforgedGambleFrame and Hh.env.IronforgedGambleFrame:IsShown()), "no popup for guildmates outside the raid")
 check(K.env.IronforgedGambleFrame and K.env.IronforgedGambleFrame:IsShown(), "guildmates get the gambling popup")
 K.ns.Gamble.Join(); D.ns.Gamble.Join(); M.ns.Gamble.Join(); A.ns.Gamble.Join()
 H.run(2)
@@ -474,6 +478,9 @@ K.rollQueue = { 88 }; D.rollQueue = { 88 }; A.rollQueue = { 12 }
 K.ns.Gamble.Roll(); D.ns.Gamble.Roll(); A.ns.Gamble.Roll()
 H.run(3)
 check(A.ns.Gamble.game.phase == "tiehigh", "tie for high goes to a re-roll")
+-- a faked roll report from a player's addon is ignored
+K.ns.Comm.Send({ op = "XV", id = A.ns.Gamble.game.id, roll = 100 }, "WHISPER", "Thorin-Forever"); H.run(2)
+check(A.ns.Gamble.game.tieRolls["Kurdran-Forever"] == nil, "a roll reported by an addon doesn't count")
 K.rollQueue = { 40 }; D.rollQueue = { 70 }
 K.ns.Gamble.Roll(); D.ns.Gamble.Roll()
 H.run(3)
@@ -493,7 +500,7 @@ check(gbtn ~= nil, "Gambling button in the header")
 local navGamble = 0
 for _, f in ipairs(A.frames) do if f.__text == "Gambling" then navGamble = navGamble + 1 end end
 check(navGamble == 1, "no Gambling entry in the side list")
-A.ns.Gamble.Open(50, "GUILD")
+A.ns.Gamble.Open(50)
 H.run(2)
 K.ns.Gamble.Join(); D.ns.Gamble.Join(); M.ns.Gamble.Join()
 H.run(2)
@@ -517,6 +524,7 @@ check(A.ns.Gamble.game.phase == "rolling", "still waiting on a roll")
 A.ns.Gamble.Kick("Dagna-Forever")
 H.run(2)
 check(A.ns.Gamble.game.phase == "cancelled", "removing down to one player cancels the game")
+A.inRaid, K.inRaid, D.inRaid, M.inRaid = false, false, false, false
 
 check(not KD.Put("gambles", "Thorin-Forever#fake", { high = "Kurdran-Forever", low = "Thorin-Forever", owed = 9999, players = {} }, true), "can't record a game in someone else's name")
 
@@ -791,18 +799,20 @@ H.run(90)
 check(Bc.ns.PlayerName() == "Buttercup Clamstone-Forever", "surnamed member recognised")
 check(Bc.ns.Data.Digest("grudges") == AD.Digest("grudges"), "surnamed member syncs (whispered records arrive)")
 check(A.ns.CharName("Buttercup Clamstone-Forever") == "Buttercup-Forever" and A.ns.CharName("Buttercup Clamstone-Forever", false) == "Buttercup", "real character name")
-A.ns.Gamble.Open(100, "GUILD"); H.run(2)
+A.inRaid, K.inRaid, D.inRaid, Bc.inRaid = true, true, true, true
+A.ns.Gamble.Open(100); H.run(2)
 Bc.ns.Gamble.Join(); K.ns.Gamble.Join(); H.run(2)
 A.ns.Gamble.StartRolling(); H.run(2)
 Bc.rollQueue = { 86 }; K.rollQueue = { 12 }
 Bc.ns.Gamble.Roll(); K.ns.Gamble.Roll(); H.run(4)
-check(A.ns.Gamble.game.rolls["Buttercup Clamstone-Forever"] == 86 and A.ns.Gamble.game.phase == "done", "surnamed player's roll reaches the host outside a group")
-Bc.ns.Gamble.Open(50, "GUILD"); H.run(2)
+check(A.ns.Gamble.game.rolls["Buttercup Clamstone-Forever"] == 86 and A.ns.Gamble.game.phase == "done", "surnamed player's roll counted in a raid")
+Bc.ns.Gamble.Open(50); H.run(2)
 K.ns.Gamble.Join(); D.ns.Gamble.Join(); H.run(2)
 Bc.ns.Gamble.StartRolling(); H.run(2)
 K.rollQueue = { 40 }; D.rollQueue = { 7 }
 K.ns.Gamble.Roll(); D.ns.Gamble.Roll(); H.run(4)
 check(Bc.ns.Gamble.game.phase == "done" and Bc.ns.Gamble.game.rolls["Kurdran-Forever"] == 40, "rolls reach a surnamed host")
+A.inRaid, K.inRaid, D.inRaid, Bc.inRaid = false, false, false, false
 
 -- UI smoke test for every role
 for _, client in ipairs({ A, M, D, K, Hh, B, F }) do

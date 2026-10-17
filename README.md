@@ -10,20 +10,20 @@ The big **Dwarvish: ON/OFF** button at the top of the window sets your chat lang
 
 ## Cheers
 
-Officers press **Call for Cheers!** at the top of the window, or type `/hold cheers`. The call goes out in guild chat, and everyone with the addon also gets a banner and a Cheers popup with a button to drink an ale from their bags. Ales and stouts are picked first, then other drinks. Each dwarf who drinks announces it in guild chat ("Kurdran chugs a Thunder Ale! Cheers to Frugo! That's 3 mugs raised to the call."), and the popup lists who has drunk so far. One drink per dwarf per call. Calls last 3 minutes, and an officer can call once a minute. Cheers and Cross Gambling are the only parts of the addon that post to chat. Members can turn the popup off in Settings.
+Officers press **Call for Cheers!** at the top of the window, or type `/hold cheers`. The call goes out in guild chat, and everyone with the addon also gets a banner and a Cheers popup with a button to drink an ale from their bags. Ales and stouts are picked first, then other drinks. Each dwarf who drinks announces it in guild chat ("Kurdran chugs a Thunder Ale! Cheers to Frugo! That's 3 mugs raised to the call."), and the popup lists who has drunk so far. One drink per dwarf per call. Calls last 3 minutes, and an officer can call once a minute. Cheers (guild chat) and Cross Gambling (raid chat) are the only parts of the addon that post to chat. Members can turn the popup off in Settings.
 
 ## Cross Gambling
 
-The **Gambling** button at the top of the window, beside Call for Cheers!, opens Cross Gambling for the guild, party or raid.
-1. A host sets the gold amount, picks guild, party or raid chat, and presses **Open game**. The game is posted in that chat, and guildmates with the addon get a popup.
-2. Players type **1** in that chat to join, or **-1** to leave (addon users can press Join). The host can post a **Last call**.
+The **Gambling** button at the top of the window, beside Call for Cheers!, opens Cross Gambling. Games are raid only: the game itself shows every raid member's /roll to everyone in the raid, so no one can report a roll they didn't make. To gamble with a few friends, make your party a raid.
+1. A host in a raid sets the gold amount and presses **Open game**. The game is posted in raid chat, and guildmates in the raid with the addon get a popup.
+2. Players type **1** in raid chat to join, or **-1** to leave (addon users can press Join). The host can post a **Last call**.
 3. The host presses **Start rolling**. Everyone rolls 1 to the amount (`/roll 500`, or the Roll button).
 4. The highest roll wins, and the lowest roll pays the winner the difference between their rolls. Ties for highest or lowest roll again among the tied players.
-5. The result is posted in the game's chat. Gold changes hands by trade; the addon only keeps score.
+5. The result is posted in raid chat. Gold changes hands by trade; the addon only keeps score.
 
 The host can click a player's name in the players list to remove them from the game at any point. If a game drops below two players after rolling starts, it is cancelled.
 
-The **Hall of Fortune** beside the table shows every dwarf's net gold and games played across all recorded games. In a guild game, players far from the host report their own roll through the addon, so they need the addon; in a party or raid game, anyone in the group can play. Officers can delete a recorded game. Members can turn the popup off in Settings.
+The **Hall of Fortune** beside the table shows every dwarf's net gold and games played across all recorded games. Anyone in the raid can play, guildmate or not. Officers can delete a recorded game. Members can turn the popup off in Settings.
 
 ## Titles
 

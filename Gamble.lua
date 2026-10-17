@@ -1,19 +1,19 @@
 -- Ironforged: Cross Gambling, in the style of the CrossGambling addon.
---   1. A host opens a game for an amount of gold, in guild, party or raid chat.
---   2. Players join by typing 1 in that chat (or -1 to leave), or with the Join button.
+--   1. A host in a raid opens a game for an amount of gold. Games are raid only.
+--   2. Players join by typing 1 in raid chat (or -1 to leave), or with the Join button.
 --   3. The host starts the rolling; everyone rolls 1 to the amount.
 --   4. Highest roll wins. Lowest roll pays the winner the difference between the two rolls.
 --      Ties for highest or lowest roll again among the tied players.
 -- Gold changes hands by trade between the players; the addon only keeps score.
--- The host's client runs the game. Rolls are read from the game's own roll messages; in a guild
--- game, players far from the host report their own roll through the addon.
+-- The host's client runs the game. Rolls are read only from the game's own roll messages, which
+-- every raid member sees, so no one can report a roll they didn't make.
 local ADDON, ns = ...
 
 local G = {}
 ns.Gamble = G
 
 local Data = ns.Data
-local CHANNELS = { GUILD = "Guild", PARTY = "Party", RAID = "Raid" }
+local CHANNELS = { RAID = "Raid" }
 G.CHANNELS = CHANNELS
 local MAX_AMOUNT = 1000000
 
@@ -74,9 +74,11 @@ end
 function G.Open(amount, channel)
   amount = math.floor(tonumber(amount) or 0)
   if amount < 2 or amount > MAX_AMOUNT then ns.Print("Pick an amount from 2 to " .. MAX_AMOUNT .. " gold."); return end
-  channel = CHANNELS[channel] and channel or "GUILD"
-  if channel == "PARTY" and not (IsInGroup and IsInGroup()) then ns.Print("You're not in a party."); return end
-  if channel == "RAID" and not (IsInRaid and IsInRaid()) then ns.Print("You're not in a raid."); return end
+  channel = "RAID"
+  if not (IsInRaid and IsInRaid()) then
+    ns.Print("Cross Gambling is raid only, so every roll is seen by the game itself. Form a raid first (make your party a raid).")
+    return
+  end
   if G.Active() and not G.IsHost() then ns.Print(first(G.game.host) .. " is already running a game."); return end
   local me = ns.PlayerName()
   G.game = { id = string.format("%x", ns.Hash(me .. ns.Now()) % 0xFFFFFF), host = me, amount = amount, channel = channel,
@@ -306,15 +308,9 @@ ns.RegisterEvent("CHAT_MSG_SYSTEM", function(text)
   local who, roll, lo, hi = parseRoll(text)
   if not who then return end
   if G.IsHost() then G.OnRoll(who, roll, lo, hi) end
-  -- report my own roll to a host who may be too far away to see it
-  local g = G.game
-  if not G.IsHost() and ns.FullName(who) == ns.PlayerName() and g.host and lo == 1 and hi == g.amount
-    and (g.phase == "rolling" or g.phase == "tiehigh" or g.phase == "tielow") then
-    ns.Comm.Send({ op = "XV", id = g.id, roll = roll }, "WHISPER", g.host)
-  end
 end)
 
-for _, ev in ipairs({ "CHAT_MSG_GUILD", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER" }) do
+for _, ev in ipairs({ "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER" }) do
   local channel = ev:match("CHAT_MSG_(%u+)")
   ns.RegisterEvent(ev, function(text, sender) G.OnChat(channel, text, sender) end)
 end
@@ -324,19 +320,15 @@ ns.On("GAMBLE_STATE", function(host, msg)
   if G.IsHost() then return end
   if type(msg.order) ~= "table" or type(msg.rolls) ~= "table" then return end
   local fresh = not G.game or G.game.id ~= msg.id
-  G.game = { id = msg.id, host = host, amount = tonumber(msg.amount) or 0, channel = CHANNELS[msg.channel] and msg.channel or "GUILD",
+  G.game = { id = msg.id, host = host, amount = tonumber(msg.amount) or 0, channel = "RAID",
     phase = msg.phase, order = msg.order, rolls = msg.rolls, tie = msg.tie or {}, tieRolls = msg.tieRolls or {},
     high = msg.high, low = msg.low, owed = msg.owed, players = {} }
   for _, n in ipairs(msg.order) do G.game.players[n] = true end
   ns.Fire("GAMBLE", fresh)
 end)
 
--- A player's own roll, reported to me as host
-ns.On("GAMBLE_ROLL", function(sender, msg)
-  if not G.IsHost() or msg.id ~= G.game.id then return end
-  local r = tonumber(msg.roll)
-  if r and r >= 1 and r <= G.game.amount then G.OnRoll(sender, math.floor(r), 1, G.game.amount) end
-end)
+-- Rolls reported by a player's own addon (older versions did this outside a raid) are ignored:
+-- only the game's roll messages count.
 
 ----------------------------------------------------------------------
 -- Score: net gold per dwarf across recorded games

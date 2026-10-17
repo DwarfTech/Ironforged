@@ -189,6 +189,7 @@ local function makeClient(shortName, race, fullName)
     SendChatMessage = function(text, channel)
       table.insert(client.guildChat, text)
       if channel == "GUILD" then H.guildBus = H.guildBus or {}; table.insert(H.guildBus, { from = client.full, text = text }) end
+      if channel == "RAID" and client.inRaid then H.raidBus = H.raidBus or {}; table.insert(H.raidBus, { from = client.full, text = text }) end
     end,
   }
   env.GetPlayerInfoByGUID = function(guid)
@@ -254,8 +255,9 @@ local function makeClient(shortName, race, fullName)
   env.C_AuctionHouse = { CloseAuctionHouse = function() client.closed.ah = true end }
   env.GetMaxPlayerLevel = function() return 60 end
   client.inGroup, client.left, client.declined = false, false, false
-  env.IsInGroup = function() return client.inGroup end
-  env.IsInRaid = function() return false end
+  client.inRaid = false
+  env.IsInGroup = function() return client.inGroup or client.inRaid end
+  env.IsInRaid = function() return client.inRaid end
   env.UnitExists = env.UnitExists or function(u) return client.units[u] ~= nil end
   env.LeaveParty = function() client.left = true end -- the game drops the group a moment later
   env.DeclineGroup = function() client.declined = true end
@@ -332,9 +334,19 @@ function H.step(dt)
   for _, m in ipairs(gb) do
     for _, c in pairs(H.clients) do H.fire(c, "CHAT_MSG_GUILD", m.text, m.from) end
   end
+  local raidb = H.raidBus or {}
+  H.raidBus = {}
+  for _, m in ipairs(raidb) do
+    for _, c in pairs(H.clients) do if c.inRaid then H.fire(c, "CHAT_MSG_RAID", m.text, m.from) end end
+  end
+  -- a roll is seen by the roller and, in a raid, by everyone in the raid
   local rb = H.rollBus or {}
   H.rollBus = {}
-  for _, m in ipairs(rb) do H.fire(m.to, "CHAT_MSG_SYSTEM", m.text) end
+  for _, m in ipairs(rb) do
+    for _, c in pairs(H.clients) do
+      if c == m.to or (m.to.inRaid and c.inRaid) then H.fire(c, "CHAT_MSG_SYSTEM", m.text) end
+    end
+  end
   local bus = H.bus
   H.bus = {}
   for _, m in ipairs(bus) do

@@ -4,7 +4,7 @@ local UI = ns.UI
 local Data = ns.Data
 local G = ns.Gamble
 
-local state = { channel = "GUILD", amount = "100" }
+local state = { amount = "100" }
 
 local function first(name) return (ns.ShortName(name):match("^(%S+)")) or ns.ShortName(name) end
 
@@ -100,11 +100,13 @@ end
 
 ns.On("GAMBLE", function(fresh)
   local g = G.game
-  if fresh and g and g.phase == "open" and not G.IsHost() and ns.settings and ns.settings.gamblePopup ~= false then
+  -- only raid members can play, so only they get the popup
+  local inRaid = IsInRaid and IsInRaid()
+  if fresh and g and g.phase == "open" and not G.IsHost() and inRaid and ns.settings and ns.settings.gamblePopup ~= false then
     buildPopup():Show()
   end
   -- bring the popup back when it's my turn to roll
-  if g and pop and not pop:IsShown() and not G.IsHost() then
+  if g and pop and not pop:IsShown() and not G.IsHost() and inRaid then
     for _, n in ipairs(G.Waiting()) do
       if n == ns.PlayerName() and ns.settings.gamblePopup ~= false then pop:Show() end
     end
@@ -124,14 +126,11 @@ local function build(f, w, h)
   f.amount:SetNumeric(true)
   f.amount:SetText(state.amount)
   f.amount:SetScript("OnTextChanged", function(self) state.amount = self:GetText() end)
-  f.channel = UI.Button(f, "Guild chat", 100, 22, function(self)
-    UI.Pick(self, { { text = "Guild chat", value = "GUILD" }, { text = "Party chat", value = "PARTY" }, { text = "Raid chat", value = "RAID" } },
-      function(v, t) state.channel = v; self:SetText(t) end, "Play in")
-  end)
+  f.channel = UI.Label(f, "in raid chat", "GameFontHighlightSmall")
   f.channel:SetPoint("LEFT", f.amount, "RIGHT", 8, 0)
 
-  f.openB = UI.Button(f, "Open game", 96, 22, function() G.Open(state.amount, state.channel) end)
-  f.openB:SetPoint("LEFT", f.channel, "RIGHT", 6, 0)
+  f.openB = UI.Button(f, "Open game", 96, 22, function() G.Open(state.amount) end)
+  f.openB:SetPoint("LEFT", f.channel, "RIGHT", 10, 0)
   f.lastB = UI.Button(f, "Last call", 80, 22, function() G.LastCall() end)
   f.lastB:SetPoint("LEFT", f.openB, "RIGHT", 4, 0)
   f.rollNowB = UI.Button(f, "Start rolling", 100, 22, function() G.StartRolling() end)
@@ -170,7 +169,7 @@ local function build(f, w, h)
   }, function(name) UI.ShowMember(name) end)
   f.board:SetPoint("TOPLEFT", listW + 8, -102)
 
-  f.note = UI.Label(f, "Highest roll wins; lowest pays the winner the difference. Pay up by trade. Host: click a player to remove them.", "GameFontDisableSmall")
+  f.note = UI.Label(f, "Raid only. Highest roll wins; lowest pays the winner the difference. Pay up by trade. Host: click a player to remove them.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 6)
 end
 
