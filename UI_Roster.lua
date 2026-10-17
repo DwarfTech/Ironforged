@@ -57,29 +57,6 @@ function UI.ManageInGuildWindow(name)
   })
 end
 
--- Officers mark a guildmate's challenge completed or failed.
-function UI.JudgeChallenges(name)
-  local opts = {}
-  for _, ch in ipairs(ns.Challenges.Of(name)) do
-    if ch.data.status == "active" then
-      opts[#opts + 1] = { text = ch.data.name .. " (from level " .. tostring(ch.data.startLevel or "?") .. ")", value = ch.key }
-    end
-  end
-  if #opts == 0 then return end
-  UI.OpenForm({
-    title = ns.ShortName(name) .. "'s challenges",
-    width = 560,
-    fields = {
-      { type = "info", value = "Mark a challenge completed when they've earned it, or failed if they broke its rules." },
-      { key = "key", label = "Challenge", type = "choice", value = opts[1].value, options = opts },
-    },
-    buttons = {
-      { text = "Mark failed", onClick = function(v) if v.key then ns.Challenges.Judge(v.key, "failed", "Marked failed by an officer.") end end },
-      { text = "Mark completed", onClick = function(v) if v.key then ns.Challenges.Judge(v.key, "completed") end end },
-    },
-  })
-end
-
 -- Award a title to a guildmate (officers).
 function UI.AwardTitle(name)
   local opts = {}
@@ -117,7 +94,7 @@ function UI.StripTitle(name)
   })
 end
 
--- opts.noManage: leave out Edit record and Manage (used where they don't belong, like the Blood Tally).
+-- opts.noManage: leave out Edit record and Manage (used where they don't belong, like the War Hall).
 function UI.ShowMember(name, opts)
   opts = opts or {}
   local info = ns.roster[name] or {}
@@ -166,7 +143,7 @@ function UI.ShowMember(name, opts)
   local attended, total = Data.AttendanceCount(name)
   if total > 0 then add("Attendance", attended .. " of " .. total .. " events") end
   local hk, elves, avenged = ns.Blood.Tally(name)
-  if hk then add("Blood Tally", hk .. " Horde slain, " .. elves .. " elves slain, " .. avenged .. " grudges avenged") end
+  if hk then add("War Hall", hk .. " Horde slain, " .. elves .. " elves slain, " .. avenged .. " grudges avenged") end
   for _, t in ipairs(Data.AssignedTrials(name)) do
     add("Trial", t.title .. " (" .. ns.RankName(t.rank) .. ") - " .. t.done .. "/" .. t.total ..
       (t.done == t.total and t.total > 0 and " |cff40ff40(complete)|r" or ""))
@@ -189,11 +166,6 @@ function UI.ShowMember(name, opts)
     for _, t in ipairs(ns.Titles.Of(name)) do if t.key then hasAwarded = true end end
     if hasAwarded then buttons[#buttons + 1] = { text = "Strip title", onClick = function() UI.StripTitle(name) end } end
     buttons[#buttons + 1] = { text = "Award title", onClick = function() UI.AwardTitle(name) end }
-    local judgeable = false
-    for _, ch in ipairs(ns.Challenges.Of(name)) do if ch.data.status == "active" then judgeable = true end end
-    if judgeable and name ~= ns.PlayerName() then
-      buttons[#buttons + 1] = { text = "Challenges", onClick = function() UI.JudgeChallenges(name) end }
-    end
   end
   if ns.IAmOfficer() and not opts.noManage then
     buttons[#buttons + 1] = { text = "Edit record", onClick = function() UI.EditMember(name) end }

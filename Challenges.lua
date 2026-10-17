@@ -1,7 +1,7 @@
 -- Ironforged: challenges.
 -- Anyone can take on a challenge at any level; the level they started at is recorded and shown.
--- Custom challenges run on the honor system. Only officers mark a custom challenge completed;
--- ready-made ones complete themselves at max level. The ready-made ones
+-- Custom challenges run on the honor system. Every challenge completes itself at max level;
+-- no one marks one completed by hand. The ready-made ones
 -- are enforced by the addon: it takes off forbidden armor, keeps you PvP-flagged, closes the auction
 -- house, trade and mail, and fails the challenge if a rule is broken anyway.
 -- Records: "challenges" key = member .. "#" .. id
@@ -136,16 +136,6 @@ function C.Complete(key, atLevel)
   if update(key, { status = "completed", ended = ns.Now(), lvl = atLevel or level() }) then
     ns.Print("|cff40ff40Challenge completed:|r " .. d.name .. "! The hold will hear of this.")
   end
-end
-
--- An officer marks someone's challenge completed (or failed).
-function C.Judge(key, status, reason)
-  local d = Data.Get("challenges", key)
-  if not d or d.status ~= "active" or not ns.IAmOfficer() then return false end
-  if Data.SplitKey(key) == ns.PlayerName() then ns.Print("Another officer has to judge your own challenge."); return false end
-  local fields = { status = status, ended = ns.Now(), judgedBy = ns.PlayerName() }
-  if reason then fields.reason = reason end
-  return update(key, fields)
 end
 
 -- A member's challenges worth showing on tooltips and the roster: under way and completed.
@@ -413,7 +403,7 @@ ns.RegisterEvent("PLAYER_LEVEL_UP", function(newLevel)
   local lvl = tonumber(newLevel) or level()
   for k, d in Data.Each("challenges") do
     if Data.SplitKey(k) == me and d.status == "active" then
-      if d.preset and lvl >= C.MaxLevel() then
+      if lvl >= C.MaxLevel() then
         C.Complete(k, lvl)
       else
         update(k, { lvl = lvl, xp = 0, seen = ns.Now() })
@@ -525,19 +515,8 @@ end)
 local lastStatus = {}
 ns.On("DATA_CHANGED", function(coll, key)
   if coll ~= "challenges" or not key then return end
-
   local d = Data.Get("challenges", key)
   local member = Data.SplitKey(key)
-  if d and member == ns.PlayerName() and lastStatus[key] == "active" and d.status ~= "active" and d.judgedBy and d.judgedBy ~= member then
-    lastStatus[key] = d.status
-    local word = d.status == "completed" and "completed" or "failed"
-    ns.Print("|cffd4a017Challenge:|r " .. ns.ShortName(d.judgedBy) .. " marks your " .. d.name .. " challenge " .. word .. ".")
-    if ns.UI and ns.UI.Notice then
-      ns.UI.Notice({ id = "challenge", icon = "Interface\\Icons\\Achievement_General", title = "Challenge " .. word,
-        text = ns.ShortName(d.judgedBy) .. " marks |cffffd040" .. d.name .. "|r " .. word .. ".", buttons = { { text = "Huzzah!" } } })
-    end
-    return
-  end
   if not d or member == ns.PlayerName() or lastStatus[key] == d.status then lastStatus[key] = d and d.status; return end
   lastStatus[key] = d.status
   if ns.Now() - (tonumber(d.ended or d.ts) or 0) > 600 then return end

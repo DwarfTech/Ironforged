@@ -17,7 +17,7 @@ local CONTENT_W, CONTENT_H = 640, 452
 local NAV_SECTIONS = {
   { title = "Guild Management", ids = { "roster", "clans", "trials", "events" } },
   { title = "In Game", ids = { "lfd", "professions", "challenges" } },
-  { title = "Roleplay", ids = { "grudges", "blood", "profile" } },
+  { title = "Roleplay", ids = { "grudges", "blood", "titles", "profile" } },
   { ids = { "settings" } },
 }
 

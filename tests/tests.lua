@@ -629,18 +629,30 @@ check(M.env.IronforgedNotice:IsShown() and M.env.IronforgedNotice.id == "title",
 check(not A.ns.Titles.Award("Muradin-Forever", "keg champion"), "no duplicate titles")
 A.ns.ToggleMain("blood")
 local bt
-for _, f in ipairs(A.frames) do if f.champs then bt = f end end
-check(bt and bt.champs:GetText():find("Elfbane:", 1, true) and bt.champs:GetText():find("Muradin", 1, true), "Blood Tally names the Elfbane")
+for _, f in ipairs(A.frames) do if f.mine and f.list and not f.champs then bt = f end end
 local mrow2
 for _, row in ipairs(bt.list.rows) do if row.item and row.item.data == "Muradin-Forever" then mrow2 = row end end
-check(mrow2 and mrow2.cells[2]:GetText():find("[Elfbane]", 1, true), "Elfbane highlighted in the tally")
+check(mrow2 and mrow2.cells[5]:GetText():find("|cff7fff5f40", 1, true), "most elves slain highlighted in the War Hall")
+check(not mrow2.cells[2]:GetText():find("[Elfbane]", 1, true), "no title tags in the War Hall")
+-- Titles tab: automatic holders and awarded titles
+A.ns.ToggleMain("titles")
+local tt
+for _, f in ipairs(A.frames) do if f.awardB and f.list then tt = f end end
+local sawElf, sawKeg = false, false
+for _, it in ipairs(tt.list.items) do
+  if it.cols[1]:find("Elfbane", 1, true) and it.cols[2]:find("Muradin", 1, true) then sawElf = true end
+  if it.cols[1] == "Keg Champion" and it.cols[2]:find("Muradin", 1, true) then sawKeg = true end
+end
+check(sawElf and sawKeg, "Titles tab lists automatic and awarded titles")
+check(tt.awardB:IsShown(), "officers can award from the Titles tab")
+A.ns.ToggleMain("blood")
 mrow2.__scripts.OnClick(mrow2, "LeftButton")
 local hasManage, hasAward = false, false
 for _, b in ipairs(A.env.IronforgedDialog.buttons) do
   if b.__text == "Manage" or b.__text == "Edit record" then hasManage = true end
   if b.__text == "Award title" then hasAward = true end
 end
-check(not hasManage and hasAward, "no management buttons from the Blood Tally")
+check(not hasManage and hasAward, "no management buttons from the War Hall")
 local tkey
 for _, t in ipairs(A.ns.Titles.Of("Muradin-Forever")) do if t.key then tkey = t.key end end
 A.ns.Titles.Strip(tkey); H.run(3)
@@ -788,15 +800,11 @@ local myKey = CK.Start(nil, "No Hearthstone", "Walk everywhere.")
 H.run(2)
 check(myKey and D.ns.Data.Get("challenges", myKey).name == "No Hearthstone", "custom challenge any level")
 check(not D.ns.Data.Put("challenges", "Kurdran-Forever#x", { name = "x", status = "failed" }, true), "can't write someone else's challenge")
-CK.Complete(myKey); H.run(2)
-check(D.ns.Data.Get("challenges", myKey).status == "active", "can't complete your own challenge")
 check(#A.ns.Challenges.Showing("Kurdran-Forever") >= 1, "guildmates' challenges listed for the roster and tooltip")
-check(A.ns.Challenges.Judge(myKey, "completed"), "an officer marks it completed")
-H.run(2)
-check(D.ns.Data.Get("challenges", myKey).status == "completed", "completion reaches the guild")
-check(K.env.IronforgedNotice:IsShown() and K.env.IronforgedNotice.id == "challenge", "member told an officer completed it")
-local own = A.ns.Challenges.Start(nil, "Thane's Trial", "x"); H.run(1)
-check(not A.ns.Challenges.Judge(own, "completed"), "officers can't complete their own either")
+check(A.ns.Challenges.Judge == nil and A.ns.UI.JudgeChallenges == nil, "officers don't handle challenges")
+K.level = 60
+H.fire(K, "PLAYER_LEVEL_UP", 60); H.run(2)
+check(D.ns.Data.Get("challenges", myKey).status == "completed", "your own challenge completes itself at max level")
 K.level = 1
 
 -- Invite from whispers
@@ -885,7 +893,7 @@ for _, client in ipairs({ A, M, D, K, Hh, B, F }) do
   local cns = client.ns
   local ok, err = pcall(function()
     cns.ToggleMain()
-    for _, id in ipairs({ "roster", "clans", "trials", "events", "lfd", "professions", "challenges", "grudges", "blood", "gamble", "profile", "settings" }) do cns.UI.SelectTab(id) end
+    for _, id in ipairs({ "roster", "clans", "trials", "events", "lfd", "professions", "challenges", "grudges", "blood", "titles", "gamble", "profile", "settings" }) do cns.UI.SelectTab(id) end
     H.run(1)
     cns.UI.ShowMember("Muradin-Forever")
     cns.UI.GiveTrial("Kurdran-Forever")

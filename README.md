@@ -1,6 +1,6 @@
 # Ironforged
 
-The guild addon for Ironforged, an all-dwarf guild in World of Warcraft: Forever. It handles the roster, clans, promotion trials, events, Looking for Dwarf groups, a profession directory, the Book of Grudges, the Blood Tally and backstories, and it watches for non-dwarves in the hold. Everything recorded in it is shared automatically with every guildmate who has Ironforged installed.
+The guild addon for Ironforged, an all-dwarf guild in World of Warcraft: Forever. It handles the roster, clans, promotion trials, events, Looking for Dwarf groups, a profession directory, the Book of Grudges, the War Hall, titles and backstories, and it watches for non-dwarves in the hold. Everything recorded in it is shared automatically with every guildmate who has Ironforged installed.
 
 Open it with the gold hammer button on the minimap, from the addon list beside the minimap, or with `/hold` (or `/ironforged`).
 
@@ -35,7 +35,7 @@ Some titles are earned automatically and move to whoever holds the record. Ties 
 - **The Grudgebearer:** most grudges avenged
 - **The Goldbringer:** most gold won at Cross Gambling
 
-Titles show on the member's record, in the roster's Title column, and on their tooltip.
+Titles show on the Titles tab, on the member's record, in the roster's Title column, and on their tooltip.
 
 ## Invite from whispers
 
@@ -43,7 +43,7 @@ Like Leatrix Plus: when a guildmate whispers you **inv**, you invite them to you
 
 ## Tabs
 
-The side list is split into three sections: **Guild Management** (Roster, Clans, Promotions, Events), **In Game** (Looking for Dwarf, Professions, Challenges) and **Roleplay** (Book of Grudges, Blood Tally, Backstory), with Settings at the bottom.
+The side list is split into three sections: **Guild Management** (Roster, Clans, Promotions, Events), **In Game** (Looking for Dwarf, Professions, Challenges) and **Roleplay** (Book of Grudges, War Hall, Titles, Backstory), with Settings at the bottom.
 
 Every list can be sorted: click a column title to sort by it, and click again to reverse.
 
@@ -59,7 +59,7 @@ Every list can be sorted: click a column title to sort by it, and click again to
 
 **Professions.** The hold's profession directory. Each member's professions and skill levels are recorded automatically when they log in. Their recipes are recorded the first time they open each profession window, and again whenever they learn more. Search a recipe ("bronze axe") to see every dwarf who can make it, online crafters first. Click a recipe to ask that dwarf to craft it: they get a private popup with your note, and nothing goes to chat. With the search empty, the tab shows one row per profession, with how many dwarves have it, how many are online and who is most skilled. Click a profession to see its dwarves, best first, then click a dwarf to see everything they can make. **Back** steps out a level, and **Online only** hides anyone offline.
 
-**Challenges.** Press **Take on a challenge** and pick a ready-made one or write your own. You can start at any level; the level you started at is recorded and shown. The tab lists your own challenges. Your own challenges run on your honor, and an officer marks them completed (or failed) from your roster record, under **Challenges**. No one can mark their own challenge completed. The ready-made ones are enforced by the addon and complete themselves at max level:
+**Challenges.** Press **Take on a challenge** and pick a ready-made one or write your own. You can start at any level; the level you started at is recorded and shown. The tab lists your own challenges. Your own challenges run on your honor. Every challenge completes itself when you reach max level; no one marks one completed by hand, and officers don't have to manage them. The ready-made ones are enforced by the addon:
 - **Slayer:** no chest or shoulder armor, no shirt or tabard, and you stay flagged for PvP. Chest or shoulder armor, a shirt or a tabard you put on goes straight back into your bags. Blizzard only lets players switch PvP on themselves, so whenever you're not flagged (including right after you start, or if you turn it off) you get a warning to type /pvp, and if you're still not flagged a minute later, the challenge fails. `/hold pvp` shows whether you count as flagged.
 - **Self-Made:** no auction house, trading or mail. They close as soon as they open.
 - **One Life:** die once and the challenge is over.
@@ -67,7 +67,7 @@ Every list can be sorted: click a column title to sort by it, and click again to
 
 **Audit.** Experience only goes up by playing, so the addon remembers each character's level and experience: on your computer when you log out, and in the synced challenge record every few minutes and at each level. If you log in with more experience than the addon last saw, you played with Ironforged turned off, and a note is added to each challenge you have under way, for example "Played without Ironforged: level 20 to 22". The note shows when the challenge is opened. Nothing is announced. On a second computer, only levels gained without the addon count.
 
-If forbidden armor can't come off (your bags are full), you get a warning and one minute to remove it before the challenge fails. Everyone's challenges under way or completed show in the roster's Challenge column and on their tooltip, for example "Challenge: Slayer (from level 12)", and in full on their roster record. Guildmates with the addon are told when a challenge starts, fails or is completed. Officers can remove any challenge.
+If forbidden armor can't come off (your bags are full), you get a warning and one minute to remove it before the challenge fails. Everyone's challenges under way or completed show in the roster's Challenge column and on their tooltip, for example "Challenge: Slayer (from level 12)", and in full on their roster record. Guildmates with the addon are told when a challenge starts, fails or is completed.
 
 **Book of Grudges.** Anyone can write a grudge against someone outside the guild: who, their side (Horde or Alliance), where, and what they did. "Grudge my target" fills in your target's first and last name, their side, and the zone you're in. Guildmates can't be grudged. Everyone can read the book, with unavenged grudges listed first.
 - A **Horde** grudge is avenged automatically when a guildmate with the addon gets an honorable kill on that foe, or sees them dead. The whole guild is told who avenged it.
@@ -76,7 +76,9 @@ If forbidden armor can't come off (your bags are full), you get a warning and on
 - Avenged grudges are stamped **AVENGED** in the book, with who avenged them and when.
 - Only officers can strike a grudge out.
 
-**Blood Tally.** A leaderboard of every dwarf's Horde slain (their lifetime honorable kills), elves slain, and grudges avenged, ranked by Horde slain. Click a column title to sort by another. The tally also shows on each member's roster record. The line above the board names the current **Elfbane**, **Hordebreaker** and **Grudgebearer**, and their rows are tagged and highlighted. Clicking a dwarf here shows their record without the management buttons.
+**War Hall.** A leaderboard of every dwarf's Horde slain (their lifetime honorable kills), elves slain, and grudges avenged, ranked by Horde slain. Click a column title to sort by another. The most elves slain is highlighted in green. The tally also shows on each member's roster record. Clicking a dwarf here shows their record without the management buttons.
+
+**Titles.** Every title in the hold. The automatic titles come first, with who holds each one now and their count; then every title an officer has awarded, with who awarded it, why and when. Officers press **Award a title** to give one, and click an awarded title to strip it.
 
 **Backstory.** Your character's backstory and your standing in the hold.
 

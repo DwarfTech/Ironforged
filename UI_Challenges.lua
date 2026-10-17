@@ -23,7 +23,7 @@ local function startForm(selected)
   else
     fields[#fields + 1] = { key = "name", label = "Name", type = "text", value = "", maxLen = 40 }
     fields[#fields + 1] = { key = "rules", label = "Rules", type = "multiline", value = "", maxLen = 400, height = 70 }
-    fields[#fields + 1] = { type = "info", value = "|cff999999Your own challenge runs on your honor. An officer marks it completed when you've earned it.|r" }
+    fields[#fields + 1] = { type = "info", value = "|cff999999Your own challenge runs on your honor, and completes itself when you reach max level.|r" }
   end
   UI.OpenForm({
     title = "Take on a challenge",
@@ -46,7 +46,7 @@ local function showChallenge(key)
   local lines = {
     "|cffd4a017Dwarf:|r " .. ns.ShortName(member),
     "|cffd4a017Status:|r " .. (C.STATUS[d.status] or d.status or ""),
-    "|cffd4a017Kind:|r " .. (d.preset and "Ready-made, enforced by the addon. Completes itself at max level." or "Their own, on their honor. An officer marks it completed."),
+    "|cffd4a017Kind:|r " .. (d.preset and "Ready-made, enforced by the addon. Completes itself at max level." or "Their own, on their honor. Completes itself at max level."),
     "|cffd4a017Started:|r " .. ns.FormatDate(d.ts) .. " at level " .. tostring(d.startLevel or "?"),
     "|cffd4a017Level now:|r " .. tostring(d.lvl or "?"),
   }
@@ -62,15 +62,7 @@ local function showChallenge(key)
       UI.Confirm("Give up on " .. d.name .. "?", function() C.Abandon(key) end)
     end }
   end
-  if not mine and ns.IAmOfficer() and d.status == "active" then
-    buttons[#buttons + 1] = { text = "Mark failed", onClick = function()
-      UI.Confirm("Mark " .. ns.ShortName(member) .. "'s " .. d.name .. " failed?", function() C.Judge(key, "failed", "Marked failed by an officer.") end)
-    end }
-    buttons[#buttons + 1] = { text = "Mark completed", onClick = function()
-      UI.Confirm("Mark " .. ns.ShortName(member) .. "'s " .. d.name .. " completed?", function() C.Judge(key, "completed") end)
-    end }
-  end
-  if ns.IAmOfficer() or (mine and d.status ~= "active") then
+  if mine and d.status ~= "active" then
     buttons[#buttons + 1] = { text = "Remove", onClick = function()
       UI.Confirm("Remove this challenge from the list?", function() C.Remove(key) end)
     end }
