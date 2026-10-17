@@ -246,7 +246,7 @@ local function makeClient(shortName, race, fullName)
   env.IsInGroup = function() return client.inGroup end
   env.IsInRaid = function() return false end
   env.UnitExists = env.UnitExists or function(u) return client.units[u] ~= nil end
-  env.LeaveParty = function() client.left = true; client.inGroup = false end
+  env.LeaveParty = function() client.left = true end -- the game drops the group a moment later
   env.DeclineGroup = function() client.declined = true end
   client.rollQueue = {}
   client.emotes = {}

@@ -277,6 +277,7 @@ end)
 
 -- Dwarf Found: no non-dwarves in your group.
 local strangerSince
+local leavingUntil = 0 -- after leaving, the game takes a moment to drop the group; stay quiet meanwhile
 local GROUP_GRACE = 15
 local function groupUnits()
   local out = {}
@@ -290,7 +291,8 @@ end
 
 function C.CheckGroup()
   local name = forbids("dwarfOnly")
-  if not name or not (IsInGroup and IsInGroup()) then strangerSince = nil; return end
+  if not name or not (IsInGroup and IsInGroup()) then strangerSince = nil; leavingUntil = 0; return end
+  if (GetTime and GetTime() or 0) < leavingUntil then return end
   local stranger
   for _, u in ipairs(groupUnits()) do
     if UnitExists and UnitExists(u) and not (UnitIsUnit and UnitIsUnit(u, "player")) and dwarfRace(u) == false then
@@ -308,9 +310,10 @@ function C.CheckGroup()
   end
   if now - strangerSince >= GROUP_GRACE then
     strangerSince = nil
+    leavingUntil = now + 10
     local leave = (C_PartyInfo and C_PartyInfo.LeaveParty) or LeaveParty
     if leave then pcall(leave) end
-    ns.Print("|cffd4a017" .. name .. ":|r you left the group. You walk only with dwarves.")
+    ns.Print("|cffd4a017" .. name .. ":|r leaving the group. You walk only with dwarves.")
   end
 end
 ns.RegisterEvent("GROUP_ROSTER_UPDATE", function() C.CheckGroup() end)

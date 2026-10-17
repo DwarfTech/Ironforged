@@ -657,6 +657,12 @@ H.fire(K, "GROUP_ROSTER_UPDATE"); H.run(5)
 check(not K.left, "a warning first")
 H.run(15)
 check(K.left, "leaves a group with a non-dwarf in it")
+local warnings = 0
+H.fire(K, "GROUP_ROSTER_UPDATE"); H.run(3)
+for _, m in ipairs(K.chat) do if m:find("is no dwarf", 1, true) then warnings = warnings + 1 end end
+check(warnings == 1, "warned once, not again while leaving")
+K.inGroup = false
+H.fire(K, "GROUP_ROSTER_UPDATE")
 K.units.party1, K.units.party2 = nil, nil
 H.fire(K, "PARTY_INVITE_REQUEST", "Hilda-Forever")
 check(K.declined, "declines invites from non-dwarf guildmates")
