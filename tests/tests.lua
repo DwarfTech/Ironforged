@@ -677,6 +677,17 @@ K.env.SetPVP(0)
 check(K.pvp == true, "turning PvP off is undone")
 K.env.TogglePVP()
 check(K.pvp == true, "/pvp can't turn it off either")
+-- when the game refuses, the member is asked to type /pvp
+local realSet = K.env.SetPVP
+K.env.SetPVP = function() end
+K.pvp = false
+K.ns.Challenges.KeepFlagged("Slayer"); H.run(3)
+local asked = false
+for _, m in ipairs(K.chat) do if m:find("Type |cffffd040/pvp|r", 1, true) then asked = true end end
+check(asked, "asks for /pvp when the addon can't flag")
+K.env.SetPVP = realSet
+K.env.SlashCmdList.IRONFORGED("pvp"); H.run(3)
+check(K.pvp == true, "/hold pvp flags and reports")
 CK.Abandon(slayer2)
 K.env.SetPVP(0)
 check(K.pvp == false, "free to turn it off once the challenge ends")

@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.11.1"
+ns.VERSION = "2.11.2"
 ns.PROTOCOL = 11
 ns.PREFIX = "IRONFORGED"
 ns.COLOR = "ffd4a017"
@@ -512,6 +512,8 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Cheers.Call()
   elseif cmd == "dwarvish" or cmd == "lang" then
     ns.Lang.Toggle()
+  elseif cmd == "pvp" then
+    if ns.Challenges then ns.Challenges.PvPReport() end
   elseif cmd == "status" then
     local me = ns.PlayerName()
     local info = me and ns.roster[me]
@@ -531,6 +533,7 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Print("/hold dwarvish  - turn speaking Dwarvish on or off")
     ns.Print("/hold cheers  - officers: call the hold to raise a mug")
     ns.Print("/hold sync  - ask guildmates for the latest records")
+    ns.Print("/hold pvp  - check whether the addon can flag you for PvP (for Slayer)")
   end
 end
 
