@@ -661,6 +661,16 @@ K.units.party1, K.units.party2 = nil, nil
 H.fire(K, "PARTY_INVITE_REQUEST", "Hilda-Forever")
 check(K.declined, "declines invites from non-dwarf guildmates")
 CK.Abandon(dfKey)
+-- Slayer: turning PvP off is undone at once
+local slayer2 = CK.Start("slayer")
+check(K.pvp == true, "Slayer flags you for PvP")
+K.env.SetPVP(0)
+check(K.pvp == true, "turning PvP off is undone")
+K.env.TogglePVP()
+check(K.pvp == true, "/pvp can't turn it off either")
+CK.Abandon(slayer2)
+K.env.SetPVP(0)
+check(K.pvp == false, "free to turn it off once the challenge ends")
 
 -- custom, honor system
 K.level = 20

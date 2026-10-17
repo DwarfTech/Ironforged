@@ -237,6 +237,7 @@ local function makeClient(shortName, race, fullName)
   env.UnitIsPVP = function(u) return client.pvp end
   env.GetPVPDesired = function() return client.pvp end
   env.SetPVP = function(v) client.pvp = v == 1 or v == true end
+  env.TogglePVP = function() client.pvp = not client.pvp end
   env.CancelTrade = function() client.closed.trade = true end
   env.CloseMail = function() client.closed.mail = true end
   env.C_AuctionHouse = { CloseAuctionHouse = function() client.closed.ah = true end }

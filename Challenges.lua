@@ -206,14 +206,35 @@ function C.Enforce()
         warned[slot] = nil
       end
     end
-    if p.pvp and UnitIsPVP and not UnitIsPVP("player") then
-      local desired = GetPVPDesired and GetPVPDesired()
-      if not desired and SetPVP then
-        pcall(SetPVP, 1)
-        ns.Print("|cffd4a017" .. p.name .. ":|r you stay flagged for PvP.")
-      end
-    end
+    if p.pvp then C.KeepFlagged(p.name) end
   end
+end
+
+-- Slayer: PvP stays on. Turning it off (/pvp, the portrait menu, anything) is undone at once.
+-- "Desired" is the setting the game remembers; the flag itself lingers for a few minutes after
+-- it's turned off, so the setting is what gets checked.
+local lastFlagMsg = 0
+function C.KeepFlagged(name)
+  if not SetPVP then return end
+  local desired = GetPVPDesired and GetPVPDesired()
+  local flagged = UnitIsPVP and UnitIsPVP("player")
+  if desired and flagged ~= false then return end
+  pcall(SetPVP, 1)
+  local now = GetTime and GetTime() or 0
+  if now - lastFlagMsg > 30 or lastFlagMsg == 0 then
+    lastFlagMsg = now
+    ns.Print("|cffd4a017" .. name .. ":|r your PvP flag stays on for the whole challenge.")
+  end
+end
+
+local function pvpChanged()
+  for _, c in ipairs(C.MyEnforced()) do
+    if c.preset.pvp then C.KeepFlagged(c.preset.name); return end
+  end
+end
+if hooksecurefunc then
+  if TogglePVP then hooksecurefunc("TogglePVP", pvpChanged) end
+  if SetPVP then hooksecurefunc("SetPVP", function(v) if not v or v == 0 then pvpChanged() end end) end
 end
 
 local function forbids(field)
