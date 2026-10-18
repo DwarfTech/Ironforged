@@ -137,7 +137,7 @@ local function announceAvenged()
       if g and (a.ts or 0) > ns.Now() - 3600 then
         local how = a.how == "officer" and "has been avenged" or "has fallen"
         ns.Print("|cffffd040GRUDGE AVENGED!|r " .. (g.against or "?") .. " " .. how .. ". " ..
-          (a.by and ("Honor to " .. ns.ShortName(a.by) .. ". ") or "") .. "The book is one line lighter.")
+          (a.by and ("Honor to " .. ns.Name(a.by) .. ". ") or "") .. "The book is one line lighter.")
         if RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo then
           pcall(RaidNotice_AddMessage, RaidWarningFrame, "Grudge avenged: " .. (g.against or "?"), ChatTypeInfo.RAID_WARNING)
         end
@@ -221,24 +221,24 @@ function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)
   if not foe or not Blood.IsElf(foe.race) then return false end
   if IsInRaid and IsInRaid() then
-    ns.Print("|cff999999" .. ns.ShortName(victim) .. " falls, but elf kills don't count toward Elfbane in a raid.|r")
+    ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but elf kills don't count toward Elfbane in a raid.|r")
     return false
   end
   if IsInGroup and IsInGroup() and not wasMyTarget(victim, key) then
-    ns.Print("|cff999999" .. ns.ShortName(victim) .. " falls, but in a party an elf only counts if they were your target.|r")
+    ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but in a party an elf only counts if they were your target.|r")
     return false
   end
   ns.db.elfCounted = ns.db.elfCounted or {}
   local last = ns.db.elfCounted[key]
   local now = ns.Now()
   if last and now - last < Blood.ELF_COOLDOWN then
-    ns.Print("|cff999999" .. ns.ShortName(victim) .. " already counted toward your elves this hour.|r")
+    ns.Print("|cff999999" .. ns.Name(victim) .. " already counted toward your elves this hour.|r")
     return false
   end
   ns.db.elfCounted[key] = now
   local p = personal()
   p.elves = (p.elves or 0) + 1
-  ns.Print("|cffd4a017An elf falls.|r " .. ns.ShortName(victim) .. " is the " .. p.elves .. Blood.Ordinal(p.elves) .. " elf to fall to your axe.")
+  ns.Print("|cffd4a017An elf falls.|r " .. ns.Name(victim) .. " is the " .. p.elves .. Blood.Ordinal(p.elves) .. " elf to fall to your axe.")
   schedulePublish(5)
   return true
 end
@@ -307,7 +307,7 @@ local function alertSighting(foe, spotter, zone)
   if #deed > 60 then deed = deed:sub(1, 57) .. "..." end
   local where = (zone and zone ~= "") and (" in " .. zone) or ""
   if spotter then
-    ns.Print("|cffff4040GRUDGED FOE SPOTTED:|r " .. ns.ShortName(spotter) .. " sees " .. foe .. where .. ". (" .. deed .. ")")
+    ns.Print("|cffff4040GRUDGED FOE SPOTTED:|r " .. ns.Name(spotter) .. " sees " .. foe .. where .. ". (" .. deed .. ")")
   else
     ns.Print("|cffff4040A GRUDGED FOE IS NEAR:|r " .. foe .. " - " .. deed ..
       (#grudges > 1 and (" (+" .. (#grudges - 1) .. " more grudges)") or ""))

@@ -224,22 +224,22 @@ end
 function P.Request(crafter, recipe, note)
   local info = ns.roster[crafter]
   if not info or not info.online then
-    ns.Print(ns.ShortName(crafter) .. " is offline. Catch them later, or send a letter.")
+    ns.Print(ns.Name(crafter) .. " is offline. Catch them later, or send a letter.")
     return false
   end
   ns.Comm.Send({ op = "CQ", r = ns.Clean(recipe, 80), n = ns.Clean(note or "", 120) }, "WHISPER", crafter)
-  ns.Print("Asked " .. ns.ShortName(crafter) .. " to craft |cffd4a017" .. recipe .. "|r.")
+  ns.Print("Asked " .. ns.Name(crafter) .. " to craft |cffd4a017" .. recipe .. "|r.")
   return true
 end
 
 ns.On("CRAFT_REQUEST", function(sender, recipe, note)
-  ns.Print("|cffd4a017Craft request:|r " .. ns.ShortName(sender) .. " asks you to make |cffffd040" .. recipe .. "|r." ..
+  ns.Print("|cffd4a017Craft request:|r " .. ns.Name(sender) .. " asks you to make |cffffd040" .. recipe .. "|r." ..
     ((note and note ~= "") and (" \"" .. note .. "\"") or ""))
   if PlaySound and SOUNDKIT and SOUNDKIT.TELL_MESSAGE then pcall(PlaySound, SOUNDKIT.TELL_MESSAGE) end
   if ns.UI and ns.UI.Notice then
     ns.UI.Notice({
       id = "craft", icon = "Interface\\Icons\\Trade_BlackSmithing", title = "Craft request",
-      text = ns.ShortName(sender) .. " asks you to make |cffffd040" .. recipe .. "|r." ..
+      text = ns.Name(sender) .. " asks you to make |cffffd040" .. recipe .. "|r." ..
         ((note and note ~= "") and ("\n\"" .. note .. "\"") or ""),
       buttons = { { text = "Got it" } },
     })

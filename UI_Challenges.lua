@@ -44,7 +44,7 @@ local function showChallenge(key)
   local member = ns.Data.SplitKey(key)
   local mine = member == ns.PlayerName()
   local lines = {
-    "|cffd4a017Dwarf:|r " .. ns.ShortName(member),
+    "|cffd4a017Dwarf:|r " .. ns.Name(member),
     "|cffd4a017Status:|r " .. (C.STATUS[d.status] or d.status or ""),
     "|cffd4a017Kind:|r " .. (d.preset and "Ready-made, enforced by the addon. Completes itself at max level." or "Their own, on their honor. Completes itself at max level."),
     "|cffd4a017Started:|r " .. ns.FormatDate(d.ts) .. " at level " .. tostring(d.startLevel or "?"),

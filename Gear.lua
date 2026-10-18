@@ -78,7 +78,7 @@ local function remember(unit)
   local display = ns.UnitDisplayName(unit)
   local _, raceFile = UnitRace(unit)
   if not display or not raceFile or isSecret(raceFile) then return end
-  local full = ns.FullName(display)
+  local full = ns.Name(display)
   if ns.db then
     seenCache()[full] = raceFile
     seenCache()["~" .. ns.NameKey(display)] = raceFile
@@ -162,7 +162,7 @@ function Gear.ScanGuild(silent)
     for _, name in ipairs(ns.rosterList) do
       local dwarf = Gear.IsDwarf(name)
       if dwarf == true then dwarves = dwarves + 1
-      elseif dwarf == false then others = others + 1; outsiders[#outsiders + 1] = ns.ShortName(name)
+      elseif dwarf == false then others = others + 1; outsiders[#outsiders + 1] = ns.Name(name)
       else unknown = unknown + 1 end
     end
     if verbose then
@@ -281,7 +281,7 @@ end
 
 local function checkInvite(name)
   if type(name) ~= "string" or name == "" or isSecret(name) then return end
-  local full = ns.FullName(name)
+  local full = ns.Name(name)
   if UnitExists("target") then
     local tn = ns.UnitDisplayName("target")
     if tn and ns.NameKey(tn) == ns.NameKey(name) then remember("target") end
@@ -289,10 +289,10 @@ local function checkInvite(name)
   local race = Gear.RaceOf(full)
   logInvite(name, race)
   if race and not Gear.DWARF[race] then
-    ns.Print("|cffff6060" .. ns.ShortName(full) .. " is no dwarf! The law of the hold forbids inviting non-dwarves. The Longbeards will hear of this.|r")
+    ns.Print("|cffff6060" .. ns.Name(full) .. " is no dwarf! The law of the hold forbids inviting non-dwarves. The Longbeards will hear of this.|r")
     if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then PlaySound(SOUNDKIT.RAID_WARNING) end
   elseif not race then
-    ns.Print("Make sure " .. ns.ShortName(full) .. " is a dwarf before they join the hold.")
+    ns.Print("Make sure " .. ns.Name(full) .. " is a dwarf before they join the hold.")
   end
 end
 Gear.CheckInvite = checkInvite
@@ -301,7 +301,7 @@ Gear.CheckInvite = checkInvite
 -- Remember a race we've learned, share it if we're an officer (or the inviter), and re-check the hold.
 function Gear.RecordRace(name, race)
   if not name or not race then return end
-  local full = ns.FullName(name)
+  local full = ns.Name(name)
   seenCache()[full] = race
   seenCache()["~" .. shortKey(name)] = race
   local me = ns.PlayerName()
@@ -314,7 +314,7 @@ function Gear.RecordRace(name, race)
 end
 
 local function resolveNewMember(who)
-  local full = ns.FullName(who)
+  local full = ns.Name(who)
   local info = ns.roster[full]
   local race = info and raceFromGUID(info.guid) or Gear.RaceOf(full)
   if race then Gear.RecordRace(full, race) end
@@ -356,7 +356,7 @@ function Gear.CheckIntruders()
     local race = entry.race or Gear.RaceOf(entry.name or invitee)
     if race and not Gear.DWARF[race] and not seen.invites[key] then
       seen.invites[key] = true
-      local line = ns.ShortName(inviter) .. " invited " .. (entry.name or invitee) .. ", who is not a dwarf."
+      local line = ns.Name(inviter) .. " invited " .. (entry.name or invitee) .. ", who is not a dwarf."
       ns.Print("|cffff6060" .. line .. "|r")
       popupLines[#popupLines + 1] = line
     end
@@ -367,7 +367,7 @@ function Gear.CheckIntruders()
       seen.members[name] = true
       local inviters = Gear.InvitersOf(name)
       local by = #inviters > 0 and (" Invited by " .. table.concat(inviters, ", "):gsub("%-[^,]*", "") .. ".") or ""
-      local line = ns.ShortName(name) .. " is in the guild and is not a dwarf. " .. tostring(Gear.RaceOf(name)) .. " - " .. by
+      local line = ns.Name(name) .. " is in the guild and is not a dwarf. " .. tostring(Gear.RaceOf(name)) .. " - " .. by
       ns.Print("|cffff6060" .. line .. "|r")
       popupLines[#popupLines + 1] = line
     end

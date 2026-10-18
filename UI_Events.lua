@@ -51,7 +51,7 @@ local function takeAttendance(eventId)
   end
   local count = 0
   local function mark(name)
-    name = name and ns.FullName(name)
+    name = name and ns.Name(name)
     if name and ns.roster[name] and not present[name] then present[name] = true; count = count + 1 end
   end
   if IsInRaid and IsInRaid() then
@@ -75,7 +75,7 @@ local function showEvent(id)
   local r = Data.RSVPs(id)
   local function names(list)
     local out = {}
-    for _, n in ipairs(list) do out[#out + 1] = ns.ShortName(n) end
+    for _, n in ipairs(list) do out[#out + 1] = ns.Name(n) end
     return #out > 0 and table.concat(out, ", ") or "-"
   end
   local lines = {
@@ -83,7 +83,7 @@ local function showEvent(id)
     "|cffd4a017Kind:|r " .. (e.kind or ""),
   }
   if e.place and e.place ~= "" then lines[#lines + 1] = "|cffd4a017Meet at:|r " .. e.place end
-  lines[#lines + 1] = "|cffd4a017Called by:|r " .. ns.ShortName(e.organizer)
+  lines[#lines + 1] = "|cffd4a017Called by:|r " .. ns.Name(e.organizer)
   if e.desc and e.desc ~= "" then lines[#lines + 1] = " "; lines[#lines + 1] = e.desc end
   lines[#lines + 1] = " "
   lines[#lines + 1] = STATUS_TEXT.yes .. " (" .. #r.yes .. "): " .. names(r.yes)

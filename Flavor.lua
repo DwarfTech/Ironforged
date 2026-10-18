@@ -65,7 +65,7 @@ ns.On("DATA_READY", function()
   greeted = true
   local function greet()
     local me = ns.PlayerName()
-    ns.Print(Flavor.Random("greeting", ns.ShortName(me)))
+    ns.Print(Flavor.Random("greeting", ns.Name(me)))
     local apps = 0
     for _, clanId in ipairs(ns.Data.ClansLedBy(me)) do apps = apps + #ns.Data.Applications(clanId) end
     if apps > 0 then
@@ -80,7 +80,7 @@ end)
 
 ns.On("PEER_ARRIVED", function(sender)
   if not ns.settings.arrivalNotices then return end
-  ns.Print(Flavor.Random("arrival", ns.ShortName(sender)))
+  ns.Print(Flavor.Random("arrival", ns.Name(sender)))
 end)
 
 ----------------------------------------------------------------------
@@ -98,7 +98,7 @@ local function addTooltipLines(tooltip)
   if not UnitIsPlayer(unit) then return end
   local display = ns.UnitDisplayName(unit)
   if not display then return end
-  local full = ns.FullName(display)
+  local full = ns.Name(display)
   if not ns.roster[full] then return end
 
   local m = ns.Data.Member(full)

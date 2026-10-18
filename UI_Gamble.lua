@@ -6,7 +6,7 @@ local G = ns.Gamble
 
 local state = { amount = "100" }
 
-local function first(name) return (ns.ShortName(name):match("^(%S+)")) or ns.ShortName(name) end
+local function first(name) return (ns.Name(name):match("^(%S+)")) or ns.Name(name) end
 
 local PHASE_TEXT = {
   open = "Joining: type 1 in chat or press Join",

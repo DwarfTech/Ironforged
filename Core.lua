@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.16.9"
+ns.VERSION = "2.16.7"
 ns.PROTOCOL = 11
 ns.PREFIX = "IRONFORGED"
 ns.COLOR = "ffd4a017"
@@ -62,23 +62,38 @@ function ns.RealmSuffix()
   return nil
 end
 
--- Canonical "Name-Realm" form so roster names and message senders match.
--- Matching key for any character name. Forever has no realms but gives characters a first
--- name and a surname, which some APIs return as "First Surname" and others as "First-Surname".
--- The key is lowercase "first surname", with any realm suffix of ours removed.
-function ns.NameKey(name)
-  if type(name) ~= "string" then return "" end
+-- Character names. Every name in this addon is "First Surname" with no realm.
+-- Forever has one server but gives characters a first name and a surname, which some APIs
+-- return as "First Surname", others as "First Surname-Realm" or "First-Surname".
+local function normalize(name)
+  if type(name) ~= "string" then return nil end
   name = name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
   local suffix = name:match("%-([^%s%-]+)$")
-  if suffix then
-    -- "First Surname-Realm": the part after the hyphen is a realm. "First-Surname" (no space):
-    -- only a realm when it's one we know.
-    if name:find(" ", 1, true) or suffix == ns.RealmSuffix() or (ns.knownRealms and ns.knownRealms[suffix]) then
-      name = name:sub(1, -#suffix - 2)
-    end
+  -- "First Surname-Realm": the part after the hyphen is a realm. "First-Surname" (no space):
+  -- only a realm when it's one we know.
+  if suffix and (name:find(" ", 1, true) or suffix == ns.RealmSuffix() or (ns.knownRealms and ns.knownRealms[suffix])) then
+    name = name:sub(1, -#suffix - 2)
   end
-  name = name:gsub("%-", " "):gsub("%s+", " ")
-  return ns.Trim(name):lower()
+  name = ns.Trim((name:gsub("%-", " "):gsub("%s+", " ")))
+  if name == "" then return nil end
+  return name
+end
+
+ns.rosterByKey = {} -- lowercase name -> name as the guild roster spells it
+
+-- THE name function: "Frugo Firehammer-ClassicBetaPvP" -> "Frugo Firehammer". Use it for
+-- data keys, roster lookups, whispers, invites, slash commands and display alike. Spelled as
+-- the guild roster spells it when the character is a guildmate. Returns "" for non-names.
+function ns.Name(name)
+  local n = normalize(name)
+  if not n then return "" end
+  return ns.rosterByKey[n:lower()] or n
+end
+
+-- Lowercase form of a name, for case-insensitive comparison. "" for non-names.
+function ns.NameKey(name)
+  local n = normalize(name)
+  return n and n:lower() or ""
 end
 
 -- A unit's full name, first name and surname together, e.g. "Grubnak Skullsplitter".
@@ -102,45 +117,11 @@ ns.IS_FOREVER = (WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CA
     return type(v) == "number" and v >= 16000 and v < 20000
   end)()
 
--- Canonical name for a character. Prefers the exact form the guild roster uses, matching on the
--- name before any realm suffix, because Forever's single mega-server can report realms differently
--- in different places (roster, chat, unit names).
-ns.rosterByShort = {}
-function ns.FullName(name)
-  if type(name) ~= "string" or name == "" then return nil end
-  if ns.roster and ns.roster[name] then return name end
-  local key = ns.NameKey(name)
-  -- Only an exact first-name-and-surname match counts. "Sunny Skyborne" is not the guildmate
-  -- "Sunny Dworf" just because they share a first name.
-  local known = ns.rosterByShort[key] or ns.rosterByShort[(name:gsub("%-.*$", "")):lower()]
-  if known then return known end
-  if name:find("-", 1, true) then return name end
-  local realm = ns.RealmSuffix()
-  if realm then return name .. "-" .. realm end
-  return name
-end
-
--- Name for display: Forever has one server, so any "-Realm" suffix is dropped.
--- "Frugo Firehammer-ClassicBetaPvP" -> "Frugo Firehammer".
-function ns.ShortName(name)
-  if type(name) ~= "string" then return "?" end
-  local stripped = name:gsub("%-[^%s%-]+$", "")
-  if stripped ~= "" then return stripped end
-  return name
-end
-
--- The name used for whispers, invites and slash commands: first name and surname together, with
--- no realm ("Buttercup Clamstone-ClassicBetaPvP" -> "Buttercup Clamstone").
-function ns.CharName(name)
-  if type(name) ~= "string" then return name end
-  return (name:match("^(.-)%-[^%s%-]+$")) or name
-end
-
 -- Your own roster name, matched by character ID first (exact), then by name.
 function ns.PlayerName()
   local guid = UnitGUID and UnitGUID("player")
   if guid and ns.rosterByGUID and ns.rosterByGUID[guid] then return ns.rosterByGUID[guid] end
-  return ns.FullName(ns.UnitDisplayName("player"))
+  return ns.Name(ns.UnitDisplayName("player"))
 end
 
 function ns.FormatDate(ts)
@@ -214,7 +195,7 @@ end
 function ns.ColorName(fullName)
   local info = ns.roster[fullName]
   local hex = info and ns.ClassColor(info.classFile) or "ffcccccc"
-  return "|c" .. hex .. ns.ShortName(fullName) .. "|r"
+  return "|c" .. hex .. ns.Name(fullName) .. "|r"
 end
 
 ----------------------------------------------------------------------
@@ -294,11 +275,19 @@ function ns.RefreshRoster()
   end
   local roster, list, ranks = {}, {}, {}
   local n = GetNumGuildMembers and GetNumGuildMembers() or 0
+  -- Learn the realm suffixes in use first, so "First-Surname" isn't mistaken for a realm.
+  local realms = {}
+  for i = 1, n do
+    local rawName = GetGuildRosterInfo(i)
+    local r = type(rawName) == "string" and rawName:find(" ", 1, true) and rawName:match("%-([^%s%-]+)$")
+    if r then realms[r] = true end
+  end
+  ns.knownRealms = realms
   for i = 1, n do
     local name, rankName, rankIndex, level, className, zone, publicNote, officerNote, online, status, classFile,
       _, _, _, _, _, guid = GetGuildRosterInfo(i)
-    if name then
-      local full = ns.FullName(name)
+    local full = normalize(name)
+    if full then
       local years, months, days, hours
       if GetGuildRosterLastOnline then years, months, days, hours = GetGuildRosterLastOnline(i) end
       roster[full] = {
@@ -323,23 +312,12 @@ function ns.RefreshRoster()
       end
     end
   end
-  local realms = {}
+  local byKey, byGUID = {}, {}
   for _, full in ipairs(list) do
-    local r = full:find(" ", 1, true) and full:match("%-([^%s%-]+)$")
-    if r then realms[r] = true end
-  end
-  ns.knownRealms = realms
-  local byShort, byGUID = {}, {}
-  for _, full in ipairs(list) do
-    local key = ns.NameKey(full)
-    byShort[key] = full
-    local plain = (full:gsub("%-.*$", "")):lower()
-    if not byShort[plain] then byShort[plain] = full end
-    local first = key:match("^(%S+)%s")
-    if first and not byShort[first] then byShort[first] = full end
+    byKey[full:lower()] = full
     if roster[full].guid then byGUID[roster[full].guid] = full end
   end
-  ns.roster, ns.rosterList, ns.ranks, ns.rosterByShort, ns.rosterByGUID = roster, list, ranks, byShort, byGUID
+  ns.roster, ns.rosterList, ns.ranks, ns.rosterByKey, ns.rosterByGUID = roster, list, ranks, byKey, byGUID
   ns.Fire("ROSTER")
 end
 

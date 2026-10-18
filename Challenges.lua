@@ -380,11 +380,11 @@ ns.RegisterEvent("GROUP_ROSTER_UPDATE", function() C.CheckGroup() end)
 ns.RegisterEvent("PARTY_INVITE_REQUEST", function(inviter)
   local name = forbids("dwarfOnly")
   if not name or type(inviter) ~= "string" then return end
-  local full = ns.FullName(inviter)
+  local full = ns.Name(inviter)
   if ns.roster[full] and ns.Gear.IsDwarf(full) == false then
     if DeclineGroup then pcall(DeclineGroup) end
     if StaticPopup_Hide then pcall(StaticPopup_Hide, "PARTY_INVITE") end
-    ns.Print("|cffd4a017" .. name .. ":|r turned down " .. ns.ShortName(inviter) .. "'s invite. Dwarves only.")
+    ns.Print("|cffd4a017" .. name .. ":|r turned down " .. ns.Name(inviter) .. "'s invite. Dwarves only.")
   end
 end)
 ns.RegisterEvent("MAIL_SHOW", function()
@@ -520,7 +520,7 @@ ns.On("DATA_CHANGED", function(coll, key)
   if not d or member == ns.PlayerName() or lastStatus[key] == d.status then lastStatus[key] = d and d.status; return end
   lastStatus[key] = d.status
   if ns.Now() - (tonumber(d.ended or d.ts) or 0) > 600 then return end
-  local who = ns.ShortName(member)
+  local who = ns.Name(member)
   if d.status == "active" then
     ns.Print("|cffd4a017Challenge:|r " .. who .. " takes on " .. d.name .. ".")
   elseif d.status == "failed" then

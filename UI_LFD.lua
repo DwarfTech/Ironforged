@@ -17,7 +17,7 @@ local function roleList(joins)
   local parts = {}
   for _, j in ipairs(joins) do
     local on = ns.roster[j.member] and ns.roster[j.member].online
-    parts[#parts + 1] = (on and "" or "|cff999999") .. ns.ShortName(j.member) .. " (" .. (L.ROLES[j.role] or "Damage") .. ")" .. (on and "" or " offline|r")
+    parts[#parts + 1] = (on and "" or "|cff999999") .. ns.Name(j.member) .. " (" .. (L.ROLES[j.role] or "Damage") .. ")" .. (on and "" or " offline|r")
   end
   return #parts > 0 and table.concat(parts, ", ") or "|cff999999No one yet.|r"
 end
@@ -29,7 +29,7 @@ local function showPost(postKey)
   local me = ns.PlayerName()
   local joins = L.Joins(postKey)
   local lines = {
-    "|cffd4a017Leader:|r " .. ns.ShortName(leader),
+    "|cffd4a017Leader:|r " .. ns.Name(leader),
     "|cffd4a017Looking for:|r " .. d.need .. (d.need == 1 and " dwarf" or " dwarves") .. " for " .. d.what,
     "|cffd4a017Posted:|r " .. ago(d.ts),
   }
@@ -50,7 +50,7 @@ local function showPost(postKey)
     end
     if ns.IAmOfficer() then
       buttons[#buttons + 1] = { text = "Remove", onClick = function()
-        UI.Confirm("Take down " .. ns.ShortName(leader) .. "'s post?", function() L.Close(postKey, true) end)
+        UI.Confirm("Take down " .. ns.Name(leader) .. "'s post?", function() L.Close(postKey, true) end)
       end }
     end
   end

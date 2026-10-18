@@ -124,7 +124,7 @@ local function refresh(f)
   local peers = {}
   local t = GetTime()
   for name, p in pairs(ns.Comm.peers) do
-    if t - p.seen < 1800 then peers[#peers + 1] = ns.ShortName(name) .. " |cff888888" .. p.version .. "|r" end
+    if t - p.seen < 1800 then peers[#peers + 1] = ns.Name(name) .. " |cff888888" .. p.version .. "|r" end
   end
   table.sort(peers)
   local peerCount = #peers

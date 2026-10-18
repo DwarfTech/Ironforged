@@ -128,7 +128,7 @@ end
 Cheers._sayGuild = sayGuild
 
 local function shortFirst(name)
-  return (ns.ShortName(name):match("^(%S+)")) or ns.ShortName(name)
+  return (ns.Name(name):match("^(%S+)")) or ns.Name(name)
 end
 
 ----------------------------------------------------------------------

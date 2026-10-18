@@ -6,20 +6,20 @@ local P = ns.Prof
 local state = { search = "", prof = nil, online = false, crafter = nil }
 local MAX_ROWS = 600
 
-local function first(name) return (ns.ShortName(name):match("^(%S+)")) or ns.ShortName(name) end
+local function first(name) return (ns.Name(name):match("^(%S+)")) or ns.Name(name) end
 
 local function isOnline(member) return ns.roster[member] and ns.roster[member].online end
 
 local function askToCraft(member, recipe)
   if not isOnline(member) then
-    ns.Print(ns.ShortName(member) .. " is offline. Catch them later, or send a letter.")
+    ns.Print(ns.Name(member) .. " is offline. Catch them later, or send a letter.")
     return
   end
   UI.OpenForm({
     title = "Ask " .. first(member) .. " to craft",
     width = 460,
     fields = {
-      { type = "info", value = "Ask |cffd4a017" .. ns.ShortName(member) .. "|r to make |cffffd040" .. recipe .. "|r. They get a private popup; nothing goes to chat." },
+      { type = "info", value = "Ask |cffd4a017" .. ns.Name(member) .. "|r to make |cffffd040" .. recipe .. "|r. They get a private popup; nothing goes to chat." },
       { key = "note", label = "Note (optional)", type = "text", value = "", maxLen = 120 },
     },
     saveText = "Ask",
@@ -58,7 +58,7 @@ local function refresh(f)
                 data = { kind = "recipe", member = r.member, recipe = recipe },
                 keys = { [4] = r.skill },
                 color = (not on) and { 0.6, 0.6, 0.6 } or nil,
-                cols = { recipe, (on and "|cff40ff40" or "|cff999999") .. ns.ShortName(r.member) .. "|r", r.prof, r.skill .. "/" .. r.max },
+                cols = { recipe, (on and "|cff40ff40" or "|cff999999") .. ns.Name(r.member) .. "|r", r.prof, r.skill .. "/" .. r.max },
               }
             end
           end
@@ -66,7 +66,7 @@ local function refresh(f)
       end
     end
     if crafterRec then
-      f.info:SetText("|cffd4a017" .. ns.ShortName(crafterRec.member) .. "|r: " .. crafterRec.prof .. " " .. crafterRec.skill .. "/" .. crafterRec.max ..
+      f.info:SetText("|cffd4a017" .. ns.Name(crafterRec.member) .. "|r: " .. crafterRec.prof .. " " .. crafterRec.skill .. "/" .. crafterRec.max ..
         "  |cff999999(" .. P.RecipeCount(crafterRec.data) .. " recipes)|r" .. (isOnline(crafterRec.member) and "  |cff40ff40online|r" or ""))
     else
       f.info:SetText(count .. (count == 1 and " recipe" or " recipes") .. " found" .. (state.prof and (" in " .. state.prof) or "") ..
@@ -126,7 +126,7 @@ local function refresh(f)
         data = { kind = "prof", prof = name },
         keys = { [4] = b.top.skill },
         cols = { name, b.n, b.on > 0 and ("|cff40ff40" .. b.on .. "|r") or "|cff9999990|r",
-          ns.ShortName(b.top.member) .. " |cff999999(" .. b.top.skill .. ")|r" },
+          ns.Name(b.top.member) .. " |cff999999(" .. b.top.skill .. ")|r" },
       }
     end
   end

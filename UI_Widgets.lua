@@ -762,7 +762,7 @@ function UI.RosterOptions(includeNone)
   local opts = {}
   if includeNone then opts[#opts + 1] = { text = "(none)", value = false } end
   for _, name in ipairs(ns.rosterList) do
-    opts[#opts + 1] = { text = ns.ShortName(name), value = name }
+    opts[#opts + 1] = { text = ns.Name(name), value = name }
   end
   return opts
 end

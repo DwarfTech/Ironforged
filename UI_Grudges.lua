@@ -59,11 +59,11 @@ UI.WriteGrudge = writeGrudge
 local function avengedText(a)
   if not a then return nil end
   if a.how == "officer" then
-    return "Avenged" .. (a.by and (", credited to " .. ns.ShortName(a.by)) or "") .. " (marked by " .. ns.ShortName(a.marker or a.by) .. ")"
+    return "Avenged" .. (a.by and (", credited to " .. ns.Name(a.by)) or "") .. " (marked by " .. ns.Name(a.marker or a.by) .. ")"
   elseif a.how == "witnessed" then
-    return "Avenged: seen falling by " .. ns.ShortName(a.by)
+    return "Avenged: seen falling by " .. ns.Name(a.by)
   end
-  return "Avenged: slain by " .. ns.ShortName(a.by)
+  return "Avenged: slain by " .. ns.Name(a.by)
 end
 
 local function showGrudge(key)
@@ -144,7 +144,7 @@ local function refresh(f)
     if state.showAvenged or not a then
       local status
       if a then
-        status = "|cffffd040AVENGED|r |cff999999" .. ns.ShortName(a.by) .. "|r"
+        status = "|cffffd040AVENGED|r |cff999999" .. ns.Name(a.by) .. "|r"
       else
         status = "|cffff6060Unavenged|r"
       end
@@ -231,7 +231,7 @@ local function showDoom(foe, deed, count)
   local d = buildDoom()
   d.foe = foe
   -- the emote finds them by their character name
-  local who = ns.CharName(foe)
+  local who = ns.Name(foe)
   d.go:SetAttribute("macrotext", "/doom " .. who)
   d.sub:SetText("|cffff8060" .. foe .. "|r" .. ((deed and deed ~= "") and (": " .. deed) or "") ..
     ((count or 1) > 1 and ("  |cff999999(+" .. (count - 1) .. " more)|r") or ""))

@@ -41,8 +41,7 @@ end
 local function rawSend(item)
   if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return "drop" end
   if item.channel == "WHISPER" and not targetOnline(item.target) then return "drop" end
-  local target = item.target
-  if item.channel == "WHISPER" then target = ns.CharName(target) end -- never "First Surname-Realm"
+  local target = item.target -- already "First Surname", never with a realm
   local ok, result = pcall(C_ChatInfo.SendAddonMessage, ns.PREFIX, item.text, item.channel, target)
   if not ok then return "drop" end
   if result == nil or result == true then return "ok" end
@@ -236,8 +235,8 @@ end
 function Comm.OnAddonMessage(prefix, text, channel, sender)
   if prefix ~= ns.PREFIX then return end
   if channel ~= "GUILD" and channel ~= "WHISPER" then return end
-  sender = ns.FullName(sender)
-  if not sender or sender == ns.PlayerName() then return end
+  sender = ns.Name(sender)
+  if sender == "" or sender == ns.PlayerName() then return end
   if not ns.Data.Ready() then return end
 
   local id, i, n, part = text:match("^(%x+)\t(%d+)\t(%d+)\t(.*)$")

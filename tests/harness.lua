@@ -8,7 +8,11 @@ end
 local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000 }
 -- the server knows a character by its full "First Surname" name; the realm is dropped when whispering
 function H.charName(full) return full end
-function H.baseName(n) return (n:match("^(.-)%-[^%s%-]+$")) or n end
+function H.baseName(n) -- same rule as the addon: a trailing "-Realm" goes; "First-Surname" becomes "First Surname"
+  local base, suffix = n:match("^(.-)%-([^%s%-]+)$")
+  if base and (base:find(" ", 1, true) or suffix == "Forever") then n = base end
+  return (n:gsub("%-", " "))
+end
 
 local ROSTER = {
   { "Thorin-Forever", "Thane", 0, 60, "Warrior", "WARRIOR" },

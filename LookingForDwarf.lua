@@ -13,7 +13,7 @@ L.TTL = 2 * 60 * 60 -- posts close themselves after two hours
 L.ROLES = { tank = "Tank", healer = "Healer", dps = "Damage" }
 L.ROLE_ORDER = { "tank", "healer", "dps" }
 
-local function first(name) return (ns.ShortName(name):match("^(%S+)")) or ns.ShortName(name) end
+local function first(name) return (ns.Name(name):match("^(%S+)")) or ns.Name(name) end
 
 function L.Leader(postKey) return (Data.SplitKey(postKey)) end
 
@@ -108,11 +108,11 @@ end
 -- Invite a guildmate to my group. Falls back to a command to copy if the game refuses.
 function L.Invite(member)
   local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-  local ok = fn and pcall(fn, ns.CharName(member))
+  local ok = fn and pcall(fn, ns.Name(member))
   if ok then
-    ns.Print("Invited " .. ns.ShortName(member) .. ".")
+    ns.Print("Invited " .. ns.Name(member) .. ".")
   elseif ns.UI and ns.UI.CopyCommand then
-    ns.UI.CopyCommand("/invite " .. ns.CharName(member), "Invite " .. ns.ShortName(member))
+    ns.UI.CopyCommand("/invite " .. ns.Name(member), "Invite " .. ns.Name(member))
   end
   return ok
 end
@@ -144,7 +144,7 @@ local function postPopup(postKey, d)
   buttons[#buttons + 1] = { text = "Dismiss" }
   UI.Notice({
     id = "lfd", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore", title = "Looking for Dwarf",
-    text = "|cffd4a017" .. ns.ShortName(leader) .. "|r needs " .. d.need .. (d.need == 1 and " dwarf" or " dwarves") ..
+    text = "|cffd4a017" .. ns.Name(leader) .. "|r needs " .. d.need .. (d.need == 1 and " dwarf" or " dwarves") ..
       " for |cffffd040" .. d.what .. "|r." .. ((d.note and d.note ~= "") and ("\n" .. d.note) or "") ..
       (joined > 0 and ("  |cff999999(" .. joined .. " signed up)|r") or "") .. "\nSign up as:",
     buttons = buttons,
@@ -159,13 +159,13 @@ local function joinPopup(joinKey, d)
   if not p then return end
   local role = L.ROLES[d.role] or "Damage"
   local joined, need = #L.Joins(post), tonumber(p.need) or 1
-  ns.Print("|cffd4a017Looking for Dwarf:|r " .. ns.ShortName(member) .. " (" .. role .. ") wants in on " .. p.what ..
+  ns.Print("|cffd4a017Looking for Dwarf:|r " .. ns.Name(member) .. " (" .. role .. ") wants in on " .. p.what ..
     ". " .. joined .. " of " .. need .. " signed up.")
   if PlaySound and SOUNDKIT and SOUNDKIT.TELL_MESSAGE then pcall(PlaySound, SOUNDKIT.TELL_MESSAGE) end
   if UI and UI.Notice then
     UI.Notice({
       id = "lfdjoin", icon = "Interface\\Icons\\INV_Misc_GroupLooking", title = "A dwarf answers",
-      text = "|cffd4a017" .. ns.ShortName(member) .. "|r (" .. role .. ") wants in on |cffffd040" .. p.what .. "|r.\n" ..
+      text = "|cffd4a017" .. ns.Name(member) .. "|r (" .. role .. ") wants in on |cffffd040" .. p.what .. "|r.\n" ..
         joined .. " of " .. need .. " signed up.",
       buttons = { { text = "Invite", onClick = function() L.Invite(member) end }, { text = "Later" } },
       timeout = 60,

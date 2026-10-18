@@ -24,7 +24,7 @@ end
 function UI.EditMember(name)
   local m = Data.Member(name)
   UI.OpenForm({
-    title = "Hold record: " .. ns.ShortName(name),
+    title = "Hold record: " .. ns.Name(name),
     fields = {
       { key = "main", label = "Alt of", type = "choice", value = m.main or false, options = UI.RosterOptions(true) },
       { key = "joined", label = "Joined (YYYY-MM-DD)", type = "text", value = m.joined, maxLen = 10 },
@@ -58,7 +58,7 @@ function UI.CopyCommand(command, what)
 end
 
 function UI.ManageInGuildWindow(name)
-  local short = ns.ShortName(name)
+  local short = ns.Name(name)
   local info = ns.roster[name] or {}
   UI.OpenForm({
     title = "Manage " .. short,
@@ -66,9 +66,9 @@ function UI.ManageInGuildWindow(name)
     fields = { { type = "info", value = "|cffd4a017" .. short .. "|r  (" .. (info.rankName or "?") .. ", level " .. tostring(info.level or "?") .. ")" ..
       "\n\nBlizzard only lets you promote, demote or remove someone with a command you type yourself, or from its own guild window. Pick one and the addon gives you the command to copy." } },
     buttons = {
-      { text = "Remove", onClick = function() UI.CopyCommand("/gremove " .. ns.CharName(name), "Remove " .. short) end },
-      { text = "Demote", onClick = function() UI.CopyCommand("/gdemote " .. ns.CharName(name), "Demote " .. short) end },
-      { text = "Promote", onClick = function() UI.CopyCommand("/gpromote " .. ns.CharName(name), "Promote " .. short) end },
+      { text = "Remove", onClick = function() UI.CopyCommand("/gremove " .. ns.Name(name), "Remove " .. short) end },
+      { text = "Demote", onClick = function() UI.CopyCommand("/gdemote " .. ns.Name(name), "Demote " .. short) end },
+      { text = "Promote", onClick = function() UI.CopyCommand("/gpromote " .. ns.Name(name), "Promote " .. short) end },
     },
   })
 end
@@ -91,7 +91,7 @@ function UI.ShowMember(name, opts)
   local inviters = ns.Gear.InvitersOf(name)
   if #inviters > 0 then
     local short = {}
-    for _, n in ipairs(inviters) do short[#short + 1] = ns.ShortName(n) end
+    for _, n in ipairs(inviters) do short[#short + 1] = ns.Name(n) end
     add("Invited by", table.concat(short, ", "))
   end
   local shame = ns.Gear.NonDwarfInvites(name)
@@ -111,10 +111,10 @@ function UI.ShowMember(name, opts)
     cl[#cl + 1] = ch.data.name .. " |cff999999(from level " .. tostring(ch.data.startLevel or "?") .. ")|r " .. (ns.Challenges.STATUS[ch.data.status] or "") 
   end
   add("Challenges", table.concat(cl, ", "))
-  if m.main then add("Alt of", ns.ShortName(m.main)) end
+  if m.main then add("Alt of", ns.Name(m.main)) end
   local alts = {}
   for other, om in Data.Each("members") do
-    if om.main == name then alts[#alts + 1] = ns.ShortName(other) end
+    if om.main == name then alts[#alts + 1] = ns.Name(other) end
   end
   table.sort(alts)
   add("Alts", table.concat(alts, ", "))
@@ -158,14 +158,14 @@ end
 local function inviteToParty(name)
   local info = ns.roster[name]
   if info and not info.online then
-    ns.Print(ns.ShortName(name) .. " is not online.")
+    ns.Print(ns.Name(name) .. " is not online.")
     return
   end
   local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-  if fn and pcall(fn, ns.CharName(name)) then
-    ns.Print("Invited " .. ns.ShortName(name) .. ".")
+  if fn and pcall(fn, ns.Name(name)) then
+    ns.Print("Invited " .. ns.Name(name) .. ".")
   elseif UI.CopyCommand then
-    UI.CopyCommand("/invite " .. ns.CharName(name), "Invite " .. ns.ShortName(name))
+    UI.CopyCommand("/invite " .. ns.Name(name), "Invite " .. ns.Name(name))
   end
 end
 
@@ -173,7 +173,7 @@ end
 local function rowMenu(row, name)
   if MenuUtil and MenuUtil.CreateContextMenu then
     MenuUtil.CreateContextMenu(row, function(_, root)
-      if root.CreateTitle then root:CreateTitle(ns.ShortName(name)) end
+      if root.CreateTitle then root:CreateTitle(ns.Name(name)) end
       root:CreateButton("Invite to party", function() inviteToParty(name) end)
     end)
   else
@@ -254,7 +254,7 @@ local function refresh(f)
       if shamed then display = display .. " |cffff4040(shamed)|r" end
       if ns.Gear.IsDwarf(name) == false then
         local by = ns.Gear.InvitersOf(name)
-        if #by > 0 then display = display .. " |cffff4040(invited by " .. ns.ShortName(by[1]) .. ")|r" end
+        if #by > 0 then display = display .. " |cffff4040(invited by " .. ns.Name(by[1]) .. ")|r" end
       end
       items[#items + 1] = {
         data = name,

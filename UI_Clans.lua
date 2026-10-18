@@ -43,7 +43,7 @@ end
 local function memberPicker(owner, title, filter, onPick)
   local opts = {}
   for _, name in ipairs(ns.rosterList) do
-    if filter(name) then opts[#opts + 1] = { text = ns.ShortName(name), value = name } end
+    if filter(name) then opts[#opts + 1] = { text = ns.Name(name), value = name } end
   end
   if #opts == 0 then ns.Print("Nobody to choose."); return end
   UI.Pick(owner, opts, onPick, title)
@@ -72,7 +72,7 @@ showClan = function(id)
   lines[#lines + 1] = "|cffd4a017Members (" .. #members .. "):|r " .. (#names > 0 and table.concat(names, ", ") or "none yet")
   if invited then
     lines[#lines + 1] = " "
-    lines[#lines + 1] = "|cff40ff40" .. ns.ShortName(c.leader) .. " has invited you to join this clan.|r"
+    lines[#lines + 1] = "|cff40ff40" .. ns.Name(c.leader) .. " has invited you to join this clan.|r"
   elseif applied then
     lines[#lines + 1] = " "
     lines[#lines + 1] = "|cffffd040You have asked to join. The Clan Leader will answer.|r"
@@ -100,7 +100,7 @@ showClan = function(id)
         UI.OpenForm({
           title = "Ask to join clan " .. c.name,
           fields = {
-            { type = "info", font = "GameFontHighlightSmall", value = ns.ShortName(c.leader) .. " leads this clan and will accept or deny you." },
+            { type = "info", font = "GameFontHighlightSmall", value = ns.Name(c.leader) .. " leads this clan and will accept or deny you." },
             { key = "note", label = "Why you'd join", type = "multiline", value = "", maxLen = 200, height = 70 },
           },
           saveText = "Send",
@@ -118,7 +118,7 @@ showClan = function(id)
         return Data.ClanOf(n) ~= id and not Data.Get("invites", id .. "#" .. n)
       end, function(n)
         Data.Put("invites", id .. "#" .. n, { by = me })
-        ns.Print("Invitation sent to " .. ns.ShortName(n) .. ".")
+        ns.Print("Invitation sent to " .. ns.Name(n) .. ".")
       end)
       return false
     end, true)
@@ -187,11 +187,11 @@ local function showApplication(key)
     buttons = {
       { text = "Deny", onClick = function()
         Data.Delete("applications", key)
-        ns.Print("Denied " .. ns.ShortName(member) .. ".")
+        ns.Print("Denied " .. ns.Name(member) .. ".")
       end },
       { text = "Accept", onClick = function()
         if Data.Put("invites", key, { by = ns.PlayerName() }) then
-          ns.Print(ns.ShortName(member) .. " is now of clan " .. (Data.ClanName(clanId) or "?") .. ".")
+          ns.Print(ns.Name(member) .. " is now of clan " .. (Data.ClanName(clanId) or "?") .. ".")
         end
       end },
     },
@@ -267,7 +267,7 @@ local function refresh(f)
     if c.status ~= "disbanded" then
       items[#items + 1] = {
         data = id, name = c.name or "",
-        cols = { "|cffd4a017" .. (c.name or "?") .. "|r", c.leader and ns.ShortName(c.leader) or "",
+        cols = { "|cffd4a017" .. (c.name or "?") .. "|r", c.leader and ns.Name(c.leader) or "",
           #Data.ClanMembers(id), c.motto or "" },
       }
     end

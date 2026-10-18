@@ -56,7 +56,7 @@ local function refresh(f)
       order = 100 + i,
       keys = { [4] = a.d.ts or 0 },
       cols = { a.d.title, ns.ColorName(a.member),
-        "Awarded by " .. ns.ShortName(a.by or "?") .. ((a.d.reason and a.d.reason ~= "") and (": " .. a.d.reason) or ""),
+        "Awarded by " .. ns.Name(a.by or "?") .. ((a.d.reason and a.d.reason ~= "") and (": " .. a.d.reason) or ""),
         ns.FormatDate(a.d.ts) },
     }
   end
@@ -75,7 +75,7 @@ local function build(f, w, h)
   }, function(d)
     if type(d) ~= "table" then return end
     if d.kind == "awarded" and ns.IAmOfficer() then
-      UI.Confirm("Strip " .. ns.ShortName(d.name) .. " of the title " .. d.title .. "?", function() T.Strip(d.key) end)
+      UI.Confirm("Strip " .. ns.Name(d.name) .. " of the title " .. d.title .. "?", function() T.Strip(d.key) end)
     elseif d.name then
       UI.ShowMember(d.name, { noManage = true })
     end

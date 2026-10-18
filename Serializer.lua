@@ -13,7 +13,9 @@ local MAX_DEPTH = 12
 
 local function encodeNumber(n)
   if n == math.floor(n) and n > -1e15 and n < 1e15 then
-    return format("%d", n)
+    -- %d overflows on 32-bit-int builds of string.format (millisecond stamps are ~1.8e12)
+    if n == 0 then return "0" end
+    return format("%.0f", n)
   end
   return format("%.17g", n)
 end

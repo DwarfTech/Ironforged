@@ -58,7 +58,7 @@ local function memberOptions(me)
   local opts = {}
   for _, name in ipairs(ns.rosterList) do
     if name ~= me or ns.IsGuildMaster(me) then
-      opts[#opts + 1] = { text = ns.ShortName(name) .. " (" .. (ns.roster[name].rankName or "") .. ")", value = name }
+      opts[#opts + 1] = { text = ns.Name(name) .. " (" .. (ns.roster[name].rankName or "") .. ")", value = name }
     end
   end
   return opts
@@ -87,7 +87,7 @@ local function trialForm(member, key)
     value = table.concat(taskLines, "\n"), maxLen = 1200, height = 130 }
 
   UI.OpenForm({
-    title = key and ("Edit " .. ns.ShortName(Data.SplitKey(key)) .. "'s trial") or "Give a promotion trial",
+    title = key and ("Edit " .. ns.Name(Data.SplitKey(key)) .. "'s trial") or "Give a promotion trial",
     width = 540,
     fields = fields,
     saveText = key and "Save" or "Give trial",
@@ -112,7 +112,7 @@ local function trialForm(member, key)
         state.key = newKey
         if not key then
           if Data.Get("requests", who) then Data.Delete("requests", who) end
-          ns.Print(ns.ShortName(who) .. " begins the " .. title .. ".")
+          ns.Print(ns.Name(who) .. " begins the " .. title .. ".")
         end
       end
     end,
@@ -127,7 +127,7 @@ function UI.ClearTrial(key)
   if not Data.Delete("progress", key) then return false end
   if Data.Get("taskmarks", key) then Data.Delete("taskmarks", key) end
   if state.key == key then state.key = nil end
-  ns.Print(ns.ShortName(member) .. "'s " .. ((t and t.title) or "trial") .. " is complete and cleared.")
+  ns.Print(ns.Name(member) .. "'s " .. ((t and t.title) or "trial") .. " is complete and cleared.")
   return true
 end
 
@@ -182,7 +182,7 @@ local function showRequests()
   end
   if #lines == 0 then lines[1] = "No one is waiting on a promotion." end
   local opts = {}
-  for _, q in ipairs(reqs) do opts[#opts + 1] = { text = ns.ShortName(q.name), value = q.name } end
+  for _, q in ipairs(reqs) do opts[#opts + 1] = { text = ns.Name(q.name), value = q.name } end
   local buttons
   if #opts > 0 then
     buttons = {
@@ -273,7 +273,7 @@ local function build(f, w, h)
   -- until they reach the trial's rank.
   local promote = UI.Button(panel, "", pw - 20, 24, function(self)
     if not self.target then return end
-    UI.CopyCommand("/gpromote " .. ns.CharName(self.target), "Promote " .. ns.ShortName(self.target))
+    UI.CopyCommand("/gpromote " .. ns.Name(self.target), "Promote " .. ns.Name(self.target))
     if C_Timer then
       C_Timer.After(3, ns.RequestRoster)
       C_Timer.After(8, ns.RequestRoster)
@@ -329,7 +329,7 @@ local function build(f, w, h)
   panel.removeButton = UI.Button(panel, "End trial", 76, 22, function()
     local key = state.key
     local member = Data.SplitKey(key)
-    UI.Confirm("End " .. ns.ShortName(member) .. "'s trial?", function()
+    UI.Confirm("End " .. ns.Name(member) .. "'s trial?", function()
       Data.Delete("progress", key)
       state.key = nil
     end)
@@ -385,7 +385,7 @@ local function refresh(f)
   panel.who:SetText(ns.ColorName(member))
   panel.title:SetText(t.title or "Promotion trial")
   panel.rank:SetText("Earns the rank: |cffd4a017" .. ns.RankName(t.rank) .. "|r")
-  panel.giver:SetText(rec and rec.b and ("Given by " .. ns.ShortName(rec.b)) or "")
+  panel.giver:SetText(rec and rec.b and ("Given by " .. ns.Name(rec.b)) or "")
   panel.desc:SetText(t.desc or "")
   local complete = total > 0 and done == total
   local current = ns.RankIndexOf(member)
@@ -404,7 +404,7 @@ local function refresh(f)
     if task then
       c:Show()
       local isDone, by = Data.TaskState(state.key, task.id)
-      c.label:SetText(task.text .. ((isDone and by == "member" and canManage and not isMember) and "  |cff999999(marked by " .. ns.ShortName(member):match("^(%S+)") .. ")|r" or ""))
+      c.label:SetText(task.text .. ((isDone and by == "member" and canManage and not isMember) and "  |cff999999(marked by " .. ns.Name(member):match("^(%S+)") .. ")|r" or ""))
       c:SetChecked(isDone and true or false)
       c:SetEnabled((canManage or isMember) and not t.completed)
     else

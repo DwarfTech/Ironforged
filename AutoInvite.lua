@@ -46,16 +46,16 @@ function AI.OnWhisper(text, sender)
   if issecretvalue and (issecretvalue(text) or issecretvalue(sender)) then return end
   local msg = ns.Trim(text):lower()
   if not AI.Keywords()[msg] then return end
-  local guildmate = ns.roster[ns.FullName(sender)] ~= nil
+  local guildmate = ns.roster[ns.Name(sender)] ~= nil
   if not guildmate and not ns.settings.inviteAnyone then return end
   local ok, why = canInvite()
   if not ok then
-    ns.Print(ns.ShortName(sender) .. " asked for an invite, but " .. why .. ".")
+    ns.Print(ns.Name(sender) .. " asked for an invite, but " .. why .. ".")
     return
   end
   local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-  if fn and pcall(fn, ns.CharName(sender)) then
-    ns.Print("Invited " .. ns.ShortName(sender) .. " (they whispered \"" .. msg .. "\").")
+  if fn and pcall(fn, ns.Name(sender)) then
+    ns.Print("Invited " .. ns.Name(sender) .. " (they whispered \"" .. msg .. "\").")
   end
 end
 

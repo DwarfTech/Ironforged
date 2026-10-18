@@ -92,11 +92,11 @@ function T.Award(member, title, reason)
   title = ns.Clean(title, 40)
   if title == "" then ns.Print("Name the title."); return false end
   for _, t in ipairs(T.Of(member)) do
-    if t.title:lower() == title:lower() then ns.Print(ns.ShortName(member) .. " already holds that title."); return false end
+    if t.title:lower() == title:lower() then ns.Print(ns.Name(member) .. " already holds that title."); return false end
   end
   local key = member .. "#" .. string.format("%x", ns.Stamp())
   if Data.Put("titles", key, { title = title, reason = ns.Clean(reason or "", 120), ts = ns.Now() }) then
-    ns.Print(ns.ShortName(member) .. " is now |cffd4a017" .. title .. "|r.")
+    ns.Print(ns.Name(member) .. " is now |cffd4a017" .. title .. "|r.")
     return true
   end
   return false
@@ -114,12 +114,12 @@ ns.On("DATA_CHANGED", function(coll, key)
   if not d or Data.SplitKey(key) ~= ns.PlayerName() or (rec and rec.b == ns.PlayerName()) then return end
   told[key] = true
   if ns.Now() - (tonumber(d.ts) or 0) > 600 then return end
-  ns.Print("|cffd4a017" .. ns.ShortName(rec and rec.b or "?") .. " names you " .. d.title .. ".|r" ..
+  ns.Print("|cffd4a017" .. ns.Name(rec and rec.b or "?") .. " names you " .. d.title .. ".|r" ..
     ((d.reason and d.reason ~= "") and (" " .. d.reason) or ""))
   if ns.UI and ns.UI.Notice then
     ns.UI.Notice({
       id = "title", icon = "Interface\\Icons\\INV_Misc_Note_02", title = "A new title",
-      text = ns.ShortName(rec and rec.b or "?") .. " names you |cffffd040" .. d.title .. "|r." ..
+      text = ns.Name(rec and rec.b or "?") .. " names you |cffffd040" .. d.title .. "|r." ..
         ((d.reason and d.reason ~= "") and ("\n" .. d.reason) or ""),
       buttons = { { text = "Huzzah!" } },
     })

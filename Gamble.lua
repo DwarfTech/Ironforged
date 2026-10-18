@@ -32,7 +32,7 @@ end
 function G.InMyRaid(name)
   if name == ns.PlayerName() then return IsInRaid and IsInRaid() end
   if not (IsInRaid and IsInRaid()) or not UnitInRaid then return false end
-  local ok, r = pcall(UnitInRaid, ns.CharName(name))
+  local ok, r = pcall(UnitInRaid, ns.Name(name))
   return ok and r ~= nil
 end
 local MAX_AMOUNT = 1000000
@@ -45,7 +45,7 @@ local function isSecret(v) return issecretvalue and issecretvalue(v) end
 --   high, low, highRoll, lowRoll, owed }
 G.game = nil
 
-local function first(name) return (ns.ShortName(name):match("^(%S+)")) or ns.ShortName(name) end
+local function first(name) return (ns.Name(name):match("^(%S+)")) or ns.Name(name) end
 
 local function say(text, channel)
   local locked = C_ChatInfo and C_ChatInfo.InChatMessagingLockdown and select(2, pcall(C_ChatInfo.InChatMessagingLockdown))
@@ -102,7 +102,7 @@ function G.Open(amount, channel)
     phase = "open", players = {}, order = {}, rolls = {}, tie = {}, tieRolls = {} }
   local word = ns.AutoInvite and ns.AutoInvite.Word() or "inv"
   G.game.kw = word
-  local host = ns.CharName(me)
+  local host = ns.Name(me)
   if channel == "RAID" then say("Ironforged Cross Gambling: " .. amount .. "g! Type 1 to join, -1 to leave.", "RAID") end
   -- the guild is told to type 1 and get into the raid, where the rolling happens
   say("Ironforged Cross Gambling: " .. amount .. "g hosted by " .. host .. "! Type 1 to join. Rolls happen in " .. host ..
@@ -133,7 +133,7 @@ function G.StartRolling()
   local missing = {}
   for _, n in ipairs(g.order) do if not G.InMyRaid(n) then missing[#missing + 1] = n end end
   if #missing > 0 then
-    local host = ns.CharName(g.host)
+    local host = ns.Name(g.host)
     say("Rolling has started! " .. rollNames(missing) .. ": join " .. host .. "'s raid to roll. Whisper " .. host ..
       " \"" .. (g.kw or "inv") .. "\" for an invite.", "GUILD")
   end
@@ -236,7 +236,7 @@ end
 function G.OnRoll(name, roll, lo, hi)
   local g = G.game
   if not G.IsHost() or not g then return end
-  name = ns.FullName(name)
+  name = ns.Name(name)
   if lo ~= 1 or hi ~= g.amount then return end
   if g.phase == "rolling" then
     if not g.players[name] or g.rolls[name] then return end
@@ -256,8 +256,8 @@ function G.OnChat(channel, text, sender)
   local g = G.game
   if not G.IsHost() or not g or g.phase ~= "open" then return end
   if (channel ~= "GUILD" and channel ~= "RAID") or type(text) ~= "string" or isSecret(text) or isSecret(sender) then return end
-  local name = ns.FullName(sender)
-  if not name then return end
+  local name = ns.Name(sender)
+  if name == "" then return end
   text = ns.Trim(text)
   if text == "1" and not g.players[name] then
     g.players[name] = true
@@ -319,7 +319,7 @@ function G.AskInvite()
   local g = G.game
   if not g or not g.host then return end
   local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
-  local target = ns.CharName(g.host)
+  local target = ns.Name(g.host)
   if send and pcall(send, g.kw or "inv", "WHISPER", nil, target) then
     ns.Print("Asked " .. first(g.host) .. " for an invite. Type 1 in raid chat once you're in.")
   else
