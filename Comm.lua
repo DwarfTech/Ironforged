@@ -1,7 +1,12 @@
 -- Ironforged: guild sync over hidden addon messages.
--- Live edits go to the GUILD channel. On login each client sends a digest of its data;
--- one designated officer whispers back any collections that differ, and everyone whispers
--- back the records they personally wrote. Messages are chunked and rate limited.
+-- To keep the one guild channel quiet, traffic flows through "relays": the online Longbeards
+-- and guild master.
+--   * A member whispers their own edits to one relay, who merges them and posts them to GUILD.
+--   * At login a member whispers their digest to two relays, who whisper back what differs.
+--     Only the changes since the last sync are sent (see `sn` in the digest).
+--   * Crafts are never broadcast. Members push theirs to relays; clients pull them on demand.
+--   * If no relay is online, everything falls back to guild-wide sync as before.
+-- Messages are chunked and rate limited.
 local ADDON, ns = ...
 
 local Comm = {}
@@ -11,6 +16,7 @@ local Ser = ns.Ser
 local CHUNK = 220
 local BATCH_RECORDS = 20
 local PEER_TTL = 30 * 60
+local RELAY_TTL = 4 * 60 * 60 -- how long a heard-from Longbeard counts as a relay
 local MAX_PARTS = 600
 
 local queue = {}
@@ -95,10 +101,55 @@ end
 function Comm.QueueLength() return #queue end
 
 ----------------------------------------------------------------------
+-- Relays: online Longbeards and the guild master (other than me)
+----------------------------------------------------------------------
+-- Online Longbeards/GM other than me. `known` keeps only those we have heard from recently,
+-- i.e. who actually run the addon; a Longbeard without it would swallow whispered edits.
+local function relayList(known)
+  local me = ns.PlayerName()
+  local t = now()
+  local list = {}
+  for _, name in ipairs(ns.rosterList) do
+    local info = ns.roster[name]
+    if info and info.online and name ~= me and ns.IsOfficer(name) then
+      local peer = Comm.peers[name]
+      if not known or (peer and t - peer.seen < RELAY_TTL) then list[#list + 1] = name end
+    end
+  end
+  return list
+end
+
+-- Up to n relays, chosen the same way every time from my own name, so each member sticks to
+-- the same few relays and the load spreads evenly across all of them.
+-- With known=false (login, before anyone has been heard from) every online officer is a candidate.
+local function pickRelays(n, known)
+  local list = relayList(known)
+  local out = {}
+  if #list == 0 then return out end
+  local start = ns.Hash(ns.PlayerName() or "") % #list
+  for i = 0, math.min(n, #list) - 1 do out[#out + 1] = list[(start + i) % #list + 1] end
+  return out
+end
+Comm.PickRelays = pickRelays
+
+----------------------------------------------------------------------
 -- Outgoing helpers
 ----------------------------------------------------------------------
 function Comm.BroadcastRecord(coll, key, rec)
-  Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD")
+  local localOnly = ns.Data.LOCAL_ONLY[coll]
+  if ns.IAmOfficer() then
+    if not localOnly then Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD") end
+    return
+  end
+  local relays = pickRelays(localOnly and 2 or 1, true)
+  if #relays == 0 then
+    -- no Longbeard online: guild-wide as before (crafts wait for the next login push or a pull)
+    if not localOnly then Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD") end
+    return
+  end
+  for _, relay in ipairs(relays) do
+    Comm.Send({ op = "P", c = coll, k = key, r = rec }, "WHISPER", relay)
+  end
 end
 
 -- Tell the guild you've spotted a grudged foe (not stored).
@@ -106,17 +157,76 @@ function Comm.BroadcastSighting(foe, zone)
   Comm.Send({ op = "S", n = foe, z = zone }, "GUILD")
 end
 
-function Comm.SendDigest(channel, target, isReply)
+-- `since` (ms stamp) asks the responder for records newer than that only.
+function Comm.SendDigest(channel, target, isReply, since)
   if not ns.Data.Ready() then return end
-  Comm.Send({ op = "D", v = ns.VERSION, dg = ns.Data.Digests(), r = isReply or nil }, channel, target)
+  Comm.Send({ op = "D", v = ns.VERSION, dg = ns.Data.Digests(), r = isReply or nil, sn = since }, channel, target)
+end
+
+local DAY_MS = 86400 * 1000
+local SYNC_MARGIN_MS = 10 * 60 * 1000
+
+-- When I last synced successfully; nil means ask for everything (first run, or a weekly full sync).
+local function sinceStamp()
+  local db = ns.db
+  if not db or not db.syncedAt or not db.fullSyncAt then return nil end
+  if ns.Now() * 1000 - db.fullSyncAt > 7 * DAY_MS then return nil end
+  return db.syncedAt - SYNC_MARGIN_MS
+end
+
+local sendRecords
+
+-- Hand my own crafts to the relays so others can pull them.
+local function pushCrafts(relays)
+  local me = ns.PlayerName()
+  for _, relay in ipairs(relays) do
+    sendRecords("crafts", function(_, rec) return rec.b == me end, relay)
+  end
 end
 
 function Comm.RequestSync()
-  Comm.SendDigest("GUILD")
   Comm.stats.lastSync = ns.Now()
+  Comm.syncStartMs = ns.Now() * 1000
+  Comm.gotReply = false
+  local since = sinceStamp()
+  Comm.syncWasFull = since == nil
+  local relays = ns.IAmOfficer() and {} or pickRelays(2, false)
+  if #relays == 0 then
+    Comm.SendDigest("GUILD", nil, nil, since)
+    return
+  end
+  for _, relay in ipairs(relays) do Comm.SendDigest("WHISPER", relay, nil, since) end
+  pushCrafts(relays)
+  -- if neither relay answers (no addon, or they logged off) fall back to the guild channel
+  if C_Timer then
+    C_Timer.After(25, function()
+      if not Comm.gotReply then Comm.SendDigest("GUILD", nil, nil, since) end
+    end)
+  end
 end
 
-local function sendRecords(coll, filter, target)
+-- Ask a relay for crafts: one profession, or all (nil). Only what changed since my last pull.
+-- Limited to once per 5 minutes per profession.
+local lastPull = {}
+function Comm.PullCrafts(prof)
+  local k = prof or "*"
+  local t = now()
+  if lastPull[k] and t - lastPull[k] < 300 then return false end
+  local relays = pickRelays(1, true)
+  if #relays == 0 then return false end
+  lastPull[k] = t
+  local db = ns.db
+  local since
+  if db then
+    db.craftsPulled = db.craftsPulled or {}
+    if db.craftsPulled[k] then since = db.craftsPulled[k] - SYNC_MARGIN_MS end
+    db.craftsPulled[k] = ns.Now() * 1000
+  end
+  Comm.Send({ op = "CG", pf = prof, sn = since }, "WHISPER", relays[1])
+  return true
+end
+
+function sendRecords(coll, filter, target)
   local raw = ns.Data.Raw(coll)
   if not raw then return 0 end
   local batch, count, total = {}, 0, 0
@@ -159,23 +269,46 @@ Comm.DesignatedResponder = designatedResponder
 local function handleDigest(sender, msg, channel)
   if type(msg.dg) ~= "table" then return end
   local me = ns.PlayerName()
+  local isReply = msg.r and true or false
+
+  if isReply and channel == "WHISPER" and not Comm.gotReply then
+    -- a relay answered my login digest: remember when this sync started
+    Comm.gotReply = true
+    local db = ns.db
+    if db and Comm.syncStartMs then
+      db.syncedAt = Comm.syncStartMs
+      if Comm.syncWasFull then db.fullSyncAt = Comm.syncStartMs end
+    end
+  end
+
+  -- Members don't answer digests broadcast to the guild while a relay is online; the relays do.
+  if channel == "GUILD" and not isReply and not ns.IAmOfficer() and #relayList(true) > 0 then
+    ns.Fire("PEER_ARRIVED", sender)
+    return
+  end
+
   local mine = ns.Data.Digests()
   local differs = {}
   for _, coll in ipairs(ns.Data.COLLECTIONS) do
-    if msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
+    if not ns.Data.LOCAL_ONLY[coll] and msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
   end
-  if #differs == 0 then return end
+  local since = type(msg.sn) == "number" and msg.sn or nil
+  local function recent(rec) return not since or (rec.t or 0) >= since end
 
-  if designatedResponder(sender) == me then
-    for _, coll in ipairs(differs) do sendRecords(coll, nil, sender) end
-  else
-    for _, coll in ipairs(differs) do
-      sendRecords(coll, function(_, rec) return rec.b == me end, sender)
+  if #differs > 0 then
+    if designatedResponder(sender) == me or (channel == "WHISPER" and ns.IAmOfficer()) then
+      for _, coll in ipairs(differs) do sendRecords(coll, function(_, rec) return recent(rec) end, sender) end
+    else
+      for _, coll in ipairs(differs) do
+        sendRecords(coll, function(_, rec) return rec.b == me and recent(rec) end, sender)
+      end
     end
   end
-  if not msg.r then Comm.SendDigest("WHISPER", sender, true) end
+  -- always answer a digest so the sender knows someone is there
+  if not isReply then Comm.SendDigest("WHISPER", sender, true) end
 
-  if channel == "GUILD" and not msg.r then ns.Fire("PEER_ARRIVED", sender) end
+  if channel == "GUILD" and not isReply then ns.Fire("PEER_ARRIVED", sender) end
+  if channel == "WHISPER" and not isReply then ns.Fire("PEER_ARRIVED", sender) end
 end
 
 local function acceptRecord(sender, coll, key, rec)
@@ -202,8 +335,25 @@ local function dispatch(sender, msg, channel)
   if msg.op == "D" then
     handleDigest(sender, msg, channel)
   elseif msg.op == "P" then
+    local localOnly = ns.Data.LOCAL_ONLY[msg.c]
+    if localOnly and channel ~= "WHISPER" then return end -- crafts only travel by whisper
     if ns.Data.VALID[msg.c] and type(msg.k) == "string" and acceptRecord(sender, msg.c, msg.k, msg.r) then
       ns.Fire("DATA_CHANGED", msg.c, msg.k)
+      -- A relay posts a member's own whispered edit to the guild for everyone else.
+      if channel == "WHISPER" and not localOnly and ns.IAmOfficer() and type(msg.r) == "table"
+        and msg.r.b == sender and not ns.IsOfficer(sender) then
+        Comm.Send({ op = "P", c = msg.c, k = msg.k, r = msg.r }, "GUILD")
+      end
+    end
+  elseif msg.op == "CG" then
+    -- a craft pull: any Longbeard answers what a member asks for
+    if channel == "WHISPER" and ns.IAmOfficer() then
+      local pf = type(msg.pf) == "string" and msg.pf or nil
+      local since = type(msg.sn) == "number" and msg.sn or nil
+      sendRecords("crafts", function(key, rec)
+        if since and (rec.t or 0) < since then return false end
+        return not pf or select(2, ns.Data.SplitKey(key)) == pf
+      end, sender)
     end
   elseif msg.op == "XS" then
     if type(msg.id) == "string" then ns.Fire("GAMBLE_STATE", sender, msg) end
@@ -284,3 +434,26 @@ ns.On("DATA_READY", function()
     C_Timer.NewTicker(60, sweep)
   end
 end)
+
+----------------------------------------------------------------------
+-- Debug: /sendmsg [Sender-Realm] feeds a test backstory through Comm.OnAddonMessage as if
+-- that guildmate had broadcast it (default Frugo-Forever). Sender must be on your roster.
+-- NOTE: this really stores the record ("Frugo Test Backstory") in your local profiles data.
+----------------------------------------------------------------------
+SLASH_IFSENDMSG1 = "/sendmsg"
+SlashCmdList.IFSENDMSG = function(arg)
+  arg = ns.Trim and ns.Trim(arg or "") or (arg or "")
+  local sender = arg ~= "" and arg or "Frugo-Forever"
+  local resolved = ns.Name(sender)
+  if not ns.roster[resolved] then
+    ns.Print("sendmsg: '" .. sender .. "' isn't on your guild roster, so the message would be ignored.")
+    return
+  end
+  local rec = { d = { backstory = "Frugo Test Backstory" }, t = ns.Stamp(), b = resolved }
+  local packed = Ser.Pack({ p = ns.PROTOCOL, op = "P", v = ns.VERSION, c = "profiles", k = resolved, r = rec })
+  local before = Comm.stats.received
+  Comm.OnAddonMessage(ns.PREFIX, "dbf\t1\t1\t" .. packed, "GUILD", sender)
+  local got = ns.Data.Get("profiles", resolved)
+  ns.Print(string.format("sendmsg: delivered as %s (received %d -> %d), stored backstory: %s",
+    resolved, before, Comm.stats.received, got and got.backstory or "none"))
+end

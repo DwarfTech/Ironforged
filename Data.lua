@@ -35,6 +35,11 @@ Data.COLLECTIONS = {
   "lfdjoin",      -- key = post key .. "#" .. member; who signed up for a post
   "challenges",   -- key = member .. "#" .. id; challenges a member took on, written by their own client
 }
+-- Collections that are NOT part of login digests or guild-wide broadcasts. Each member's own
+-- client writes them and pushes them (by whisper) to the online Longbeards, who hand them out
+-- on request. Crafts are too big to flood the guild channel with.
+Data.LOCAL_ONLY = { crafts = true }
+
 local VALID = {}
 for _, c in ipairs(Data.COLLECTIONS) do VALID[c] = true end
 Data.VALID = VALID
@@ -406,7 +411,9 @@ end
 
 function Data.Digests()
   local out = {}
-  for _, c in ipairs(Data.COLLECTIONS) do out[c] = Data.Digest(c) end
+  for _, c in ipairs(Data.COLLECTIONS) do
+    if not Data.LOCAL_ONLY[c] then out[c] = Data.Digest(c) end
+  end
   return out
 end
 

@@ -297,7 +297,7 @@ local function makeClient(shortName, race, fullName)
   env.RandomRoll = function(lo, hi)
     local r = table.remove(client.rollQueue, 1) or lo
     H.rollBus = H.rollBus or {}
-    table.insert(H.rollBus, { to = client, text = string.format("%s rolls %d (%d-%d)", shortName, r, lo, hi) })
+    table.insert(H.rollBus, { to = client, text = string.format("%s rolls %d (%d-%d)", H.baseName(client.full), r, lo, hi) }) -- the roller's full name, no realm
   end
   env.RANDOM_ROLL_RESULT = "%s rolls %d (%d-%d)"
   env.Ambiguate = function(n) return (n:gsub("%-.*$", "")) end

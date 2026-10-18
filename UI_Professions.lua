@@ -32,6 +32,8 @@ local function showOnly(f, which)
 end
 
 local function refresh(f)
+  -- crafts are not broadcast: ask a Longbeard for what we are looking at (rate limited, deltas only)
+  if ns.Comm and ns.Comm.PullCrafts then ns.Comm.PullCrafts(state.prof) end
   local all = P.All()
   local search = state.search
   local items = {}

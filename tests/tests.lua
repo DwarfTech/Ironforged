@@ -617,11 +617,13 @@ check(not KD.Put("gambles", "Thorin#fake", { high = "Kurdran", low = "Thorin", o
 K.profs = { { name = "Blacksmithing", skill = 150, max = 225 }, { name = "Mining", skill = 160, max = 225 }, { name = "First Aid", skill = 141, max = 150 }, { name = "Fishing", skill = 1, max = 75 } }
 K.ns.Prof.ScanSkills()
 H.run(3)
+H.clock = H.clock + 301; D.ns.Comm.PullCrafts(); H.run(6) -- crafts are pulled from a Longbeard on demand
 check(D.ns.Data.Get("crafts", "Kurdran#First Aid") == nil and D.ns.Data.Get("crafts", "Kurdran#Fishing") == nil, "First Aid and Fishing left out")
 check(D.ns.Data.Get("crafts", "Kurdran#Blacksmithing") ~= nil and D.ns.Data.Get("crafts", "Kurdran#Mining").skill == 160, "professions shared with the guild")
 K.trade = { name = "Blacksmithing", skill = 151, max = 225, recipes = { [3491] = true, [2741] = true, [12259] = false } }
 H.fire(K, "TRADE_SKILL_SHOW")
 H.run(3)
+H.clock = H.clock + 301; D.ns.Comm.PullCrafts(); H.run(6)
 local kb = D.ns.Data.Get("crafts", "Kurdran#Blacksmithing")
 check(kb and kb.skill == 151 and D.ns.Prof.RecipeCount(kb) == 2, "known recipes recorded when the profession window opens")
 local rn = D.ns.Prof.Recipes(kb)
@@ -631,6 +633,7 @@ H.fire(K, "TRADE_SKILL_SHOW"); H.run(3)
 check(K.ns.Comm.stats.sent == sent, "no resend when nothing changed")
 K.trade = { name = "Blacksmithing", linked = true, skill = 300, max = 300, recipes = { [3297] = true } }
 H.fire(K, "TRADE_SKILL_SHOW"); H.run(3)
+H.clock = H.clock + 301; D.ns.Comm.PullCrafts(); H.run(6) -- crafts are pulled from a Longbeard on demand
 check(D.ns.Prof.RecipeCount(D.ns.Data.Get("crafts", "Kurdran#Blacksmithing")) == 2, "someone else's linked profession is ignored")
 check(not D.ns.Data.Put("crafts", "Kurdran#Alchemy", { prof = "Alchemy", skill = 300, max = 300 }, true), "can't write someone else's professions")
 -- search the directory and ask for a craft
@@ -661,6 +664,7 @@ pt.back.__scripts.OnClick(pt.back); pt.back.__scripts.OnClick(pt.back)
 check(pt.profs:IsShown(), "Back returns to the professions")
 K.profs = { { name = "Blacksmithing", skill = 151, max = 225 } }
 K.ns.Prof.ScanSkills(); H.run(3)
+H.clock = H.clock + 301; D.ns.Comm.PullCrafts(); H.run(6) -- crafts are pulled from a Longbeard on demand
 check(D.ns.Data.Get("crafts", "Kurdran#Mining") == nil, "dropped profession removed")
 
 -- Titles
@@ -952,7 +956,9 @@ local F = H.makeClient("Frugo", nil, "Frugo-Mega"); F.guidOverride = "Player-Fru
 H.boot(F)
 H.run(90)
 for _, coll in ipairs(AD.COLLECTIONS) do
-  check(F.ns.Data.Digest(coll) == AD.Digest(coll), "late joiner digest " .. coll)
+  if not AD.LOCAL_ONLY[coll] then -- crafts are pulled on demand, not synced at login
+    check(F.ns.Data.Digest(coll) == AD.Digest(coll), "late joiner digest " .. coll)
+  end
 end
 check(F.ns.PlayerName() == "Frugo Mega" and F.ns.IAmOfficer(), "matched by character ID")
 
