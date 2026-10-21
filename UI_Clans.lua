@@ -9,29 +9,35 @@ local Data = ns.Data
 local showClan
 
 local function canFound(me)
-  return ns.IsOfficer(me) or ns.RankAtLeast(me, ns.RankSetting("founderRank"))
+  return me ~= nil and ns.roster[me] ~= nil -- any guildmate may found a clan
 end
 
 local function editClan(id)
   local me = ns.PlayerName()
   local c = id and Data.Get("clans", id) or {}
   local officer = ns.IAmOfficer()
-  local fields = {
-    { key = "name", label = "Clan name", type = "text", value = c.name, maxLen = 40 },
-    { key = "motto", label = "Motto", type = "text", value = c.motto, maxLen = 80 },
-    { key = "desc", label = "History", type = "multiline", value = c.desc, maxLen = 600, height = 90 },
-  }
+  local fields = {}
+  -- the name is the clan's identity (its key), so it is only chosen when founding
+  if not id then fields[#fields + 1] = { key = "name", label = "Clan name", type = "text", value = c.name, maxLen = 40 } end
+  fields[#fields + 1] = { key = "motto", label = "Motto", type = "text", value = c.motto, maxLen = 80 }
+  fields[#fields + 1] = { key = "desc", label = "History", type = "multiline", value = c.desc, maxLen = 600, height = 90 }
   UI.OpenForm({
     title = id and ("Edit clan " .. (c.name or "")) or "Found a clan",
     width = 500,
     fields = fields,
     onSave = function(v)
-      local name = ns.Clean(v.name, 40)
+      local name = id and c.name or ns.Clean(v.name, 40)
       if name == "" then ns.Print("A clan needs a name, and it must suit dwarven roleplay."); return false end
-      local newId = id or (me .. "#" .. ns.NewId())
+      local newId = id or Data.KeyOf(name)
+      if newId == "" then ns.Print("A clan needs a name, and it must suit dwarven roleplay."); return false end
+      if not id and Data.Get("clans", newId) then
+        ns.Print("A clan called " .. name .. " already exists.")
+        return false
+      end
+      local founder = id and c.founder or me
       local ok = Data.Put("clans", newId, {
         name = name, motto = ns.Clean(v.motto, 80), desc = ns.Clean(v.desc, 600),
-        leader = Data.ClanFounder(newId), -- whoever founds the clan leads it
+        founder = founder, leader = founder, -- whoever founds the clan leads it
       })
       if ok and not id then
         ns.Print("Clan " .. name .. " is founded. Invite your kin from the clan's page.")
@@ -141,7 +147,7 @@ showClan = function(id)
       end)
     end)
   end
-  if Data.ICanWrite("clans", id, { leader = c.leader }) then
+  if Data.ICanWrite("clans", id, { name = c.name, founder = c.founder, leader = c.leader }) then
     add("Edit", function() editClan(id) end)
   end
   if Data.ICanWrite("clans", id, nil) then
@@ -258,7 +264,7 @@ local function refresh(f)
     elseif canFound(me) then
       f.help:SetText("Found a clan, then invite your kin from the clan's page.")
     else
-      f.help:SetText("Click a clan and press Ask to join. " .. ns.RankName(ns.RankSetting("founderRank")) .. "s and above may found one.")
+      f.help:SetText("Click a clan and press Ask to join.")
     end
   end
 

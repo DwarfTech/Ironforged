@@ -1,5 +1,5 @@
 -- Ironforged: titles.
--- Officers award titles to guildmates ("titles" collection, key = member .. "#" .. id).
+-- Officers award titles to guildmates ("titles" collection, key = member .. "#" .. KeyOf(title)).
 -- Some titles are earned automatically and move to whoever holds the record:
 --   Elfbane            most elves slain
 --   The Hordebreaker   most Horde slain
@@ -94,7 +94,7 @@ function T.Award(member, title, reason)
   for _, t in ipairs(T.Of(member)) do
     if t.title:lower() == title:lower() then ns.Print(ns.Name(member) .. " already holds that title."); return false end
   end
-  local key = member .. "#" .. string.format("%x", ns.Stamp())
+  local key = member .. "#" .. Data.KeyOf(title)
   if Data.Put("titles", key, { title = title, reason = ns.Clean(reason or "", 120), ts = ns.Now() }) then
     ns.Print(ns.Name(member) .. " is now |cffd4a017" .. title .. "|r.")
     return true

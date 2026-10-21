@@ -47,7 +47,12 @@ local function writeGrudge(prefill, where)
         end
         return false
       end
-      Data.Put("grudges", ns.PlayerName() .. "#" .. ns.NewId(), {
+      local gkey = Data.KeyOf(against)
+      if Data.Get("grudges", gkey) then
+        ns.Print("|cffff6060" .. against .. " is already in the Book of Grudges.|r")
+        return false
+      end
+      Data.Put("grudges", gkey, {
         against = against, faction = v.faction or "Horde", where = ns.Clean(v.where, 60), deed = deed, ts = ns.Now(),
       })
       ns.Print("The grudge is written. It will not be forgotten.")
@@ -67,9 +72,9 @@ local function avengedText(a)
 end
 
 local function showGrudge(key)
-  local g = Data.Get("grudges", key)
+  local g, grec = Data.Get("grudges", key)
   if not g then return end
-  local author = Data.SplitKey(key)
+  local author = grec and grec.b or "?"
   local a = Data.Avenged(key)
   local lines = {
     "|cffd4a017Against:|r " .. (g.against or "?") .. "  |cff999999(" .. (g.faction or "?") .. ")|r",

@@ -76,6 +76,7 @@ end
 -- opts.noManage: leave out Edit record and Manage (used where they don't belong, like the War Hall).
 function UI.ShowMember(name, opts)
   opts = opts or {}
+  UI.shownMember = { name = name, opts = opts }
   local info = ns.roster[name] or {}
   local m = Data.Member(name)
   local p = Data.Profile(name) or {}
@@ -276,3 +277,12 @@ local function refresh(f)
 end
 
 UI.RegisterTab("roster", "Roster", build, refresh)
+
+-- Keep an open member card current when that member's records arrive.
+ns.On("DATA_CHANGED", function()
+  local shown = UI.shownMember
+  local dlg = IronforgedDialog
+  if shown and dlg and dlg:IsShown() and dlg.title and dlg.title:GetText() == ns.ColorName(shown.name) then
+    UI.ShowMember(shown.name, shown.opts)
+  end
+end)
