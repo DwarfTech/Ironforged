@@ -137,6 +137,12 @@ function Data.ClanFounder(clanId)
   return c and c.founder or nil
 end
 
+-- A clan that was deleted (its tombstone is known), as opposed to one this client has never heard of.
+function Data.ClanDeleted(id)
+  local raw = store and store.colls.clans and store.colls.clans[id]
+  return raw ~= nil and raw.x == true
+end
+
 function Data.Clan(id)
   local c = id and Data.Get("clans", id)
   if c and c.status ~= "disbanded" then return c end
@@ -287,12 +293,13 @@ function Data.CanWrite(author, coll, key, data)
     local clanId, member = splitKey(key)
     if not clanId then return false end
     if officer or Data.IsClanLeader(author, clanId) then return true end
+    if Data.ClanDeleted(clanId) then return true end -- the clan is gone, so the row is inert
     return data == nil and author == member -- the invited member may decline
   elseif coll == "applications" then
     local clanId, member = splitKey(key)
     if not clanId then return false end
     if data ~= nil then return author == member and ns.roster[author] ~= nil end
-    return author == member or officer or Data.IsClanLeader(author, clanId)
+    return author == member or officer or Data.IsClanLeader(author, clanId) or Data.ClanDeleted(clanId)
   elseif coll == "crafts" then
     local member = splitKey(key)
     if data == nil then return member == author or officer end
@@ -433,8 +440,11 @@ function Data.Merge(coll, key, rec, relayed)
   if rec.t > (ns.Now() + 60) * 1000 then return false, "future" end
   if rec.x and rec.t < (ns.Now() - MAX_TOMBSTONE_AGE) * 1000 then return false, "old" end
   if Data.Departed(coll, key, rec) then return false, "departed" end
-  if not relayed and not Data.CanWrite(rec.b, coll, key, (not rec.x) and rec.d or nil) then return false, "perm" end
   local c = store.colls[coll]
+  -- A deletion of a row I don't hold changes nothing and can't be judged (the permission may depend on
+  -- the row it removed, or on a clan that has since gone), so it is taken on the author's word.
+  local blind = rec.x and (c[key] == nil or c[key].x)
+  if not relayed and not blind and not Data.CanWrite(rec.b, coll, key, (not rec.x) and rec.d or nil) then return false, "perm" end
   if not newer(rec, c[key]) then return false end
   if rec.x then
     c[key] = { t = rec.t, b = rec.b, x = true }

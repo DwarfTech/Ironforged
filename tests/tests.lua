@@ -157,6 +157,7 @@ check(rt.list.sortCol == 1, "sort survives a refresh")
 local clanId = "bronzebeard"
 check(MD.Put("clans", clanId, { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }), "Veteran founds clan")
 check(not MD.Put("clans", clanId, { name = "Bronzebeard", founder = "Muradin", leader = "Kurdran" }, true), "leader must be the founder")
+H.run(5) -- Kurdran has to know the clan before he can be refused
 check(not KD.Put("clans", clanId, { name = "Bronzebeard", founder = "Kurdran", leader = "Kurdran" }, true), "nobody takes over an existing clan name")
 check(not MD.Put("clans", "wrongkey", { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }, true), "a clan's key is its name")
 check(not AD.Put("clans", "x", { name = "X", founder = "Muradin", leader = "Thorin" }, true), "even officers cannot set another leader")
