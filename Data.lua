@@ -11,21 +11,21 @@ ns.Data = Data
 Data.COLLECTIONS = {
   "config",       -- guild-wide settings (rank thresholds, hold name, oath, laws)
   "members",      -- officer-kept member records (title, main/alt, joined, notes)
-  "titles",       -- key = member .. "#" .. id; titles awarded by officers
-  "clans",        -- key = founder .. "#" .. id
-  "invites",      -- key = clanId .. "#" .. member; written by the clan leader
-  "applications", -- key = clanId .. "#" .. member; a member asking to join a clan
+  "titles",       -- key = member .. "#" .. KeyOf(title); titles awarded by officers
+  "clans",        -- key = KeyOf(clan name); the record names its founder
+  "invites",      -- key = clan key .. "#" .. member; written by the clan leader
+  "applications", -- key = clan key .. "#" .. member; a member asking to join a clan
   "clanship",     -- key = member; the member's own choice of clan (needs an invite to count)
-  "progress",     -- key = member .. "#" .. id; a promotion trial given to a member (title, rank, tasks, done)
-  "taskmarks",    -- key = same as progress; tasks the member themself marks done
+  "progress",     -- key = member; the promotion trial given to a character (title, rank, tasks, done)
+  "taskmarks",    -- key = member (same as progress); tasks the member themself marks done
   "requests",     -- key = member; promotion requests
-  "events",       -- guild events
-  "rsvp",         -- key = eventId .. "#" .. member
-  "attendance",   -- key = eventId
+  "events",       -- key = EventKey(title, date); guild events
+  "rsvp",         -- key = event key .. "#" .. member
+  "attendance",   -- key = event key
   "profiles",     -- key = member; the member's backstory
   "selfreport",   -- key = member; race, written by the member's own client
   "racecheck",    -- key = member; race found by an officer's guild scan
-  "grudges",      -- key = author .. "#" .. id; the Book of Grudges
+  "grudges",      -- key = KeyOf(the foe's name); the Book of Grudges
   "avenged",      -- key = grudge key; who avenged it and how
   "pvp",          -- key = member; Horde slain and elves slain, written by the member's own client
   "gambles",      -- key = host .. "#" .. game id; finished Cross Gambling games, written by the host
@@ -39,6 +39,17 @@ Data.COLLECTIONS = {
 -- client writes them and pushes them (by whisper) to the online Longbeards, who hand them out
 -- on request. Crafts are too big to flood the guild channel with.
 Data.LOCAL_ONLY = { crafts = true }
+-- Collections every guild member keeps in sync, always: Clans, Promotions and Events. Edits go
+-- straight to the guild channel, and a member logging in sends row hashes (op "H") so any online
+-- member can send back exactly the rows they lack. They are left out of the login digests.
+Data.ALWAYS_SYNC = {
+  clans = true, invites = true, applications = true, clanship = true,     -- Clans
+  progress = true, taskmarks = true, requests = true,                     -- Promotions
+  events = true, rsvp = true, attendance = true,                          -- Events
+  grudges = true, avenged = true,                                         -- Book of Grudges
+  pvp = true,                                                             -- War Hall
+  titles = true,                                                          -- Titles
+}
 
 local VALID = {}
 for _, c in ipairs(Data.COLLECTIONS) do VALID[c] = true end
@@ -110,9 +121,20 @@ Data.SplitKey = splitKey
 ----------------------------------------------------------------------
 -- Clans
 ----------------------------------------------------------------------
+-- Natural keys: the same thing named by two people gets the same key, so rows merge instead of doubling.
+function Data.KeyOf(text)
+  text = tostring(text or ""):lower():gsub("[%c#@|]", ""):gsub("%s+", " ")
+  return (text:gsub("^ ", ""):gsub(" $", ""))
+end
+
+-- One event per name per day (UTC, so everyone computes the same key).
+function Data.EventKey(title, ts)
+  return Data.KeyOf(title) .. "@" .. date("!%Y%m%d", tonumber(ts) or 0)
+end
+
 function Data.ClanFounder(clanId)
-  local founder = splitKey(clanId)
-  return founder
+  local c = clanId and Data.Get("clans", clanId)
+  return c and c.founder or nil
 end
 
 function Data.Clan(id)
@@ -238,14 +260,17 @@ function Data.CanWrite(author, coll, key, data)
     return officer
   elseif coll == "clans" then
     if data == nil then return ns.IsLongbeardOrGM(author) end -- only Longbeards and the guild master delete clans
-    local founder = Data.ClanFounder(key)
-    if not founder or data.leader ~= founder then return false end -- the founder always leads
+    local founder = data.founder
+    if type(founder) ~= "string" or data.leader ~= founder then return false end -- the founder always leads
+    if type(data.name) ~= "string" or key ~= Data.KeyOf(data.name) then return false end
     if officer then return true end
-    return founder == author and ns.RankAtLeast(author, ns.RankSetting("founderRank"))
+    if founder ~= author or ns.roster[author] == nil then return false end -- any guildmate may found a clan
+    local old = Data.Get("clans", key)
+    return old == nil or old.founder == author -- but nobody takes over a clan that already has a founder
   elseif coll == "grudges" then
     if data == nil then return ns.IsLongbeardOrGM(author) end -- only Longbeards and the guild master delete grudges
-    local writer = splitKey(key)
-    if writer ~= author or ns.roster[author] == nil then return false end
+    if ns.roster[author] == nil then return false end
+    if type(data.against) ~= "string" or key ~= Data.KeyOf(data.against) then return false end
     return not ns.IsGuildmateName(data.against) -- guildmates can't be grudged
   elseif coll == "avenged" then
     if data == nil then return officer end
@@ -298,8 +323,7 @@ function Data.CanWrite(author, coll, key, data)
   elseif coll == "racecheck" then
     return officer
   elseif coll == "progress" then
-    local member = splitKey(key)
-    if not member then return false end
+    local member = key
     local rank = data and data.rank
     if data == nil then
       local old = Data.Get("progress", key)
@@ -307,13 +331,15 @@ function Data.CanWrite(author, coll, key, data)
     end
     return Data.CanGiveTrial(author, member, rank)
   elseif coll == "taskmarks" then
-    local member = splitKey(key)
-    if member == nil then return false end
+    local member = key
     if data == nil and Data.CanGiveTrials(author) then return true end -- cleared with the trial
     return member == author
   elseif coll == "rsvp" then
     local _, member = splitKey(key)
     return author == member or officer
+  end
+  if coll == "events" and data ~= nil and (type(data.title) ~= "string" or key ~= Data.EventKey(data.title, data.ts)) then
+    return false
   end
   return officer -- members, events, attendance
 end
@@ -325,6 +351,64 @@ end
 ----------------------------------------------------------------------
 -- Merge
 ----------------------------------------------------------------------
+-- Who a row is about (the member whose standing it describes), or nil when it is about no one.
+function Data.Subject(coll, key, data)
+  if coll == "clanship" or coll == "requests" or coll == "pvp" or coll == "profiles" or coll == "selfreport"
+    or coll == "racecheck" or coll == "members" or coll == "progress" or coll == "taskmarks" then
+    return key
+  elseif coll == "titles" or coll == "crafts" or coll == "challenges" or coll == "invitelog"
+    or coll == "gambles" or coll == "lfd" then
+    return (splitKey(key))
+  elseif coll == "invites" or coll == "applications" or coll == "rsvp" or coll == "lfdjoin" then
+    return select(2, splitKey(key))
+  elseif coll == "clans" then
+    return data and data.founder or nil
+  end
+  return nil
+end
+
+-- A row whose author or subject has left the guild. Only judged once a full-looking roster is loaded.
+function Data.RosterTrusted()
+  local n = ns.rosterList and #ns.rosterList or 0
+  if n == 0 then return false end
+  local db = ns.db
+  if db then
+    db.rosterMax = math.max(db.rosterMax or 0, n)
+    if n < db.rosterMax * 0.8 then return false end -- a partial roster must never wipe the data
+  end
+  return true
+end
+
+function Data.Departed(coll, key, rec)
+  if not Data.RosterTrusted() then return false end
+  if coll ~= "config" and rec.b and not ns.roster[rec.b] then return true end
+  local who = Data.Subject(coll, key, rec.d)
+  return who ~= nil and not ns.roster[who]
+end
+
+-- Forget rows written by, or about, people who are no longer in the guild.
+function Data.PruneDeparted()
+  if not store or not Data.RosterTrusted() then return 0 end
+  local removed = 0
+  for coll, c in pairs(store.colls) do
+    for key, rec in pairs(c) do
+      if Data.Departed(coll, key, rec) then c[key] = nil; removed = removed + 1 end
+    end
+  end
+  if removed > 0 then ns.Fire("DATA_CHANGED") end
+  return removed
+end
+
+-- A client that has been away longer than tombstones are kept can't tell a deleted row from a live
+-- one, so it forgets its always-synced rows and fetches them again from the guild.
+function Data.DropAlwaysSyncRows()
+  if not store then return end
+  for coll in pairs(Data.ALWAYS_SYNC) do store.colls[coll] = {} end
+  ns.Fire("DATA_CHANGED")
+end
+
+Data.MAX_TOMBSTONE_AGE = MAX_TOMBSTONE_AGE
+
 local function newer(a, b)
   if not b then return true end
   if (a.t or 0) ~= (b.t or 0) then return (a.t or 0) > (b.t or 0) end
@@ -345,7 +429,11 @@ end
 function Data.Merge(coll, key, rec, relayed)
   if not store or not VALID[coll] or type(key) ~= "string" or #key > 120 then return false end
   if not validRecord(rec) then return false end
-  if not relayed and not Data.CanWrite(rec.b, coll, key, (not rec.x) and rec.d or nil) then return false end
+  -- no stamps from the future (a minute of slack for clock jitter), and no tombstones old enough to be pruned
+  if rec.t > (ns.Now() + 60) * 1000 then return false, "future" end
+  if rec.x and rec.t < (ns.Now() - MAX_TOMBSTONE_AGE) * 1000 then return false, "old" end
+  if Data.Departed(coll, key, rec) then return false, "departed" end
+  if not relayed and not Data.CanWrite(rec.b, coll, key, (not rec.x) and rec.d or nil) then return false, "perm" end
   local c = store.colls[coll]
   if not newer(rec, c[key]) then return false end
   if rec.x then
@@ -398,23 +486,96 @@ function Data.PruneTombstones()
 end
 
 -- Order-independent fingerprint of a collection, used to spot differences cheaply.
-function Data.Digest(coll)
+function Data.Digest(coll, since)
   local c = store and store.colls[coll]
   if not c then return "0:0" end
   local count, sum = 0, 0
   for k, rec in pairs(c) do
+   if not since or (rec.t or 0) >= since then
     count = count + 1
     sum = (sum + ns.Hash(k .. "@" .. string.format("%.0f", rec.t or 0) .. (rec.b or ""))) % 2147483647
+   end
   end
   return count .. ":" .. sum
+end
+
+-- Digests of the always-synced collections (rows newer than `since` ms when given).
+function Data.AlwaysDigests(since)
+  local out = {}
+  for _, c in ipairs(Data.COLLECTIONS) do
+    if Data.ALWAYS_SYNC[c] then out[c] = Data.Digest(c, since) end
+  end
+  return out
 end
 
 function Data.Digests()
   local out = {}
   for _, c in ipairs(Data.COLLECTIONS) do
-    if not Data.LOCAL_ONLY[c] then out[c] = Data.Digest(c) end
+    if not Data.LOCAL_ONLY[c] and not Data.ALWAYS_SYNC[c] then out[c] = Data.Digest(c) end
   end
   return out
+end
+
+-- A row is identified by its natural key and versioned by its stamp. The token is the key's
+-- hash (8 hex digits) followed by the stamp of the version I hold (11 hex digits).
+function Data.KeyHash(coll, key)
+  return string.format("%08x", ns.Hash(coll .. "|" .. key))
+end
+
+local function stampHex(t)
+  t = math.floor(tonumber(t) or 0)
+  local hi = math.floor(t / 16777216) -- 32-bit string.format would overflow on millisecond stamps
+  return string.format("%05x%06x", hi, t - hi * 16777216)
+end
+
+function Data.RowToken(coll, key, rec)
+  return Data.KeyHash(coll, key) .. stampHex(rec.t)
+end
+
+-- "tokens" string -> { [key hash] = stamp }
+function Data.ParseTokens(s)
+  local out = {}
+  if type(s) ~= "string" then return out end
+  for kh, hi, lo in s:gmatch("(%x%x%x%x%x%x%x%x)(%x%x%x%x%x)(%x%x%x%x%x%x)") do
+    out[kh] = tonumber(hi, 16) * 16777216 + tonumber(lo, 16)
+  end
+  return out
+end
+
+-- Rows of one collection (newer than `since` ms when given): fn(coll, key, rec, hash).
+function Data.EachRow(coll, since, fn)
+  local raw = Data.Raw(coll)
+  if not raw then return end
+  for key, rec in pairs(raw) do
+    if not since or (rec.t or 0) >= since then fn(coll, key, rec, Data.RowToken(coll, key, rec)) end
+  end
+end
+
+-- Every always-synced row: fn(coll, key, rec, hash).
+function Data.EachAlwaysRow(since, fn, only)
+  for _, c in ipairs(Data.COLLECTIONS) do
+    if Data.ALWAYS_SYNC[c] and (not only or only[c]) then Data.EachRow(c, since, fn) end
+  end
+end
+
+-- Crafts rows, optionally of one profession only: fn(coll, key, rec, hash).
+function Data.EachCraft(since, prof, fn)
+  Data.EachRow("crafts", since, function(c, key, rec, h)
+    if not prof or select(2, Data.SplitKey(key)) == prof then fn(c, key, rec, h) end
+  end)
+end
+
+function Data.CraftTokens(since, prof)
+  local out = {}
+  Data.EachCraft(since, prof, function(_, _, _, h) out[#out + 1] = h end)
+  return table.concat(out)
+end
+
+-- Concatenated row tokens of everything I hold in the always-synced collections.
+function Data.RowTokens(since, only)
+  local out = {}
+  Data.EachAlwaysRow(since, function(_, _, _, h) out[#out + 1] = h end, only)
+  return table.concat(out)
 end
 
 function Data.Count(coll)
@@ -477,8 +638,8 @@ end
 function Data.AssignedTrials(member)
   local out = {}
   for key, t in Data.Each("progress") do
-    local m = splitKey(key)
-    if m and (not member or m == member) then
+    local m = key
+    if not member or m == member then
       local done, total = Data.TrialProgress(key)
       out[#out + 1] = { key = key, member = m, title = t.title or "Promotion trial", rank = t.rank, done = done, total = total, completed = t.completed }
     end
@@ -528,3 +689,14 @@ function Data.AttendanceCount(member)
   end
   return attended, total
 end
+
+-- People who left the guild: forget their rows once the roster settles.
+local prunePending = false
+ns.On("ROSTER", function()
+  if prunePending or not C_Timer then return end
+  prunePending = true
+  C_Timer.After(30, function()
+    prunePending = false
+    Data.PruneDeparted()
+  end)
+end)

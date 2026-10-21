@@ -117,8 +117,8 @@ local function refresh(f)
   local officer = ns.IAmOfficer()
   f.guildButton:SetShown(officer)
   f.guildInfo:SetText(string.format(
-    "|cffd4a017Hold name:|r %s\n|cffd4a017Officers:|r Longbeards and the guild master\n|cffd4a017Clans:|r %s and above may found one\n|cffd4a017Trials:|r %s and above give trials below %s; Longbeards and the guild master give any trial",
-    Data.GuildDisplayName(), ns.RankName(ns.RankSetting("founderRank")),
+    "|cffd4a017Hold name:|r %s\n|cffd4a017Officers:|r Longbeards and the guild master\n|cffd4a017Clans:|r any guildmate may found one\n|cffd4a017Trials:|r %s and above give trials below %s; Longbeards and the guild master give any trial",
+    Data.GuildDisplayName(),
     ns.RankName(ns.RankSetting("nobleRank")), ns.RankName(ns.RankSetting("nobleRank"))))
 
   local peers = {}

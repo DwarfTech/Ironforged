@@ -2,8 +2,10 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.16.10"
-ns.PROTOCOL = 11
+ns.VERSION = "2.17.0"
+-- Bump whenever the wire format or data model changes: messages with any other number are ignored,
+-- so versions on different protocols never mix. 12 = natural keys and key-hash/stamp login sync.
+ns.PROTOCOL = 12
 ns.PREFIX = "IRONFORGED"
 ns.COLOR = "ffd4a017"
 

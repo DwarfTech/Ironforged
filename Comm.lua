@@ -136,20 +136,22 @@ Comm.PickRelays = pickRelays
 -- Outgoing helpers
 ----------------------------------------------------------------------
 function Comm.BroadcastRecord(coll, key, rec)
-  local localOnly = ns.Data.LOCAL_ONLY[coll]
+  if ns.Data.LOCAL_ONLY[coll] then return end -- crafts are pulled by hash, never pushed
+  if ns.Data.ALWAYS_SYNC[coll] then
+    Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD") -- everyone, immediately
+    return
+  end
   if ns.IAmOfficer() then
-    if not localOnly then Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD") end
+    Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD")
     return
   end
-  local relays = pickRelays(localOnly and 2 or 1, true)
+  local relays = pickRelays(1, true)
   if #relays == 0 then
-    -- no Longbeard online: guild-wide as before (crafts wait for the next login push or a pull)
-    if not localOnly then Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD") end
+    -- no Longbeard online: guild-wide as before
+    Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD")
     return
   end
-  for _, relay in ipairs(relays) do
-    Comm.Send({ op = "P", c = coll, k = key, r = rec }, "WHISPER", relay)
-  end
+  Comm.Send({ op = "P", c = coll, k = key, r = rec }, "WHISPER", relays[1])
 end
 
 -- Tell the guild you've spotted a grudged foe (not stored).
@@ -176,18 +178,64 @@ end
 
 local sendRecords
 
--- Hand my own crafts to the relays so others can pull them.
-local function pushCrafts(relays)
-  local me = ns.PlayerName()
-  for _, relay in ipairs(relays) do
-    sendRecords("crafts", function(_, rec) return rec.b == me end, relay)
+-- Always-synced rows (Clans, Promotions, Events, Grudges, War Hall, Titles), in three cheap steps:
+--   1. I broadcast one short digest per collection (op H).
+--   2. Up to two online members whose digests differ whisper back which collections differ (op HN);
+--      an empty list means "you are in sync".
+--   3. I whisper those members a token (key hash + stamp) for each row I hold in those collections
+--      (op HT) and they send back rows I lack or hold in an older version.
+Comm.rowsGot = 0
+local rowSession
+
+local function markRowsSynced(s)
+  if s.synced or not ns.db then return end
+  s.synced = true
+  ns.db.rowSyncedAt = s.startMs
+  if s.full then ns.db.rowFullSyncAt = s.startMs end
+end
+
+function Comm.RequestRows(attempt, since, startMs, full)
+  if not ns.Data.Ready() then return end
+  attempt = attempt or 1
+  local s = rowSession
+  if attempt == 1 or not s then
+    s = { since = since, startMs = startMs, full = full, chosen = {}, count = 0 }
+    rowSession = s
   end
+  s.attempt = attempt
+  Comm.Send({ op = "H", a = attempt, sn = since, dg = ns.Data.AlwaysDigests(since), v = ns.VERSION }, "GUILD")
+  if C_Timer then
+    C_Timer.After(attempt == 1 and 20 or 40, function()
+      if rowSession ~= s or s.answered then return end
+      if attempt < 3 then Comm.RequestRows(attempt + 1, since, startMs, full) end
+    end)
+  end
+end
+
+local function rowSince()
+  local db = ns.db
+  if not db or not db.rowSyncedAt or not db.rowFullSyncAt then return nil end
+  if ns.Now() * 1000 - db.rowFullSyncAt > 7 * DAY_MS then return nil end
+  return db.rowSyncedAt - SYNC_MARGIN_MS
+end
+
+-- Also runs every so often, so a message that got lost doesn't leave me out of step until my next login.
+function Comm.CheckRows()
+  local db = ns.db
+  if db and db.rowFullSyncAt and ns.Now() - db.rowFullSyncAt / 1000 > ns.Data.MAX_TOMBSTONE_AGE then
+    -- away so long that deletions may have been forgotten: start over from the guild's copy
+    ns.Data.DropAlwaysSyncRows()
+    db.rowSyncedAt, db.rowFullSyncAt = nil, nil
+  end
+  local rs = rowSince()
+  Comm.RequestRows(1, rs, ns.Now() * 1000, rs == nil)
 end
 
 function Comm.RequestSync()
   Comm.stats.lastSync = ns.Now()
   Comm.syncStartMs = ns.Now() * 1000
   Comm.gotReply = false
+  Comm.CheckRows()
   local since = sinceStamp()
   Comm.syncWasFull = since == nil
   local relays = ns.IAmOfficer() and {} or pickRelays(2, false)
@@ -196,7 +244,6 @@ function Comm.RequestSync()
     return
   end
   for _, relay in ipairs(relays) do Comm.SendDigest("WHISPER", relay, nil, since) end
-  pushCrafts(relays)
   -- if neither relay answers (no addon, or they logged off) fall back to the guild channel
   if C_Timer then
     C_Timer.After(25, function()
@@ -205,15 +252,15 @@ function Comm.RequestSync()
   end
 end
 
--- Ask a relay for crafts: one profession, or all (nil). Only what changed since my last pull.
--- Limited to once per 5 minutes per profession.
+-- Ask the guild for crafts: one profession, or all (nil). I send the hashes of the crafts rows I
+-- already hold; whoever is online (the crafter first of all) sends back the rows I lack.
+-- Limited to once per 5 minutes per profession, and only what changed since my last pull.
 local lastPull = {}
 function Comm.PullCrafts(prof)
+  if not ns.Data.Ready() then return false end
   local k = prof or "*"
   local t = now()
   if lastPull[k] and t - lastPull[k] < 300 then return false end
-  local relays = pickRelays(1, true)
-  if #relays == 0 then return false end
   lastPull[k] = t
   local db = ns.db
   local since
@@ -222,7 +269,7 @@ function Comm.PullCrafts(prof)
     if db.craftsPulled[k] then since = db.craftsPulled[k] - SYNC_MARGIN_MS end
     db.craftsPulled[k] = ns.Now() * 1000
   end
-  Comm.Send({ op = "CG", pf = prof, sn = since }, "WHISPER", relays[1])
+  Comm.Send({ op = "H", c = "crafts", pf = prof, a = 1, sn = since, h = ns.Data.CraftTokens(since, prof), v = ns.VERSION }, "GUILD")
   return true
 end
 
@@ -290,7 +337,7 @@ local function handleDigest(sender, msg, channel)
   local mine = ns.Data.Digests()
   local differs = {}
   for _, coll in ipairs(ns.Data.COLLECTIONS) do
-    if not ns.Data.LOCAL_ONLY[coll] and msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
+    if not ns.Data.LOCAL_ONLY[coll] and not ns.Data.ALWAYS_SYNC[coll] and msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
   end
   local since = type(msg.sn) == "number" and msg.sn or nil
   local function recent(rec) return not since or (rec.t or 0) >= since end
@@ -311,8 +358,145 @@ local function handleDigest(sender, msg, channel)
   if channel == "WHISPER" and not isReply then ns.Fire("PEER_ARRIVED", sender) end
 end
 
+local hashSeen = {}
+local function limited(k)
+  local t = now()
+  if hashSeen[k] and t - hashSeen[k] < 30 then return true end
+  hashSeen[k] = t
+  return false
+end
+
+-- Am I one of the `count` online addon users chosen for this requester? (The same choice on every
+-- client, each working from the peers it has heard; later attempts pick others, the third is open.)
+local function elect(sender, attempt, count)
+  if attempt >= 3 then return true end
+  local me = ns.PlayerName()
+  local t = now()
+  local list = { me }
+  for name, peer in pairs(Comm.peers) do
+    if name ~= sender and name ~= me and t - peer.seen < PEER_TTL and targetOnline(name) then
+      list[#list + 1] = name
+    end
+  end
+  table.sort(list)
+  local start = (ns.Hash(sender) + attempt - 1) % #list
+  for i = 0, math.min(count, #list) - 1 do
+    if list[(start + i) % #list + 1] == me then return true end
+  end
+  return false
+end
+
+-- Step 2: a member logged in (or checks in) and sent digests. Chosen members say which collections differ.
+local function handleDigestCheck(sender, msg)
+  local attempt = tonumber(msg.a) or 1
+  if limited("dg#" .. sender .. "#" .. attempt) then return end
+  if not elect(sender, attempt, 2) then return end
+  local since = type(msg.sn) == "number" and msg.sn or nil
+  local mine = ns.Data.AlwaysDigests(since)
+  local differs = {}
+  for _, coll in ipairs(ns.Data.COLLECTIONS) do
+    if ns.Data.ALWAYS_SYNC[coll] and msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
+  end
+  Comm.Send({ op = "HN", a = attempt, sn = since, c = differs }, "WHISPER", sender)
+  ns.Fire("PEER_ARRIVED", sender)
+end
+
+-- Step 3a (requester): a member told me which collections differ. Send them my tokens for those.
+local function handleNeed(sender, msg)
+  local s = rowSession
+  if not s or type(msg.c) ~= "table" then return end
+  s.answered = true
+  if #msg.c == 0 then markRowsSynced(s); return end
+  if s.chosen[sender] or s.count >= 2 then return end
+  local only, list = {}, {}
+  for _, coll in ipairs(msg.c) do
+    if ns.Data.ALWAYS_SYNC[coll] and not only[coll] then only[coll] = true; list[#list + 1] = coll end
+  end
+  if #list == 0 then return end
+  s.chosen[sender] = true
+  s.count = s.count + 1
+  Comm.Send({ op = "HT", c = list, sn = s.since, h = ns.Data.RowTokens(s.since, only) }, "WHISPER", sender)
+end
+
+-- Someone sent a token (key hash + stamp) for each row they hold: send back the rows they lack and
+-- the ones I hold in a newer version. `targeted` means they picked me (op HT); otherwise this is a
+-- crafts pull to the whole guild, where the crafter always answers for his own rows and one elected
+-- member answers for the rest.
+local function handleHashes(sender, msg, targeted)
+  if type(msg.h) ~= "string" then return end
+  local attempt = tonumber(msg.a) or 1
+  local crafts = msg.c == "crafts"
+  local pf = type(msg.pf) == "string" and msg.pf or nil
+  local only
+  if not crafts then
+    if type(msg.c) ~= "table" then return end
+    only = {}
+    for _, coll in ipairs(msg.c) do if ns.Data.ALWAYS_SYNC[coll] then only[coll] = true end end
+  end
+  if limited("h#" .. sender .. "#" .. attempt .. "#" .. (crafts and "c" or "r") .. "#" .. (pf or "")) then return end
+  local theirs = ns.Data.ParseTokens(msg.h) -- key hash -> stamp of the version the requester holds
+  local since = type(msg.sn) == "number" and msg.sn or nil
+  local me = ns.PlayerName()
+  local elected = targeted or elect(sender, attempt, 1)
+
+  -- rows go out one collection after another, so parents (clans, grudges, events) precede children
+  local batch, batchColl = { n = 0, recs = {} }, nil
+  local function flush()
+    if batchColl and batch.n > 0 then Comm.Send({ op = "B", c = batchColl, recs = batch.recs }, "WHISPER", sender) end
+    batch, batchColl = { n = 0, recs = {} }, nil
+  end
+  local function consider(cl, key, rec, token)
+    -- what the requester lacks, and what I hold in a newer version (my own stamp travels with it)
+    local their = theirs[token:sub(1, 8)]
+    if their and (rec.t or 0) <= their then return end
+    if not (rec.b == me or elected) then return end
+    if ns.Data.Departed(cl, key, rec) then return end
+    if batchColl ~= cl then flush(); batchColl = cl end
+    batch.recs[key] = rec
+    batch.n = batch.n + 1
+    if batch.n >= BATCH_RECORDS then flush() end
+  end
+  if crafts then
+    ns.Data.EachCraft(since, pf, consider)
+  else
+    ns.Data.EachAlwaysRow(since, consider, only)
+  end
+  flush()
+  ns.Fire("PEER_ARRIVED", sender)
+end
+
+-- Rows that failed a permission check, usually because the row they depend on (the clan an invite
+-- belongs to) hasn't arrived yet. They get another chance when more rows come in.
+local pending = {}
+local function parkRow(coll, key, rec)
+  if #pending >= 100 then table.remove(pending, 1) end
+  pending[#pending + 1] = { coll = coll, key = key, rec = rec, due = now() + 120 }
+end
+
+local function retryPending()
+  if #pending == 0 then return false end
+  local changed, t = false, now()
+  for pass = 1, 2 do
+    local progressed = false
+    for i = #pending, 1, -1 do
+      local p = pending[i]
+      if t > p.due then
+        table.remove(pending, i)
+      elseif ns.Data.Merge(p.coll, p.key, p.rec, false) then
+        table.remove(pending, i)
+        changed, progressed = true, true
+      end
+    end
+    if not progressed then break end
+  end
+  return changed
+end
+
 local function acceptRecord(sender, coll, key, rec)
   if type(rec) ~= "table" then return false end
+  -- Always-synced rows may come from anyone (a login reply), but are still checked against the
+  -- standing of the row's real author.
+  if ns.Data.ALWAYS_SYNC[coll] or ns.Data.LOCAL_ONLY[coll] then return ns.Data.Merge(coll, key, rec, false) end
   -- Non-officers may only pass along records they wrote themselves.
   local officer = ns.IsOfficer(sender)
   if rec.b ~= sender and not officer then return false end
@@ -323,7 +507,7 @@ local function dispatch(sender, msg, channel)
   if type(msg) ~= "table" then return end
   if not ns.roster[sender] then return end -- only guildmates
   if msg.p ~= ns.PROTOCOL then
-    if msg.op == "D" and not Comm.warnedOld and type(msg.p) == "number" and msg.p > ns.PROTOCOL then
+    if (msg.op == "D" or msg.op == "H") and not Comm.warnedOld and type(msg.p) == "number" and msg.p > ns.PROTOCOL then
       Comm.warnedOld = true
       ns.Print("A guildmate has a newer version of Ironforged. Update yours so your records keep syncing.")
     end
@@ -334,26 +518,21 @@ local function dispatch(sender, msg, channel)
 
   if msg.op == "D" then
     handleDigest(sender, msg, channel)
+  elseif msg.op == "H" then
+    if type(msg.dg) == "table" then handleDigestCheck(sender, msg) else handleHashes(sender, msg, false) end
+  elseif msg.op == "HN" then
+    if channel == "WHISPER" then handleNeed(sender, msg) end
+  elseif msg.op == "HT" then
+    if channel == "WHISPER" then handleHashes(sender, msg, true) end
   elseif msg.op == "P" then
-    local localOnly = ns.Data.LOCAL_ONLY[msg.c]
-    if localOnly and channel ~= "WHISPER" then return end -- crafts only travel by whisper
+    if ns.Data.LOCAL_ONLY[msg.c] then return end -- crafts only travel in pulled batches
     if ns.Data.VALID[msg.c] and type(msg.k) == "string" and acceptRecord(sender, msg.c, msg.k, msg.r) then
       ns.Fire("DATA_CHANGED", msg.c, msg.k)
       -- A relay posts a member's own whispered edit to the guild for everyone else.
-      if channel == "WHISPER" and not localOnly and ns.IAmOfficer() and type(msg.r) == "table"
+      if channel == "WHISPER" and ns.IAmOfficer() and type(msg.r) == "table"
         and msg.r.b == sender and not ns.IsOfficer(sender) then
         Comm.Send({ op = "P", c = msg.c, k = msg.k, r = msg.r }, "GUILD")
       end
-    end
-  elseif msg.op == "CG" then
-    -- a craft pull: any Longbeard answers what a member asks for
-    if channel == "WHISPER" and ns.IAmOfficer() then
-      local pf = type(msg.pf) == "string" and msg.pf or nil
-      local since = type(msg.sn) == "number" and msg.sn or nil
-      sendRecords("crafts", function(key, rec)
-        if since and (rec.t or 0) < since then return false end
-        return not pf or select(2, ns.Data.SplitKey(key)) == pf
-      end, sender)
     end
   elseif msg.op == "XS" then
     if type(msg.id) == "string" then ns.Fire("GAMBLE_STATE", sender, msg) end
@@ -373,9 +552,16 @@ local function dispatch(sender, msg, channel)
     if not ns.Data.VALID[msg.c] or type(msg.recs) ~= "table" then return end
     local changed = false
     for key, rec in pairs(msg.recs) do
-      if type(key) == "string" and acceptRecord(sender, msg.c, key, rec) then changed = true end
+      if type(key) == "string" then
+        local ok, why = acceptRecord(sender, msg.c, key, rec)
+        if ok then changed = true
+        elseif why == "perm" and ns.Data.ALWAYS_SYNC[msg.c] then parkRow(msg.c, key, rec) end
+      end
     end
+    if changed and retryPending() then changed = true end
+    if ns.Data.ALWAYS_SYNC[msg.c] and rowSession then markRowsSynced(rowSession) end
     if changed then
+      if ns.Data.ALWAYS_SYNC[msg.c] then Comm.rowsGot = Comm.rowsGot + 1 end
       Comm.stats.lastSync = ns.Now()
       ns.Fire("DATA_CHANGED", msg.c)
     end
@@ -386,7 +572,7 @@ function Comm.OnAddonMessage(prefix, text, channel, sender)
   if prefix ~= ns.PREFIX then return end
   if channel ~= "GUILD" and channel ~= "WHISPER" then return end
   sender = ns.Name(sender)
-  if sender == "" or sender == ns.PlayerName() then return end
+  if sender == "" or (sender == ns.PlayerName() and not Comm.allowSelf) then return end
   if not ns.Data.Ready() then return end
 
   local id, i, n, part = text:match("^(%x+)\t(%d+)\t(%d+)\t(.*)$")
@@ -432,28 +618,57 @@ ns.On("DATA_READY", function()
   if C_Timer then
     C_Timer.After(6 + math.random() * 6, Comm.RequestSync)
     C_Timer.NewTicker(60, sweep)
+    C_Timer.NewTicker(45 * 60, function() Comm.CheckRows() end) -- catch up on anything a lost message left out
   end
 end)
 
 ----------------------------------------------------------------------
--- Debug: /sendmsg [Sender-Realm] feeds a test backstory through Comm.OnAddonMessage as if
--- that guildmate had broadcast it (default Frugo-Forever). Sender must be on your roster.
--- NOTE: this really stores the record ("Frugo Test Backstory") in your local profiles data.
+-- Debug: feed a message through the real receive path as if `sender` had sent it.
+-- The payload is serialised, cut into 220-byte chunks and handed to OnAddonMessage, so
+-- chunk reassembly, the roster check, permission checks and merging all run for real.
+-- Returns true when the message got past the roster/protocol checks into dispatch.
 ----------------------------------------------------------------------
+local injectCounter = 0
+function Comm.Inject(sender, payload, channel)
+  channel = channel or "GUILD"
+  if not ns.Data.Ready() then return false, "guild data isn't loaded yet" end
+  local resolved = ns.Name(sender)
+  if resolved == "" or not ns.roster[resolved] then
+    return false, "'" .. tostring(sender) .. "' is not on your guild roster (names are matched as First Surname)"
+  end
+  payload.p = payload.p or ns.PROTOCOL -- a test may pose as an older version
+  payload.v = payload.v or ns.VERSION
+  local ok, packed = pcall(Ser.Pack, payload)
+  if not ok then return false, "could not serialise: " .. tostring(packed) end
+  injectCounter = injectCounter + 1
+  local id = string.format("%x", 0xd000 + injectCounter)
+  local n = math.max(1, math.ceil(#packed / CHUNK))
+  local before = Comm.stats.received
+  -- Messages from yourself are normally ignored; a test may impersonate you too.
+  Comm.allowSelf = true
+  local okFeed, err = pcall(function()
+    for i = 1, n do
+      local part = packed:sub((i - 1) * CHUNK + 1, i * CHUNK)
+      Comm.OnAddonMessage(ns.PREFIX, id .. "\t" .. i .. "\t" .. n .. "\t" .. part, channel, sender)
+    end
+  end)
+  Comm.allowSelf = false
+  if not okFeed then return false, "error while handling it: " .. tostring(err) end
+  if Comm.stats.received == before then
+    return false, "dropped before dispatch (bad protocol or malformed message)"
+  end
+  return true
+end
+
+-- /sendmsg [Sender Name]: send a test backstory from a guildmate (default Frugo Forever).
 SLASH_IFSENDMSG1 = "/sendmsg"
 SlashCmdList.IFSENDMSG = function(arg)
-  arg = ns.Trim and ns.Trim(arg or "") or (arg or "")
-  local sender = arg ~= "" and arg or "Frugo-Forever"
+  arg = ns.Trim(arg or "")
+  local sender = arg ~= "" and arg or "Frugo Forever"
   local resolved = ns.Name(sender)
-  if not ns.roster[resolved] then
-    ns.Print("sendmsg: '" .. sender .. "' isn't on your guild roster, so the message would be ignored.")
-    return
-  end
   local rec = { d = { backstory = "Frugo Test Backstory" }, t = ns.Stamp(), b = resolved }
-  local packed = Ser.Pack({ p = ns.PROTOCOL, op = "P", v = ns.VERSION, c = "profiles", k = resolved, r = rec })
-  local before = Comm.stats.received
-  Comm.OnAddonMessage(ns.PREFIX, "dbf\t1\t1\t" .. packed, "GUILD", sender)
+  local ok, why = Comm.Inject(sender, { op = "P", c = "profiles", k = resolved, r = rec })
   local got = ns.Data.Get("profiles", resolved)
-  ns.Print(string.format("sendmsg: delivered as %s (received %d -> %d), stored backstory: %s",
-    resolved, before, Comm.stats.received, got and got.backstory or "none"))
+  ns.Print(string.format("sendmsg: %s as %s, stored backstory: %s", ok and "delivered" or ("not delivered: " .. tostring(why)),
+    resolved, got and got.backstory or "none"))
 end

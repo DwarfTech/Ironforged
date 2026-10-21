@@ -87,12 +87,12 @@ local function trialForm(member, key)
     value = table.concat(taskLines, "\n"), maxLen = 1200, height = 130 }
 
   UI.OpenForm({
-    title = key and ("Edit " .. ns.Name(Data.SplitKey(key)) .. "'s trial") or "Give a promotion trial",
+    title = key and ("Edit " .. ns.Name(key) .. "'s trial") or "Give a promotion trial",
     width = 540,
     fields = fields,
     saveText = key and "Save" or "Give trial",
     onSave = function(v)
-      local who = key and Data.SplitKey(key) or v.member
+      local who = key or v.member
       if not who then ns.Print("Choose who gets the trial."); return false end
       if type(v.rank) ~= "number" then ns.Print("Choose the rank this trial earns."); return false end
       if not Data.CanGiveTrial(me, who, v.rank) then
@@ -103,7 +103,7 @@ local function trialForm(member, key)
       if #tasks == 0 then tasks = parseTasks(table.concat(starterTasks(v.rank), "\n")) end
       local title = ns.Clean(v.title, 50)
       if title == "" then title = ns.RankName(v.rank) .. " Trial" end
-      local newKey = key or (who .. "#" .. ns.NewId())
+      local newKey = key or who -- a character has one trial at a time
       local done = {}
       for _, task in ipairs(tasks) do
         if t.done and t.done[task.id] then done[task.id] = true end
@@ -122,7 +122,7 @@ UI.GiveTrial = function(member) trialForm(member, nil) end
 
 -- Remove a finished trial (and the member's own task marks) for everyone.
 function UI.ClearTrial(key)
-  local member = Data.SplitKey(key)
+  local member = key
   local t = Data.Get("progress", key)
   if not Data.Delete("progress", key) then return false end
   if Data.Get("taskmarks", key) then Data.Delete("taskmarks", key) end
@@ -297,7 +297,7 @@ local function build(f, w, h)
     local key = state.key
     local t = key and Data.Get("progress", key)
     if not t then return end
-    local member = Data.SplitKey(key)
+    local member = key
     local me = ns.PlayerName()
     if Data.CanGiveTrial(me, member, t.rank) then
       -- the giver's ticks; unticking a task the member marked overrules their mark
@@ -328,7 +328,7 @@ local function build(f, w, h)
   panel.editButton:SetPoint("LEFT", panel.saveButton, "RIGHT", 4, 0)
   panel.removeButton = UI.Button(panel, "End trial", 76, 22, function()
     local key = state.key
-    local member = Data.SplitKey(key)
+    local member = key
     UI.Confirm("End " .. ns.Name(member) .. "'s trial?", function()
       Data.Delete("progress", key)
       state.key = nil
@@ -363,7 +363,7 @@ local function refresh(f)
   local panel = f.panel
   if state.key and not Data.Get("progress", state.key) then state.key = nil end
   if not state.key and items[1] then state.key = items[1].data end
-  local member = Data.SplitKey(state.key)
+  local member = state.key
   local done, total, t = Data.TrialProgress(state.key)
 
   if not t then

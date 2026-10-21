@@ -44,7 +44,7 @@ check(M.ns.Gear.Status == nil and M.ns.Gear.Scan == nil, "gear check removed")
 
 -- Promotion trials
 local function give(client, member, rank, id)
-  return client.ns.Data.Put("progress", member .. "#" .. id, { title = "T", rank = rank,
+  return client.ns.Data.Put("progress", member, { title = "T", rank = rank,
     tasks = { { id = "a", text = "One" }, { id = "b", text = "Two" } }, done = {} }, true)
 end
 check(give(D, "Kurdran", 7, "p1"), "Noble gives a Veteran trial without a request")
@@ -57,28 +57,28 @@ check(give(B, "Muradin", 3, "p7"), "Longbeard gives an Overlord trial")
 check(give(A, "Thorin", 1, "p8"), "guild master can give any trial, even to self")
 H.run(5)
 check(#Hh.ns.Data.AssignedTrials() == 4, "everyone sees every trial")
-check(DD.Put("progress", "Kurdran#p1", { title = "T", rank = 7, tasks = { { id = "a", text = "One" }, { id = "b", text = "Two" } }, done = { a = true } }), "giver marks progress")
-check(not KD.Put("progress", "Kurdran#p1", { title = "T", rank = 7, tasks = {}, done = {} }, true), "member cannot edit own trial")
-check(not DD.Put("progress", "Dagna#p6", { title = "T", rank = 7, tasks = {}, done = {} }, true), "cannot downgrade own trial to edit it")
+check(DD.Put("progress", "Kurdran", { title = "T", rank = 7, tasks = { { id = "a", text = "One" }, { id = "b", text = "Two" } }, done = { a = true } }), "giver marks progress")
+check(not KD.Put("progress", "Kurdran", { title = "T", rank = 7, tasks = {}, done = {} }, true), "member cannot edit own trial")
+check(not DD.Put("progress", "Dagna", { title = "T", rank = 7, tasks = {}, done = {} }, true), "cannot downgrade own trial to edit it")
 H.run(5)
-check(select(1, Hh.ns.Data.TrialProgress("Kurdran#p1")) == 1, "progress visible to everyone")
+check(select(1, Hh.ns.Data.TrialProgress("Kurdran")) == 1, "progress visible to everyone")
 check(KD.Put("requests", "Kurdran", { note = "Ready", ts = 1 }), "member requests promotion")
 H.run(5)
 check(DD.Delete("requests", "Kurdran"), "Noble clears a request")
-check(DD.Delete("progress", "Kurdran#p1"), "Noble ends a trial they can give")
-check(not DD.Delete("progress", "Muradin#p7"), "Noble cannot end an Overlord trial")
+check(DD.Delete("progress", "Kurdran"), "Noble ends a trial they can give")
+check(not DD.Delete("progress", "Muradin"), "Noble cannot end an Overlord trial")
 H.run(5)
-check(AD.Get("progress", "Kurdran#p1") == nil, "ended trial gone everywhere")
+check(AD.Get("progress", "Kurdran") == nil, "ended trial gone everywhere")
 
 -- Trial complete: promote button, then finish and announce
 check(give(D, "Kurdran", 7, "p9"), "Noble gives Kurdran a Veteran trial")
-check(DD.Put("progress", "Kurdran#p9", { title = "Veteran Trial", rank = 7, tasks = { { id = "a", text = "One" } }, done = { a = true } }), "all tasks done")
+check(DD.Put("progress", "Kurdran", { title = "Veteran Trial", rank = 7, tasks = { { id = "a", text = "One" } }, done = { a = true } }), "all tasks done")
 D.ns.ToggleMain("trials")
 local ttab
 for _, f in ipairs(D.frames) do if f.panel and f.giveButton then ttab = f end end
 D.ns.UI.SelectTab("trials")
 for i, row in ipairs(ttab.list.rows) do
-  if row.item and row.item.data == "Kurdran#p9" then row.__scripts.OnClick(row, "LeftButton") end
+  if row.item and row.item.data == "Kurdran" then row.__scripts.OnClick(row, "LeftButton") end
 end
 H.run(1)
 local panel = ttab.panel
@@ -92,7 +92,7 @@ for _, c in ipairs({ A, M, D, K, Hh, B, E }) do H.fire(c, "GUILD_ROSTER_UPDATE")
 H.run(2)
 H.run(5)
 local chatBefore = #D.guildChat
-check(AD.Get("progress", "Kurdran#p9") == nil and KD.Get("progress", "Kurdran#p9") == nil, "trial cleared from the list for everyone once promoted")
+check(AD.Get("progress", "Kurdran") == nil and KD.Get("progress", "Kurdran") == nil, "trial cleared from the list for everyone once promoted")
 check(#D.guildChat == chatBefore, "clearing a trial posts nothing to guild chat")
 D.ns.UI.SelectTab("trials")
 H.run(1)
@@ -104,28 +104,28 @@ H.run(2)
 -- Member marks their own tasks; only the giver completes and promotes
 check(give(D, "Kurdran", 7, "m1"), "Noble gives Kurdran a trial")
 H.run(5)
-check(KD.Put("taskmarks", "Kurdran#m1", { done = { a = true, b = true } }), "member marks their own tasks")
-check(not MD.Put("taskmarks", "Kurdran#m1", { done = {} }, true), "others can't mark someone else's tasks")
-check(not KD.Put("progress", "Kurdran#m1", { title = "T", rank = 7, tasks = {}, done = { a = true }, completed = 1 }, true), "member can't complete their own trial")
+check(KD.Put("taskmarks", "Kurdran", { done = { a = true, b = true } }), "member marks their own tasks")
+check(not MD.Put("taskmarks", "Kurdran", { done = {} }, true), "others can't mark someone else's tasks")
+check(not KD.Put("progress", "Kurdran", { title = "T", rank = 7, tasks = {}, done = { a = true }, completed = 1 }, true), "member can't complete their own trial")
 H.run(5)
-check(select(1, DD.TrialProgress("Kurdran#m1")) == 2, "giver sees the member's marks")
+check(select(1, DD.TrialProgress("Kurdran")) == 2, "giver sees the member's marks")
 K.ns.ToggleMain("trials")
 local ktab
 for _, f in ipairs(K.frames) do if f.panel and f.giveButton then ktab = f end end
-for _, row in ipairs(ktab.list.rows) do if row.item and row.item.data == "Kurdran#m1" then row.__scripts.OnClick(row, "LeftButton") end end
+for _, row in ipairs(ktab.list.rows) do if row.item and row.item.data == "Kurdran" then row.__scripts.OnClick(row, "LeftButton") end end
 H.run(1)
 check(ktab.panel.saveButton:IsShown() and not ktab.panel.promote:IsShown() and not ktab.panel.finishButton:IsShown(), "member can save progress but sees no promote button")
 check(ktab.panel.progress.__text:find("officer will review", 1, true) ~= nil, "member told an officer will review")
 -- giver unticks one claimed task
 D.ns.ToggleMain("trials")
-for _, row in ipairs(ttab.list.rows) do if row.item and row.item.data == "Kurdran#m1" then row.__scripts.OnClick(row, "LeftButton") end end
+for _, row in ipairs(ttab.list.rows) do if row.item and row.item.data == "Kurdran" then row.__scripts.OnClick(row, "LeftButton") end end
 H.run(1)
 check(ttab.panel.checks[1].label.__text:find("marked by Kurdran", 1, true) ~= nil, "giver sees which tasks the member marked")
 ttab.panel.checks[2]:SetChecked(false)
 ttab.panel.saveButton.__scripts.OnClick(ttab.panel.saveButton)
 H.run(5)
-check(select(1, KD.TrialProgress("Kurdran#m1")) == 1, "giver can overrule a member's mark")
-DD.Delete("progress", "Kurdran#m1")
+check(select(1, KD.TrialProgress("Kurdran")) == 1, "giver can overrule a member's mark")
+DD.Delete("progress", "Kurdran")
 H.run(3)
 
 -- Display names drop realm suffixes; matching ignores them
@@ -154,11 +154,15 @@ H.run(1)
 check(rt.list.sortCol == 1, "sort survives a refresh")
 
 -- Clans: founder always leads, no sponsor
-local clanId = "Muradin#c1"
-check(MD.Put("clans", clanId, { name = "Bronzebeard", leader = "Muradin" }), "Veteran founds clan")
-check(not MD.Put("clans", clanId, { name = "Bronzebeard", leader = "Kurdran" }, true), "leader must be the founder")
-check(not AD.Put("clans", "Muradin#c9", { name = "X", leader = "Thorin" }, true), "even officers cannot set another leader")
-check(not KD.Put("clans", "Kurdran#c2", { name = "Y", leader = "Kurdran" }, true), "Vanguard cannot found a clan")
+local clanId = "bronzebeard"
+check(MD.Put("clans", clanId, { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }), "Veteran founds clan")
+check(not MD.Put("clans", clanId, { name = "Bronzebeard", founder = "Muradin", leader = "Kurdran" }, true), "leader must be the founder")
+check(not KD.Put("clans", clanId, { name = "Bronzebeard", founder = "Kurdran", leader = "Kurdran" }, true), "nobody takes over an existing clan name")
+check(not MD.Put("clans", "wrongkey", { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }, true), "a clan's key is its name")
+check(not AD.Put("clans", "x", { name = "X", founder = "Muradin", leader = "Thorin" }, true), "even officers cannot set another leader")
+check(KD.Put("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, true), "any guildmate can found a clan")
+AD.Delete("clans", "y") -- tidy up: only a Longbeard or the guild master removes clans
+H.run(3)
 H.run(5)
 check(KD.Clan(clanId) ~= nil, "clan active everywhere")
 check(MD.Put("invites", clanId .. "#Kurdran", { by = "Muradin" }), "leader invites")
@@ -173,7 +177,7 @@ H.run(5)
 check(KD.Clan(clanId) == nil and KD.ClanOf("Kurdran") == nil, "clan deletion synced")
 
 -- Book of Grudges through the actual buttons
-local gk = "Hilda#g1"
+local gk = "grubnak"
 check(Hh.ns.Data.Put("grudges", gk, { against = "Grubnak", deed = "Camped our flight master", ts = 1 }), "anyone writes a grudge")
 H.run(5)
 check(KD.Get("grudges", gk) ~= nil, "everyone reads the grudge")
@@ -205,8 +209,8 @@ if gtab then
 end
 
 -- Clan applications
-local c3 = "Muradin#c3"
-check(MD.Put("clans", c3, { name = "Ironhand", leader = "Muradin" }), "clan for applications")
+local c3 = "ironhand"
+check(MD.Put("clans", c3, { name = "Ironhand", founder = "Muradin", leader = "Muradin" }), "clan for applications")
 H.run(5)
 check(KD.Put("applications", c3 .. "#Kurdran", { note = "Let me in", ts = 5 }), "member asks to join")
 check(not KD.Put("applications", c3 .. "#Hilda", { note = "x", ts = 5 }, true), "cannot apply for someone else")
@@ -305,9 +309,9 @@ mmb.__scripts.OnClick(mmb, "RightButton")
 check(eb.languageID == 7, "minimap right-click toggles Dwarvish")
 
 -- Book of Grudges: factions, guildmates protected, avenging
-check(not Hh.ns.Data.Put("grudges", "Hilda#gx", { against = "Kurdran", faction = "Horde", deed = "x", ts = 1 }, true), "guildmates can't be grudged")
-check(not Hh.ns.Data.Put("grudges", "Hilda#gy", { against = "kurdran-Forever", faction = "Horde", deed = "x", ts = 1 }, true), "guildmates can't be grudged with realm or case tricks")
-local hg, ag = "Hilda#h1", "Hilda#a1"
+check(not Hh.ns.Data.Put("grudges", "kurdran", { against = "Kurdran", faction = "Horde", deed = "x", ts = 1 }, true), "guildmates can't be grudged")
+check(not Hh.ns.Data.Put("grudges", "kurdran-forever", { against = "kurdran-Forever", faction = "Horde", deed = "x", ts = 1 }, true), "guildmates can't be grudged with realm or case tricks")
+local hg, ag = "grubnak", "elandril"
 check(Hh.ns.Data.Put("grudges", hg, { against = "Grubnak", faction = "Horde", deed = "Camped the flight master", ts = 2 }), "Horde grudge written")
 check(Hh.ns.Data.Put("grudges", ag, { against = "Elandril", faction = "Alliance", deed = "Ninja'd the Thunderfury bindings", ts = 3 }), "Alliance grudge written")
 H.run(5)
@@ -404,12 +408,12 @@ K.target = nil
 check(K.ns.Blood.ELF_RULES:find("raid", 1, true), "Elfbane rules written for the tooltip")
 check(K.ns.Blood.AVENGED_RULES:find("open grudge", 1, true), "Avenged rules written for the tooltip")
 -- seeing a grudged foe dead does not avenge the grudge
-check(Hh.ns.Data.Put("grudges", "Hilda#h2", { against = "Zug", faction = "Horde", deed = "Ganked lowbies", ts = 4 }), "second Horde grudge")
+check(Hh.ns.Data.Put("grudges", "zug", { against = "Zug", faction = "Horde", deed = "Ganked lowbies", ts = 4 }), "second Horde grudge")
 H.run(5)
 D.units.nameplate3 = { name = "Zug", race = "Troll", faction = "Horde", dead = true }
 H.fire(D, "NAME_PLATE_UNIT_ADDED", "nameplate3")
 H.run(5)
-check(AD.Avenged("Hilda#h2") == nil, "seeing them dead doesn't avenge the grudge")
+check(AD.Avenged("zug") == nil, "seeing them dead doesn't avenge the grudge")
 -- officer avenges the Alliance grudge
 check(B.ns.Blood.MarkAvenged(ag, "Dagna"), "officer marks Alliance grudge avenged")
 H.run(5)
@@ -426,9 +430,9 @@ check(btab and btab.list.items[1] and btab.list.items[1].data == "Kurdran", "Kur
 table.insert(H.ROSTER, { "Thrain Ironbeard-Forever", "Vanguard", 8, 30, "Warrior", "WARRIOR" })
 for _, c in ipairs({ A, K, Hh }) do H.fire(c, "GUILD_ROSTER_UPDATE") end
 H.run(2)
-check(not Hh.ns.Data.Put("grudges", "Hilda#s1", { against = "Thrain Ironbeard", faction = "Horde", deed = "x", ts = 9 }, true), "guildmate with surname can't be grudged")
-check(not Hh.ns.Data.Put("grudges", "Hilda#s2", { against = "Thrain", faction = "Horde", deed = "x", ts = 9 }, true), "bare first name of a guildmate is refused")
-check(Hh.ns.Data.Put("grudges", "Hilda#s3", { against = "Thrain Bloodaxe", faction = "Horde", deed = "Stole our kills", ts = 9 }), "different surname is fine")
+check(not Hh.ns.Data.Put("grudges", "thrain ironbeard", { against = "Thrain Ironbeard", faction = "Horde", deed = "x", ts = 9 }, true), "guildmate with surname can't be grudged")
+check(not Hh.ns.Data.Put("grudges", "thrain", { against = "Thrain", faction = "Horde", deed = "x", ts = 9 }, true), "bare first name of a guildmate is refused")
+check(Hh.ns.Data.Put("grudges", "thrain bloodaxe", { against = "Thrain Bloodaxe", faction = "Horde", deed = "Stole our kills", ts = 9 }), "different surname is fine")
 H.run(5)
 K.target = { name = "Thrain", surname = "Bloodaxe", race = "Orc", faction = "Horde" }
 K.subzone = "Refuge Pointe"
@@ -451,7 +455,7 @@ for _, m in ipairs(K.chat) do if m:find("GRUDGED FOE IS NEAR", 1, true) and m:fi
 check(found, "grudged foe with surname recognized")
 H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Thrain Bloodaxe dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
 H.run(6)
-check(AD.Avenged("Hilda#s3") ~= nil, "surname foe avenged on kill")
+check(AD.Avenged("thrain bloodaxe") ~= nil, "surname foe avenged on kill")
 K.target = nil
 
 -- Cheers
@@ -959,6 +963,45 @@ for _, coll in ipairs(AD.COLLECTIONS) do
   if not AD.LOCAL_ONLY[coll] then -- crafts are pulled on demand, not synced at login
     check(F.ns.Data.Digest(coll) == AD.Digest(coll), "late joiner digest " .. coll)
   end
+end
+do
+  local function tokenSet(c)
+    local set = {}
+    for tok in c.ns.Data.RowTokens():gmatch("(%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)") do set[tok] = true end
+    return set
+  end
+  local ts, ta, missing = tokenSet(F), tokenSet(A), 0
+  for tok in pairs(ta) do if not ts[tok] then missing = missing + 1 end end
+  check(missing == 0, "late joiner holds every Clans/Promotions/Events/Grudges/War Hall/Titles row in its current version (" .. missing .. " missing)")
+  check(AD.ALWAYS_SYNC.clans and AD.ALWAYS_SYNC.events and AD.ALWAYS_SYNC.requests and AD.ALWAYS_SYNC.grudges and AD.ALWAYS_SYNC.pvp and AD.ALWAYS_SYNC.titles and not AD.ALWAYS_SYNC.profiles, "always-sync groups")
+  check(not AD.Digests().events and not AD.Digests().grudges and AD.Digests().profiles, "always-sync collections left out of login digests")
+end
+do
+  -- messages from another protocol version are ignored
+  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.17.0", "version 2.17.0 on protocol 12")
+  local before = A.ns.Data.Get("profiles", "Kurdran")
+  local ok = A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", p = 11,
+    r = { d = { backstory = "from an old version" }, t = A.ns.Stamp() + 5000, b = "Kurdran" } })
+  local after = A.ns.Data.Get("profiles", "Kurdran")
+  check(not ok and (not after or after.backstory ~= "from an old version"), "messages from protocol 11 are ignored")
+end
+do
+  local DA = A.ns.Data
+  local nowMs = A.ns.Now() * 1000
+  check(not DA.Merge("pvp", "Kurdran", { d = { hk = 1 }, t = nowMs + 10 * 60 * 1000, b = "Kurdran" }, false), "stamps from the future are rejected")
+  check(not DA.Merge("pvp", "Kurdran", { t = nowMs - (DA.MAX_TOMBSTONE_AGE + 100) * 1000, b = "Kurdran", x = true }, false), "tombstones past their keeping age are rejected")
+  -- people who left the guild
+  DA.Raw("pvp")["Ghost Walker"] = { d = { hk = 1 }, t = nowMs - 100000, b = "Ghost Walker" }
+  check(DA.PruneDeparted() >= 1 and DA.Raw("pvp")["Ghost Walker"] == nil, "rows of people who left the guild are forgotten")
+  check(not DA.Merge("pvp", "Ghost Walker", { d = { hk = 1 }, t = nowMs - 50000, b = "Ghost Walker" }, false), "rows from people who left are refused")
+  check(DA.Merge("pvp", "Hilda", { d = { hk = 1 }, t = nowMs - 1000, b = "Hilda" }, false) and DA.Raw("pvp")["Hilda"] ~= nil, "guildmates' rows are still accepted")
+  check(DA.PruneDeparted() == 0 and DA.Raw("pvp")["Hilda"] ~= nil, "guildmates' rows are kept")
+  -- a child row that arrives before its parent waits for it
+  local pk = "pendingclan"
+  A.ns.Comm.Inject("Muradin", { op = "B", c = "invites", recs = { [pk .. "#Kurdran"] = { d = { by = "Muradin" }, t = A.ns.Stamp(), b = "Muradin" } } }, "WHISPER")
+  check(DA.Get("invites", pk .. "#Kurdran") == nil, "an invite for an unknown clan waits")
+  A.ns.Comm.Inject("Muradin", { op = "B", c = "clans", recs = { [pk] = { d = { name = "Pendingclan", founder = "Muradin", leader = "Muradin" }, t = A.ns.Stamp(), b = "Muradin" } } }, "WHISPER")
+  check(DA.Get("invites", pk .. "#Kurdran") ~= nil, "...and is accepted once its clan arrives")
 end
 check(F.ns.PlayerName() == "Frugo Mega" and F.ns.IAmOfficer(), "matched by character ID")
 

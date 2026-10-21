@@ -31,10 +31,28 @@ local function editEvent(id)
       local ts = ns.ParseDateTime(v.when)
       if title == "" then ns.Print("The event needs a name."); return false end
       if not ts then ns.Print("Use the date format 2026-11-12 19:30."); return false end
-      Data.Put("events", id or ns.NewId(), {
+      -- an event is identified by its name and day; changing either moves it to a new key
+      local newId = Data.EventKey(title, ts)
+      if newId ~= id and Data.Get("events", newId) then
+        ns.Print("There is already an event with that name on that day.")
+        return false
+      end
+      local ok = Data.Put("events", newId, {
         title = title, ts = ts, kind = v.kind, place = ns.Clean(v.place, 60), desc = ns.Clean(v.desc, 500),
         organizer = e.organizer or ns.PlayerName(),
       })
+      if ok and id and newId ~= id then
+        for key, r in Data.Each("rsvp") do
+          local ev, member = key:match("^([^#]+)#(.+)$")
+          if ev == id then
+            Data.Put("rsvp", newId .. "#" .. member, r, true)
+            Data.Delete("rsvp", key)
+          end
+        end
+        local att = Data.Get("attendance", id)
+        if att then Data.Put("attendance", newId, att, true); Data.Delete("attendance", id) end
+        Data.Delete("events", id)
+      end
     end,
   })
 end

@@ -7,8 +7,10 @@ local main
 local current
 
 -- `headerOnly` tabs have no button in the side list; a header button opens them.
-function UI.RegisterTab(id, label, build, refresh, headerOnly)
-  tabs[#tabs + 1] = { id = id, label = label, build = build, refresh = refresh, headerOnly = headerOnly }
+-- `action`, when given, makes the side button run a function (e.g. open another window)
+-- instead of showing a page.
+function UI.RegisterTab(id, label, build, refresh, headerOnly, action)
+  tabs[#tabs + 1] = { id = id, label = label, build = build, refresh = refresh, headerOnly = headerOnly, action = action }
 end
 
 local CONTENT_W, CONTENT_H = 640, 452
@@ -22,7 +24,7 @@ local NAV_SECTIONS = {
   { title = "Guild Management", ids = { "roster", "clans", "trials", "events" } },
   { title = "In Game", ids = { "lfd", "professions", "challenges" } },
   { title = "Roleplay", ids = { "grudges", "blood", "titles", "profile" } },
-  { ids = { "settings" } },
+  { ids = { "settings", "debug" } },
 }
 
 local function selectTab(id)
@@ -245,7 +247,7 @@ local function build()
         y = y - 8
       end
       for _, t in ipairs(sec.tabs) do
-        local b = UI.Button(main, t.label, 132, 24, function() selectTab(t.id) end)
+        local b = UI.Button(main, t.label, 132, 24, function() if t.action then t.action() else selectTab(t.id) end end)
         main.navButtons[#main.navButtons + 1] = { b = b, y = y }
         t.button = b
         y = y - 27
