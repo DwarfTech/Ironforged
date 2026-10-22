@@ -13,12 +13,23 @@ local hidePending = false
 local function inCombat() return InCombatLockdown and InCombatLockdown() end
 local function isSecret(v) return issecretvalue and issecretvalue(v) end
 
+local function loaded(name)
+  if C_AddOns and C_AddOns.IsAddOnLoaded then return C_AddOns.IsAddOnLoaded(name) end
+  return IsAddOnLoaded and IsAddOnLoaded(name)
+end
+
+local function usingEUI() return loaded("ElvUI") or _G.ElvUI ~= nil or loaded("EllesmereUI") end
+
 local function build()
   if bar or inCombat() then return bar end
   bar = CreateFrame("Frame", "IronforgedGreetBar", UIParent, "BackdropTemplate")
   bar:SetSize(236, 40)
   if TargetFrame then
-    bar:SetPoint("TOP", TargetFrame, "BOTTOM", 0, 4)
+    if usingEUI() then
+      bar:SetPoint("TOP", TargetFrame, "BOTTOM", -28, -36)
+    else
+      bar:SetPoint("TOP", TargetFrame, "BOTTOM", 0, 4)
+    end
   else
     bar:SetPoint("TOP", UIParent, "TOP", 120, -130)
   end

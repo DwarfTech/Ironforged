@@ -78,8 +78,13 @@ ns.On("DATA_READY", function()
   if C_Timer then C_Timer.After(4, greet) else greet() end
 end)
 
+-- One notice per guildmate per login, however many sync messages they send.
+local lastArrival = {}
 ns.On("PEER_ARRIVED", function(sender)
   if not ns.settings.arrivalNotices then return end
+  local t = GetTime and GetTime() or 0
+  if lastArrival[sender] and t - lastArrival[sender] < 300 then return end
+  lastArrival[sender] = t
   ns.Print(Flavor.Random("arrival", ns.Name(sender)))
 end)
 

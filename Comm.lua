@@ -398,7 +398,6 @@ local function handleDigestCheck(sender, msg)
     if ns.Data.ALWAYS_SYNC[coll] and msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
   end
   Comm.Send({ op = "HN", a = attempt, sn = since, c = differs }, "WHISPER", sender)
-  ns.Fire("PEER_ARRIVED", sender)
 end
 
 -- Step 3a (requester): a member told me which collections differ. Send them my tokens for those.
@@ -462,7 +461,6 @@ local function handleHashes(sender, msg, targeted)
     ns.Data.EachAlwaysRow(since, consider, only)
   end
   flush()
-  ns.Fire("PEER_ARRIVED", sender)
 end
 
 -- Rows that failed a permission check, usually because the row they depend on (the clan an invite
