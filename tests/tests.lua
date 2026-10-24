@@ -352,7 +352,7 @@ check(tipLines[1] and tipLines[1]:find("GRUDGE: 1 wrong unavenged", 1, true) and
 check(not KD.Put("avenged", ag, { by = "Kurdran", how = "officer", ts = 1 }, true), "member can't mark an Alliance grudge avenged")
 check(not KD.Put("avenged", ag, { by = "Kurdran", how = "slain", ts = 1 }, true), "Alliance grudge isn't avenged by a kill")
 -- Kurdran kills an elf and then Grubnak
-K.units.nameplate2 = { name = "Sylvanor", race = "NightElf", faction = "Alliance" }
+K.units.nameplate2 = { name = "Sylvanor", race = "BloodElf", faction = "Horde" }
 H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate2")
 H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Sylvanor dies, honorable kill Rank: Sentinel (Estimated Honor Points: 12)")
 K.hk = 41
@@ -406,6 +406,16 @@ H.run(12)
 check(select(2, A.ns.Blood.Tally("Kurdran")) == 3, "elf kills in a raid don't count")
 K.inRaid = false
 K.target = nil
+-- Forever's Horde Sky Elves: counted whatever the game calls the race internally
+K.units.nameplate5 = { name = "Lyriel", race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate5")
+local beforeElves = select(2, A.ns.Blood.Tally("Kurdran")) or 0
+H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Lyriel dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
+H.run(12)
+check(select(2, A.ns.Blood.Tally("Kurdran")) == beforeElves + 1, "a Windshaper Skyborne counts as an elf")
+check(K.ns.db.lastKills[1].name == "Lyriel" and K.ns.db.lastKills[1].raceName == "Windshaper Skyborne", "last kills remember the race seen")
+K.env.SlashCmdList.IRONFORGED("kills")
+
 check(K.ns.Blood.ELF_RULES:find("raid", 1, true), "Elfbane rules written for the tooltip")
 check(K.ns.Blood.AVENGED_RULES:find("open grudge", 1, true), "Avenged rules written for the tooltip")
 -- seeing a grudged foe dead does not avenge the grudge
@@ -991,7 +1001,7 @@ do
 end
 do
   -- messages from another protocol version are ignored
-  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.17.2", "version 2.17.2 on protocol 12")
+  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.17.3", "version 2.17.3 on protocol 12")
   local before = A.ns.Data.Get("profiles", "Kurdran")
   local ok = A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", p = 11,
     r = { d = { backstory = "from an old version" }, t = A.ns.Stamp() + 5000, b = "Kurdran" } })

@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.17.2"
+ns.VERSION = "2.17.3"
 -- Bump whenever the wire format or data model changes: messages with any other number are ignored,
 -- so versions on different protocols never mix. 12 = natural keys and key-hash/stamp login sync.
 ns.PROTOCOL = 12
@@ -503,6 +503,15 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Cheers.Call()
   elseif cmd == "dwarvish" or cmd == "lang" then
     ns.Lang.Toggle()
+  elseif cmd == "kills" then
+    -- what the addon knew about your last few honorable kills (for checking elf detection)
+    local list = ns.db and ns.db.lastKills or {}
+    if #list == 0 then ns.Print("No honorable kills seen yet.") end
+    for _, k in ipairs(list) do
+      local race = (k.race or k.raceName) and (tostring(k.raceName) .. " / " .. tostring(k.race)) or "race never seen"
+      ns.Print(k.name .. ": " .. race .. (k.faction and (", " .. k.faction) or "") ..
+        (ns.Blood.IsElf(k.race, k.raceName) and " |cff7fff5f(elf)|r" or ""))
+    end
   elseif cmd == "pvp" then
     if ns.Challenges then ns.Challenges.PvPReport() end
   elseif cmd == "status" then
@@ -525,6 +534,7 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Print("/hold cheers  - officers: call the hold to raise a mug")
     ns.Print("/hold sync  - ask guildmates for the latest records")
     ns.Print("/hold pvp  - check whether the addon can flag you for PvP (for Slayer)")
+    ns.Print("/hold kills  - your last honorable kills and the race the addon saw for each")
   end
 end
 

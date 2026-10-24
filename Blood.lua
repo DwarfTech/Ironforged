@@ -29,10 +29,19 @@ local function foeCache()
   return ns.db.foes
 end
 
-function Blood.IsElf(raceFile)
-  if type(raceFile) ~= "string" then return false end
-  local r = raceFile:lower()
-  return r:find("elf", 1, true) ~= nil or r:find("skyborne", 1, true) ~= nil
+-- Ironforged is an Alliance guild, so the elves it kills are Horde elves: on Forever that's the
+-- Windshaper Skyborne (sky elves, the shen'dorei), plus Blood Elves. Skyborne also serve the
+-- Alliance (the High Order), so the race alone isn't enough: a foe seen as Alliance never counts.
+-- Both the race's internal name and its display name are checked.
+local ELF_WORDS = { "elf", "elves", "skyborne", "windshaper", "shen'dorei", "shendorei", "sin'dorei", "sindorei" }
+function Blood.IsElf(raceFile, raceName)
+  for _, r in ipairs({ raceFile, raceName }) do
+    if type(r) == "string" and not isSecret(r) then
+      r = r:lower()
+      for _, w in ipairs(ELF_WORDS) do if r:find(w, 1, true) then return true end end
+    end
+  end
+  return false
 end
 
 -- Full "First Surname" of a unit.
@@ -45,13 +54,16 @@ local function learn(unit)
   if not unit or isSecret(unit) or not UnitExists(unit) or not UnitIsPlayer(unit) then return nil end
   local name = unitName(unit)
   if not name then return nil end
-  local _, raceFile = UnitRace(unit)
+  local raceName, raceFile = UnitRace(unit)
   local faction = UnitFactionGroup and UnitFactionGroup(unit)
   if isSecret(raceFile) then raceFile = nil end
+  if isSecret(raceName) then raceName = nil end
   if isSecret(faction) then faction = nil end
   local key = Data.FoeKey(name)
   local c = foeCache()
-  c[key] = { race = raceFile or (c[key] and c[key].race), faction = faction or (c[key] and c[key].faction), seen = time() }
+  local old = c[key]
+  c[key] = { race = raceFile or (old and old.race), raceName = raceName or (old and old.raceName),
+    faction = faction or (old and old.faction), seen = time() }
   return name
 end
 Blood.Learn = learn
@@ -219,7 +231,8 @@ Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
 
 function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)
-  if not foe or not Blood.IsElf(foe.race) then return false end
+  -- every honorable kill an Alliance dwarf gets is on the Horde, so only Horde elves can turn up here
+  if not foe or foe.faction == "Alliance" or not Blood.IsElf(foe.race, foe.raceName) then return false end
   if IsInRaid and IsInRaid() then
     ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but elf kills don't count toward Elfbane in a raid.|r")
     return false
@@ -250,6 +263,12 @@ function Blood.OnHonorableKill(victim)
   local t = GetTime()
   if recentKills[key] and t - recentKills[key] < 3 then return end
   recentKills[key] = t
+  -- remember the last few kills and the race seen for each, for /hold kills
+  local _, foe = findFoe(victim)
+  ns.db.lastKills = ns.db.lastKills or {}
+  table.insert(ns.db.lastKills, 1, { name = victim, race = foe and foe.race, raceName = foe and foe.raceName,
+    faction = foe and foe.faction, ts = ns.Now() })
+  while #ns.db.lastKills > 10 do table.remove(ns.db.lastKills) end
   Blood.CountElf(victim, "kill")
   avenge(victim, "slain")
   schedulePublish(5)
