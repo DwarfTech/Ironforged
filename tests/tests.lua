@@ -978,6 +978,32 @@ local p2 = LK.Post("Deadmines", 4); H.run(2)
 local p3 = LK.Post("Stockades", 3); H.run(2)
 check(#D.ns.LFD.Posts() == 1 and D.ns.LFD.Posts()[1].data.what == "Stockades", "one post per leader")
 
+-- Call for aid: one line in chat, no popup, up to a raid of 40
+LK.Close(p3, true); H.run(2)
+D.env.IronforgedNotice:Hide()
+K.subzone = "Refuge Pointe"
+K.units.nameplate7 = { name = "Grashnak", race = "Orc", faction = "Horde" }
+H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate7")
+local dChat = #D.chat
+local aidKey = LK.CallForAid(); H.run(3)
+local aid = D.ns.Data.Get("lfd", aidKey)
+check(aid and aid.aid and aid.need == 39 and aid.what == "Aid in Refuge Pointe, Arathi Highlands", "call for aid posts where you are, for a full raid")
+check(aid and aid.note:find("Grashnak", 1, true), "call for aid names the Horde seen")
+local heard = false
+for i = dChat + 1, #D.chat do if D.chat[i]:find("Kurdran calls for aid!", 1, true) and D.chat[i]:find("Looking for Dwarf tab", 1, true) then heard = true end end
+check(heard, "guildmates get one chat line for a call for aid")
+check(not D.env.IronforgedNotice:IsShown(), "no popup for a call for aid")
+check(D.ns.LFD.Posts()[1].key == aidKey, "calls for aid list first")
+D.ns.LFD.Join(aidKey, "dps"); H.run(3)
+check(#LK.Joins(aidKey) == 1, "a guildmate heeds the call")
+K.invites = {}; K.inGroup, K.leader, K.inRaid = true, true, false
+LK.InviteAll(aidKey)
+check(K.converted and K.inRaid and K.invites[1] == "Dagna", "a call for aid turns the party into a raid and invites")
+K.inGroup, K.leader, K.inRaid, K.converted = false, false, false, nil
+H.clock = H.clock + 1900
+check(D.ns.LFD.IsOpen(aidKey) == false, "calls for aid close after half an hour")
+K.invites = {}
+
 -- Late joiner converges
 local F = H.makeClient("Frugo", nil, "Frugo-Mega"); F.guidOverride = "Player-Frugo-Mega"
 H.boot(F)
@@ -1001,7 +1027,7 @@ do
 end
 do
   -- messages from another protocol version are ignored
-  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.17.3", "version 2.17.3 on protocol 12")
+  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.0", "version 2.18.0 on protocol 12")
   local before = A.ns.Data.Get("profiles", "Kurdran")
   local ok = A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", p = 11,
     r = { d = { backstory = "from an old version" }, t = A.ns.Stamp() + 5000, b = "Kurdran" } })

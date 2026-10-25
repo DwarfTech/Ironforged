@@ -28,18 +28,32 @@ local function showPost(postKey)
   local leader = L.Leader(postKey)
   local me = ns.PlayerName()
   local joins = L.Joins(postKey)
-  local lines = {
-    "|cffd4a017Leader:|r " .. ns.Name(leader),
-    "|cffd4a017Looking for:|r " .. d.need .. (d.need == 1 and " dwarf" or " dwarves") .. " for " .. d.what,
-    "|cffd4a017Posted:|r " .. ago(d.ts),
-  }
+  local lines
+  if d.aid then
+    lines = {
+      "|cffff4040" .. ns.Name(leader) .. " calls for aid!|r",
+      "|cffd4a017Where:|r " .. (d.what:gsub("^Aid in ", "")),
+      "|cffd4a017Called:|r " .. ago(d.ts),
+    }
+  else
+    lines = {
+      "|cffd4a017Leader:|r " .. ns.Name(leader),
+      "|cffd4a017Looking for:|r " .. d.need .. (d.need == 1 and " dwarf" or " dwarves") .. " for " .. d.what,
+      "|cffd4a017Posted:|r " .. ago(d.ts),
+    }
+  end
   if d.note and d.note ~= "" then lines[#lines + 1] = "|cffd4a017Note:|r " .. d.note end
   lines[#lines + 1] = " "
-  lines[#lines + 1] = "|cffd4a017Signed up (" .. #joins .. " of " .. d.need .. "):|r " .. roleList(joins)
+  if d.aid then
+    lines[#lines + 1] = "|cffd4a017Answering (" .. #joins .. "):|r " .. roleList(joins)
+    if leader ~= me and not L.MyJoin(postKey) then lines[#lines + 1] = " "; lines[#lines + 1] = "Heed the call as:" end
+  else
+    lines[#lines + 1] = "|cffd4a017Signed up (" .. #joins .. " of " .. d.need .. "):|r " .. roleList(joins)
+  end
 
   local buttons = {}
   if leader == me then
-    buttons[#buttons + 1] = { text = "Close post", onClick = function() L.Close(postKey) end }
+    buttons[#buttons + 1] = { text = d.aid and "End the call" or "Close post", onClick = function() L.Close(postKey) end }
     buttons[#buttons + 1] = { text = "Invite all", onClick = function() L.InviteAll(postKey) end }
   else
     if L.MyJoin(postKey) then
@@ -54,7 +68,7 @@ local function showPost(postKey)
       end }
     end
   end
-  UI.OpenForm({ title = "Looking for Dwarf", width = 520, fields = { { type = "info", value = table.concat(lines, "\n") } }, buttons = buttons })
+  UI.OpenForm({ title = d.aid and "Call for Aid" or "Looking for Dwarf", width = 520, fields = { { type = "info", value = table.concat(lines, "\n") } }, buttons = buttons })
 end
 UI.ShowLFDPost = showPost
 
@@ -68,14 +82,19 @@ local function refresh(f)
     local need = tonumber(p.data.need) or 1
     local n = #p.joins
     local status
-    if p.leader == me then status = "|cffd4a017Your group|r"
+    if p.data.aid then
+      if p.leader == me then status = "|cffff4040Your call|r"
+      elseif L.MyJoin(p.key) then status = "|cff40ff40Answered|r"
+      else status = "|cffff4040Heed the call|r" end
+    elseif p.leader == me then status = "|cffd4a017Your group|r"
     elseif L.MyJoin(p.key) then status = "|cff40ff40You're in|r"
     elseif n >= need then status = "|cff999999Full|r"
     else status = "Open" end
     items[#items + 1] = {
       data = p.key,
       keys = { [3] = n, [4] = -(p.data.ts or 0) },
-      cols = { ns.ColorName(p.leader), p.data.what, n .. " / " .. need, ago(p.data.ts), status },
+      cols = { ns.ColorName(p.leader), p.data.aid and ("|cffff4040" .. p.data.what .. "|r") or p.data.what,
+        p.data.aid and (n .. " answered") or (n .. " / " .. need), ago(p.data.ts), status },
     }
   end
   f.list:SetItems(items, "No one is looking for dwarves right now. Post a group above.")
@@ -119,8 +138,10 @@ local function build(f, w, h)
   f.noteBox = UI.EditBox(f, 360, 120)
   f.noteBox:SetPoint("LEFT", ntl, "RIGHT", 10, 0)
   f.noteBox:SetScript("OnTextChanged", function(self) state.note = self:GetText() end)
-  local hint = UI.Label(f, "e.g. \"Need a healer, meet at the gates\"", "GameFontDisableSmall")
-  hint:SetPoint("LEFT", f.noteBox, "RIGHT", 8, 0)
+  f.aidB = UI.Button(f, "Call for Aid", 110, 22, function()
+    UI.Confirm("Call the guild to your side? Everyone online gets a line in chat.", function() L.CallForAid() end)
+  end)
+  f.aidB:SetPoint("LEFT", f.noteBox, "RIGHT", 10, 0)
 
   f.mineInfo = UI.Label(f, "", "GameFontHighlightSmall")
   f.mineInfo:SetPoint("TOPLEFT", 6, -64)
@@ -134,7 +155,7 @@ local function build(f, w, h)
   f.list:SetPoint("TOPLEFT", 0, -82)
   f.list:SetPoint("BOTTOMRIGHT", 0, 28)
 
-  f.footer = UI.Label(f, "Guildmates with Ironforged get a popup to sign up. Posts close after two hours. Click a group to sign up or manage it.", "GameFontDisableSmall")
+  f.footer = UI.Label(f, "Groups of up to 40 (more than 4 becomes a raid). Posts close after two hours, calls for aid after 30 minutes. Click one to sign up or manage it.", "GameFontDisableSmall")
   f.footer:SetPoint("BOTTOMLEFT", 4, 6)
   f.footer:SetPoint("BOTTOMRIGHT", -4, 6)
 end

@@ -139,7 +139,7 @@ local function makeClient(shortName, race, fullName)
   env.UnitRace = function(u)
     if u == "player" then return client.race, client.race, 1 end
     if u == "target" and client.target then return client.target.race, client.target.race, 1 end
-    if client.units[u] then return client.units[u].race, client.units[u].race, 1 end
+    if client.units[u] then return client.units[u].raceName or client.units[u].race, client.units[u].race, 1 end
     return nil
   end
   env.UnitFactionGroup = function(u)
@@ -300,6 +300,7 @@ local function makeClient(shortName, race, fullName)
   env.C_PartyInfo = {
     InviteUnit = function(n) table.insert(client.invites, n) end,
     LeaveParty = function(cat) client.left = true; client.leftCategory = cat end,
+    ConvertToRaid = function() if client.inGroup then client.inRaid = true; client.converted = true end end,
   }
   env.DoEmote = function(token, target) table.insert(client.emotes, { token = token, target = target }) end
   env.RandomRoll = function(lo, hi)

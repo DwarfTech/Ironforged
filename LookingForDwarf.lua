@@ -1,7 +1,9 @@
 -- Ironforged: Looking for Dwarf, a group board inside the guild.
 -- A leader posts what they need ("Need 2 for Gnomeregan"); guildmates with the addon get a quiet
 -- popup and sign up with a role; the leader invites them. Nothing goes to chat.
---   "lfd"     key = leader .. "#" .. id       { what, need, note, ts }
+-- A call for aid is a post too (aid = true): a dwarf beset by the Horde asks for up to 39 more,
+-- a full raid. Guildmates get one line in their chat window, no popup, and answer in the tab.
+--   "lfd"     key = leader .. "#" .. id       { what, need, note, ts, aid }
 --   "lfdjoin" key = post key .. "#" .. member { role, ts }
 local ADDON, ns = ...
 local Data = ns.Data
@@ -10,6 +12,11 @@ local L = {}
 ns.LFD = L
 
 L.TTL = 2 * 60 * 60 -- posts close themselves after two hours
+L.AID_TTL = 30 * 60 -- calls for aid after half an hour
+L.MAX_NEED = 39     -- a full raid of 40
+
+local HOME = LE_PARTY_CATEGORY_HOME or 1
+local function ttl(d) return (type(d) == "table" and d.aid) and L.AID_TTL or L.TTL end
 L.ROLES = { tank = "Tank", healer = "Healer", dps = "Damage" }
 L.ROLE_ORDER = { "tank", "healer", "dps" }
 
@@ -22,7 +29,7 @@ function L.IsOpen(postKey, d)
   if type(d) ~= "table" then return false end
   local leader = L.Leader(postKey)
   if not leader or not ns.roster[leader] then return false end
-  if ns.Now() - (tonumber(d.ts) or 0) > L.TTL then return false end
+  if ns.Now() - (tonumber(d.ts) or 0) > ttl(d) then return false end
   return leader == ns.PlayerName() or ns.roster[leader].online
 end
 
@@ -32,7 +39,11 @@ function L.Posts()
   for k, d in Data.Each("lfd") do
     if L.IsOpen(k, d) then out[#out + 1] = { key = k, leader = L.Leader(k), data = d, joins = L.Joins(k) } end
   end
-  table.sort(out, function(a, b) return (a.data.ts or 0) > (b.data.ts or 0) end)
+  -- calls for aid first, then newest first
+  table.sort(out, function(a, b)
+    if (a.data.aid and true or false) ~= (b.data.aid and true or false) then return a.data.aid and true or false end
+    return (a.data.ts or 0) > (b.data.ts or 0)
+  end)
   return out
 end
 
@@ -71,20 +82,38 @@ function L.Close(postKey, quiet)
   if not quiet then ns.Print("Your Looking for Dwarf post is closed.") end
 end
 
-function L.Post(what, need, note)
+function L.Post(what, need, note, aid)
   what = ns.Clean(what, 60)
   need = math.floor(tonumber(need) or 0)
   if what == "" then ns.Print("Say what the group is for."); return false end
-  if need < 1 or need > 39 then ns.Print("Need between 1 and 39 dwarves."); return false end
+  if need < 1 or need > L.MAX_NEED then ns.Print("Need between 1 and " .. L.MAX_NEED .. " dwarves."); return false end
   local me = ns.PlayerName()
   if not me then return false end
   for k in Data.Each("lfd") do if L.Leader(k) == me then L.Close(k, true) end end
   local key = me .. "#" .. string.format("%x", ns.Stamp())
-  if Data.Put("lfd", key, { what = what, need = need, note = ns.Clean(note or "", 120), ts = ns.Now() }) then
-    ns.Print("Posted: looking for " .. need .. (need == 1 and " dwarf" or " dwarves") .. " for " .. what .. ".")
+  local d = { what = what, need = need, note = ns.Clean(note or "", 120), ts = ns.Now(), aid = aid and true or nil }
+  if Data.Put("lfd", key, d) then
+    if aid then
+      ns.Print("|cffff4040You call for aid!|r Your guildmates will see it in the Looking for Dwarf tab.")
+    else
+      ns.Print("Posted: looking for " .. need .. (need == 1 and " dwarf" or " dwarves") .. " for " .. what .. ".")
+    end
     return key
   end
   return false
+end
+
+-- Call the guild to your side: where you are, and the Horde you saw in the last two minutes.
+function L.CallForAid()
+  local B = ns.Blood
+  local zone = B and B.ZoneName and B.ZoneName() or ""
+  local okS, sub = pcall(function() return GetSubZoneText and GetSubZoneText() end)
+  if not okS or type(sub) ~= "string" or (issecretvalue and issecretvalue(sub)) or sub == zone then sub = "" end
+  local where = (sub ~= "" and zone ~= "") and (sub .. ", " .. zone) or (zone ~= "" and zone or sub)
+  local foes = B and B.RecentHorde and B.RecentHorde(120, 5) or {}
+  local what = where ~= "" and ("Aid in " .. where) or "Aid against the Horde"
+  local note = #foes > 0 and ("Foes seen: " .. table.concat(foes, ", ")) or ""
+  return L.Post(what, L.MAX_NEED, note, true)
 end
 
 function L.Join(postKey, role)
@@ -94,6 +123,10 @@ function L.Join(postKey, role)
   if not L.ROLES[role] then role = "dps" end
   if Data.Put("lfdjoin", postKey .. "#" .. me, { role = role, ts = ns.Now() }) then
     local d = Data.Get("lfd", postKey)
+    if d and d.aid then
+      ns.Print("You heed " .. first(L.Leader(postKey)) .. "'s call for aid. Watch for the invite.")
+      return true
+    end
     ns.Print("You're signed up as " .. L.ROLES[role] .. " for " .. first(L.Leader(postKey)) .. "'s " .. (d and d.what or "group") .. ". Watch for the invite.")
     return true
   end
@@ -105,8 +138,27 @@ function L.Leave(postKey)
   if me then Data.Delete("lfdjoin", postKey .. "#" .. me) end
 end
 
+-- A post for more than four turns my party into a raid as soon as there is a party to turn.
+local function convertToRaid()
+  if not (IsInGroup and IsInGroup(HOME)) or (IsInRaid and IsInRaid(HOME)) then return false end
+  if UnitIsGroupLeader and not UnitIsGroupLeader("player") then return false end
+  local fn = (C_PartyInfo and C_PartyInfo.ConvertToRaid) or ConvertToRaid
+  return fn and pcall(fn) or false
+end
+
+local function wantsRaid(postKey)
+  local d = postKey and Data.Get("lfd", postKey)
+  return d ~= nil and (tonumber(d.need) or 0) > 4
+end
+
+local function grouped(member)
+  local n = ns.Name(member)
+  return (UnitInRaid and UnitInRaid(n)) or (UnitInParty and UnitInParty(n)) or false
+end
+
 -- Invite a guildmate to my group. Falls back to a command to copy if the game refuses.
-function L.Invite(member)
+function L.Invite(member, postKey)
+  if wantsRaid(postKey) then convertToRaid() end
   local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
   local ok = fn and pcall(fn, ns.Name(member))
   if ok then
@@ -117,15 +169,39 @@ function L.Invite(member)
   return ok
 end
 
+-- A party holds five, so with no group yet only four go out; the rest follow once the party has
+-- formed and been turned into a raid.
+local inviteRest
 function L.InviteAll(postKey)
-  local n = 0
+  local raid = wantsRaid(postKey)
+  if raid then convertToRaid() end
+  local room = (raid and not (IsInRaid and IsInRaid(HOME)) and not (IsInGroup and IsInGroup(HOME))) and 4 or nil
+  local n, left = 0, 0
   for _, j in ipairs(L.Joins(postKey)) do
-    if ns.roster[j.member] and ns.roster[j.member].online then
-      if L.Invite(j.member) then n = n + 1 end
+    if ns.roster[j.member] and ns.roster[j.member].online and not grouped(j.member) then
+      if room and n >= room then
+        left = left + 1
+      elseif L.Invite(j.member, postKey) then
+        n = n + 1
+      end
     end
   end
-  if n == 0 then ns.Print("No one signed up is online to invite.") end
+  if left > 0 then
+    inviteRest = postKey
+    ns.Print("Inviting the first four. The other " .. left .. " follow once your party forms and becomes a raid.")
+  end
+  if n == 0 and left == 0 then ns.Print("No one signed up is online to invite.") end
 end
+
+ns.RegisterEvent("GROUP_ROSTER_UPDATE", function()
+  local mine = L.MyPost()
+  if not mine or not wantsRaid(mine) then return end
+  convertToRaid()
+  if inviteRest == mine and IsInRaid and IsInRaid(HOME) then
+    inviteRest = nil
+    L.InviteAll(mine)
+  end
+end)
 
 ----------------------------------------------------------------------
 -- Popups
@@ -167,7 +243,7 @@ local function joinPopup(joinKey, d)
       id = "lfdjoin", icon = "Interface\\Icons\\INV_Misc_GroupLooking", title = "A dwarf answers",
       text = "|cffd4a017" .. ns.Name(member) .. "|r (" .. role .. ") wants in on |cffffd040" .. p.what .. "|r.\n" ..
         joined .. " of " .. need .. " signed up.",
-      buttons = { { text = "Invite", onClick = function() L.Invite(member) end }, { text = "Later" } },
+      buttons = { { text = "Invite", onClick = function() L.Invite(member, post) end }, { text = "Later" } },
       timeout = 60,
     })
   end
@@ -180,8 +256,13 @@ ns.On("DATA_CHANGED", function(coll, key)
     local d, rec = Data.Get("lfd", key)
     if not d or told[key] or L.Leader(key) == me then return end
     told[key] = true
-    if ns.settings.lfdPopup == false then return end
-    if ns.Now() - (tonumber(d.ts) or 0) > 300 or not L.IsOpen(key, d) or L.IsFull(key, d) then return end
+    if ns.Now() - (tonumber(d.ts) or 0) > 300 or not L.IsOpen(key, d) then return end
+    if d.aid then
+      -- one line in chat, no popup
+      ns.Print("|cffff4040" .. ns.Name(L.Leader(key)) .. " calls for aid!|r Heed the call in the Looking for Dwarf tab.")
+      return
+    end
+    if ns.settings.lfdPopup == false or L.IsFull(key, d) then return end
     postPopup(key, d)
   elseif coll == "lfdjoin" then
     local d = Data.Get("lfdjoin", key)
@@ -198,13 +279,13 @@ local function sweep()
   local me = ns.PlayerName()
   if not me then return end
   for k, d in Data.Each("lfd") do
-    if L.Leader(k) == me and ns.Now() - (tonumber(d.ts) or 0) > L.TTL then L.Close(k, true) end
+    if L.Leader(k) == me and ns.Now() - (tonumber(d.ts) or 0) > ttl(d) then L.Close(k, true) end
   end
   for k in Data.Each("lfdjoin") do
     local post, member = Data.SplitKey(k)
     if member == me then
       local p = Data.Get("lfd", post)
-      if not p or ns.Now() - (tonumber(p.ts) or 0) > L.TTL then Data.Delete("lfdjoin", k) end
+      if not p or ns.Now() - (tonumber(p.ts) or 0) > ttl(p) then Data.Delete("lfdjoin", k) end
     end
   end
 end
@@ -215,4 +296,11 @@ ns.On("DATA_READY", function()
     C_Timer.After(20, function() pcall(sweep) end)
     if C_Timer.NewTicker then C_Timer.NewTicker(600, function() pcall(sweep) end) end
   end
+end)
+
+-- Fell with the Horde about: point the way to calling for aid.
+ns.RegisterEvent("PLAYER_DEAD", function()
+  if not ns.settings or not Data.Ready() or not ns.Blood or not ns.Blood.RecentHorde then return end
+  if #ns.Blood.RecentHorde(30, 1) == 0 then return end
+  ns.Print("You fell with the Horde about. Type |cffffd040/hold aid|r, or use Call for Aid in the Looking for Dwarf tab, to call the guild to your side.")
 end)

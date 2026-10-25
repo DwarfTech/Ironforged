@@ -62,7 +62,7 @@ local function learn(unit)
   local key = Data.FoeKey(name)
   local c = foeCache()
   local old = c[key]
-  c[key] = { race = raceFile or (old and old.race), raceName = raceName or (old and old.raceName),
+  c[key] = { name = name, race = raceFile or (old and old.race), raceName = raceName or (old and old.raceName),
     faction = faction or (old and old.faction), seen = time() }
   return name
 end
@@ -294,6 +294,18 @@ ns.RegisterEvent("PLAYER_PVP_KILLS_CHANGED", function() schedulePublish(10) end)
 -- Seeing foes: learn their race, warn about grudged ones, notice when they fall.
 ----------------------------------------------------------------------
 
+-- Horde players seen in the last `secs` seconds (nameplates, target, mouseover), newest first.
+function Blood.RecentHorde(secs, max)
+  local out, t = {}, time()
+  for _, f in pairs(foeCache()) do
+    if f.faction == "Horde" and type(f.name) == "string" and t - (f.seen or 0) <= secs then out[#out + 1] = f end
+  end
+  table.sort(out, function(a, b) return a.seen > b.seen end)
+  local names = {}
+  for i = 1, math.min(#out, max or 5) do names[i] = out[i].name end
+  return names
+end
+
 local function zoneName()
   local z = GetZoneText and GetZoneText()
   if isSecret(z) then return "" end
@@ -353,6 +365,7 @@ local function checkUnit(unit, fromNameplate)
   if alertSighting(name, nil, zone) and ns.Comm then ns.Comm.BroadcastSighting(name, zone) end
 end
 Blood.CheckUnit = checkUnit
+Blood.ZoneName = zoneName
 
 ns.On("SIGHTING", function(sender, foe, zone)
   if ns.settings and ns.settings.grudgeAlerts == false then return end

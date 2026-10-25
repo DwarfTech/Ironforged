@@ -2,7 +2,7 @@
 local ADDON, ns = ...
 _G.Ironforged = ns
 
-ns.VERSION = "2.17.3"
+ns.VERSION = "2.18.0"
 -- Bump whenever the wire format or data model changes: messages with any other number are ignored,
 -- so versions on different protocols never mix. 12 = natural keys and key-hash/stamp login sync.
 ns.PROTOCOL = 12
@@ -503,6 +503,8 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Cheers.Call()
   elseif cmd == "dwarvish" or cmd == "lang" then
     ns.Lang.Toggle()
+  elseif cmd == "aid" then
+    if ns.LFD then ns.LFD.CallForAid() end
   elseif cmd == "kills" then
     -- what the addon knew about your last few honorable kills (for checking elf detection)
     local list = ns.db and ns.db.lastKills or {}
@@ -534,6 +536,7 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Print("/hold cheers  - officers: call the hold to raise a mug")
     ns.Print("/hold sync  - ask guildmates for the latest records")
     ns.Print("/hold pvp  - check whether the addon can flag you for PvP (for Slayer)")
+    ns.Print("/hold aid  - call the guild to your side (shows in the Looking for Dwarf tab)")
     ns.Print("/hold kills  - your last honorable kills and the race the addon saw for each")
   end
 end
