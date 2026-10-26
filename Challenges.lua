@@ -347,15 +347,34 @@ local function groupUnits()
   return out
 end
 
+-- While you are in an instance group (group finder, battleground) the party units describe that
+-- group, so a home party you also belong to is checked by name instead.
+local function homePartyStranger()
+  if not GetHomePartyInfo then return nil end
+  local ok, names = pcall(GetHomePartyInfo)
+  if not ok or type(names) ~= "table" then return nil end
+  for _, n in ipairs(names) do
+    local full = ns.Name(n)
+    if ns.roster[full] and ns.Gear.IsDwarf(full) == false then return ns.Name(full) end
+  end
+  return nil
+end
+
 function C.CheckGroup()
   local name = forbids("dwarfOnly")
   if not name or not (IsInGroup and IsInGroup()) then strangerSince = nil; leavingUntil = 0; return end
   if (GetTime and GetTime() or 0) < leavingUntil then return end
-  local stranger
-  for _, u in ipairs(groupUnits()) do
-    if UnitExists and UnitExists(u) and not (UnitIsUnit and UnitIsUnit(u, "player")) and dwarfRace(u) == false then
-      stranger = ns.UnitDisplayName(u) or "someone"
-      break
+  -- Strangers are fine in an instance group (the game picked them). Only the group you built must be all dwarves.
+  local inInstance = LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE)
+  local stranger, category
+  if inInstance then
+    stranger, category = homePartyStranger(), LE_PARTY_CATEGORY_HOME
+  else
+    for _, u in ipairs(groupUnits()) do
+      if UnitExists and UnitExists(u) and not (UnitIsUnit and UnitIsUnit(u, "player")) and dwarfRace(u) == false then
+        stranger = ns.UnitDisplayName(u) or "someone"
+        break
+      end
     end
   end
   if not stranger then strangerSince = nil; return end
@@ -369,8 +388,13 @@ function C.CheckGroup()
   if now - strangerSince >= GROUP_GRACE then
     strangerSince = nil
     leavingUntil = now + 10
-    local leave = (C_PartyInfo and C_PartyInfo.LeaveParty) or LeaveParty
-    if leave then pcall(leave) end
+    if category then
+      -- leave only the home party, never the dungeon group
+      if C_PartyInfo and C_PartyInfo.LeaveParty then pcall(C_PartyInfo.LeaveParty, category) end
+    else
+      local leave = (C_PartyInfo and C_PartyInfo.LeaveParty) or LeaveParty
+      if leave then pcall(leave) end
+    end
     ns.Print("|cffd4a017" .. name .. ":|r leaving the group. You walk only with dwarves.")
   end
 end

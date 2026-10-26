@@ -262,7 +262,11 @@ local function makeClient(shortName, race, fullName)
   env.GetMaxPlayerLevel = function() return 60 end
   client.inGroup, client.left, client.declined = false, false, false
   client.inRaid = false
-  env.IsInGroup = function() return client.inGroup or client.inRaid end
+  env.LE_PARTY_CATEGORY_HOME, env.LE_PARTY_CATEGORY_INSTANCE = 1, 2
+  env.IsInGroup = function(category)
+    if category == env.LE_PARTY_CATEGORY_INSTANCE then return client.instanceGroup and true or false end
+    return client.inGroup or client.inRaid or client.instanceGroup
+  end
   env.IsInRaid = function() return client.inRaid end
   env.UnitIsGroupLeader = function(u) return client.leader and true or false end
   -- UnitInRaid by character name: in my raid if we're both in the (single) test raid
@@ -274,6 +278,7 @@ local function makeClient(shortName, race, fullName)
     return nil
   end
   env.UnitExists = env.UnitExists or function(u) return client.units[u] ~= nil end
+  env.GetHomePartyInfo = function() return client.homeParty end
   env.LeaveParty = function() client.left = true end -- the game drops the group a moment later
   env.C_PartyInfo = env.C_PartyInfo or {}
   env.DeclineGroup = function() client.declined = true end
@@ -292,7 +297,10 @@ local function makeClient(shortName, race, fullName)
     GetAllRecipeIDs = function() local out = {}; if client.trade then for id in pairs(client.trade.recipes) do out[#out + 1] = id end end; return out end,
     GetRecipeInfo = function(id) local l = client.trade and client.trade.recipes[id]; if l ~= nil then return { learned = l, name = SPELLS[id] } end end,
   }
-  env.C_PartyInfo = { InviteUnit = function(n) table.insert(client.invites, n) end }
+  env.C_PartyInfo = {
+    InviteUnit = function(n) table.insert(client.invites, n) end,
+    LeaveParty = function(cat) client.left = true; client.leftCategory = cat end,
+  }
   env.DoEmote = function(token, target) table.insert(client.emotes, { token = token, target = target }) end
   env.RandomRoll = function(lo, hi)
     local r = table.remove(client.rollQueue, 1) or lo

@@ -787,6 +787,18 @@ local warnings = 0
 H.fire(K, "GROUP_ROSTER_UPDATE"); H.run(3)
 for _, m in ipairs(K.chat) do if m:find("is no dwarf", 1, true) then warnings = warnings + 1 end end
 check(warnings == 1, "warned once, not again while leaving")
+-- an instance (group finder) group may hold non-dwarves
+K.left = false
+K.instanceGroup = true
+H.run(15)
+H.fire(K, "GROUP_ROSTER_UPDATE"); H.run(30)
+check(not K.left, "non-dwarves are fine in an instance group")
+-- ...but a home party built before queueing still has to be all dwarves
+K.homeParty = { "Dagna", "Hilda" }
+H.fire(K, "GROUP_ROSTER_UPDATE"); H.run(40)
+check(K.left and K.leftCategory == 1, "leaves the home party, not the instance group, when it holds a non-dwarf")
+K.homeParty = nil
+K.instanceGroup = false
 K.inGroup = false
 H.fire(K, "GROUP_ROSTER_UPDATE")
 K.units.party1, K.units.party2 = nil, nil
