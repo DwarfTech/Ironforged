@@ -1356,6 +1356,17 @@ do
   local rf = CK.Start("rifleman"); H.run(1)
   K.units.pet = { name = "Escort", temp = true }; H.fire(K, "UNIT_PET", "player"); H.run(70)
   check(status(rf) == "active", "a temporary companion doesn't fail Rifleman")
+  local before = #K.chat
+  local okD = pcall(CK.Diagnose)
+  check(okD and #K.chat > before, "/hold check reports on challenges under way")
+  -- classic-era clients answer 1 instead of true
+  K.class = "ROGUE"
+  local bu = CK.Start("brute"); H.run(1)
+  local realStealth = K.env.IsStealthed
+  K.env.IsStealthed = function() return 1 end
+  H.fire(K, "UPDATE_STEALTH"); H.run(6)
+  check(status(bu) == "failed", "Brute works when the game answers 1 for stealthed")
+  K.env.IsStealthed = realStealth
   K.units.pet = nil
   clear()
   K.class, K.level = nil, savedLevel

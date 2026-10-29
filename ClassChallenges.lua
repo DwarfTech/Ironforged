@@ -411,3 +411,43 @@ if hooksecurefunc and C_PetInfo and C_PetInfo.PetAbandon then hooksecurefunc(C_P
 
 ns.RegisterEvent("UNIT_PET", function(unit) if unit == "player" then pcall(checkPet) end end)
 table.insert(C.ENFORCERS, function(c) if c.preset.noPet then checkPet() end end)
+
+----------------------------------------------------------------------
+-- /hold check: what the addon sees for each challenge under way (for testing)
+----------------------------------------------------------------------
+function C.Diagnose()
+  local list = C.MyPresets()
+  if #list == 0 then ns.Print("check: no ready-made challenge under way.") return end
+  ns.Print("check: version " .. tostring(ns.VERSION) .. ", level " .. level() .. ", class " .. tostring(C.MyClass()))
+  for _, c in ipairs(list) do
+    local p = c.preset
+    local on = level() >= (p.fromLevel or 1)
+    ns.Print("- " .. p.name .. ": " .. (on and "|cff40ff40enforced|r" or ("|cffffd040not yet (from level " .. p.fromLevel .. ")|r")))
+    if p.noStealth then
+      local okS, raw = pcall(IsStealthed or function() return "no IsStealthed" end)
+      ns.Print("    stealth: game says " .. tostring(raw) .. ", addon reads " .. tostring(stealthed()))
+    end
+    if p.noPet then
+      local okH, has, isHunter = pcall(HasPetUI or function() return "no HasPetUI" end)
+      local owed = petOwed()
+      ns.Print("    pet out: " .. tostring(UnitExists and UnitExists("pet")) .. ", HasPetUI: " .. tostring(has) .. "/" .. tostring(isHunter) ..
+        ", counts as hunter pet: " .. tostring(hunterPet()) .. ", abandon hook: " .. tostring(abandonHooked) ..
+        (owed and (", must abandon within " .. math.max(0, 60 - (ns.Now() - owed)) .. "s") or ""))
+    end
+    if p.needShield or p.noShield or p.weapons or p.noRanged or p.noWand then
+      local parts = {}
+      for _, slot in ipairs({ 16, 17, 18 }) do
+        local cls, sub = itemType(slot)
+        parts[#parts + 1] = slot .. "=" .. (cls and (cls .. "/" .. tostring(sub)) or "empty")
+      end
+      ns.Print("    gear (slot=class/subclass): " .. table.concat(parts, ", "))
+    end
+    if p.noDefStance then ns.Print("    knows Defensive Stance: " .. tostring(knowsDefensiveStance())) end
+    if p.needProfs then
+      local have, readable = myProfessions()
+      local names = {}
+      for n in pairs(have) do names[#names + 1] = n end
+      ns.Print("    professions (" .. (readable and "readable" or "NOT readable") .. "): " .. table.concat(names, ", "))
+    end
+  end
+end

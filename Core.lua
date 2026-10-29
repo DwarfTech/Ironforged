@@ -506,6 +506,8 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Cheers.Call()
   elseif cmd == "dwarvish" or cmd == "lang" then
     ns.Lang.Toggle()
+  elseif cmd == "check" then
+    if ns.Challenges and ns.Challenges.Diagnose then ns.Challenges.Diagnose() end
   elseif cmd == "aid" then
     if ns.LFD then ns.LFD.CallForAid() end
   elseif cmd == "kills" then
@@ -540,6 +542,7 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Print("/hold sync  - ask guildmates for the latest records")
     ns.Print("/hold pvp  - check whether the addon can flag you for PvP (for Slayer)")
     ns.Print("/hold aid  - call the guild to your side (shows in the Looking for Dwarf tab)")
+    ns.Print("/hold check  - what the addon sees for your challenges (for testing)")
     ns.Print("/hold kills  - your last honorable kills and the race the addon saw for each")
   end
 end
