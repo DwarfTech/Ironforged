@@ -145,6 +145,14 @@ function C.Start(presetId, name, rules)
         ns.Print(preset.name .. " and " .. other.name .. " can't both be kept: one needs a shield, the other forbids it.")
         return false
       end
+      if preset.weapons and other.weapons then
+        local shared = false
+        for sub in pairs(preset.weapons) do if other.weapons[sub] then shared = true end end
+        if not shared then
+          ns.Print(preset.name .. " and " .. other.name .. " can't both be kept: they allow no weapon in common.")
+          return false
+        end
+      end
     end
     name, rules = preset.name, preset.rules
   else

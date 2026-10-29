@@ -26,6 +26,10 @@ local PRIEST_HEALS = set({
   "Lightwell", "Binding Heal", "Circle of Healing", "Prayer of Mending", "Penance",
 })
 local HOLY_DAMAGE = set({ "Smite", "Holy Fire", "Holy Nova" })
+local SHAMAN_HEALS = set({
+  "Healing Wave", "Lesser Healing Wave", "Chain Heal", "Healing Stream Totem", "Healing Surge", "Riptide",
+  "Earth Shield", "Healing Rain",
+})
 local PALADIN_HEALS = set({ "Holy Light", "Flash of Light", "Lay on Hands", "Holy Shock" })
 local PALADIN_DEFENSIVE = set({
   "Divine Shield", "Divine Protection", "Blessing of Protection", "Hand of Protection", "Devotion Aura",
@@ -64,9 +68,16 @@ P.doomseeker = { name = "Doomseeker", classes = set({ WARRIOR }), fromLevel = 5,
 P.brawler = { name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN, SHAMAN }), weapons = set({ 13 }),
   weaponWhat = { what = "weapon other than a fist weapon", fail = "a weapon other than a fist weapon" },
   rules = "Warriors, Hunters, Rogues, Paladins and Shamans. Fight with fist weapons or bare hands only. No other weapons, ranged included." }
-P.hammerer = { name = "Hammerer", classes = set({ ROGUE, SHAMAN }), fromLevel = 10, weapons = set({ 4, 5 }),
+P.hammerer = { name = "Hammerer", classes = set({ WARRIOR, PALADIN, ROGUE, SHAMAN }), fromLevel = 10, weapons = set({ 4, 5 }),
   weaponWhat = { what = "weapon that isn't a mace", fail = "a weapon that wasn't a mace" },
-  rules = "Rogues and Shamans. From level 10, maces are your only weapons. No other weapons, ranged included." }
+  rules = "Warriors, Paladins, Rogues and Shamans. From level 10, maces are your only weapons. No other weapons, ranged included." }
+P.cleaver = { name = "Cleaver", classes = set({ WARRIOR, PALADIN, HUNTER, SHAMAN }), fromLevel = 10, weapons = set({ 0, 1 }),
+  weaponWhat = { what = "weapon that isn't an axe", fail = "a weapon that wasn't an axe" },
+  rules = "Warriors, Paladins, Hunters and Shamans. From level 10, axes are your only weapons. No other weapons, ranged included." }
+P.earthbreaker = { name = "Earthbreaker", classes = set({ SHAMAN }), fromLevel = 10, weapons = set({ 1, 5 }), noShield = true,
+  weaponWhat = { what = "weapon that isn't a two-handed axe or mace", fail = "a weapon that wasn't a two-handed axe or mace" },
+  spellRule = function(n) if SHAMAN_HEALS[n] then return "a healing spell" end end,
+  rules = "Shamans. From level 10, fight only with a two-handed axe or mace (no shield, no one-handers), and cast no healing spells." }
 P.beastmaster = { name = "Beastmaster", classes = set({ HUNTER }), fromLevel = 10, noRanged = true,
   rules = "Hunters. From level 10, no ranged weapon. You and your pet fight up close." }
 P.rifleman = { name = "Rifleman", classes = set({ HUNTER }), noPet = true,
@@ -88,7 +99,7 @@ P.oathbreaker = { name = "Oathbreaker", classes = set({ PALADIN }), noShield = t
     if PALADIN_DEFENSIVE[n] then return "a defensive ability" end
   end,
   rules = "Paladins. No shield, no healing spells, and no defensive abilities: Divine Shield, Divine Protection, Blessing of Protection, Devotion Aura and the like." }
-for _, id in ipairs({ "ironbreaker", "doomseeker", "brawler", "hammerer", "beastmaster", "rifleman", "brute",
+for _, id in ipairs({ "ironbreaker", "doomseeker", "brawler", "hammerer", "cleaver", "earthbreaker", "beastmaster", "rifleman", "brute",
   "lightbringer", "voidbringer", "oathbreaker" }) do
   C.ORDER[#C.ORDER + 1] = id
 end

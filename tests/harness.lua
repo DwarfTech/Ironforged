@@ -303,7 +303,7 @@ local function makeClient(shortName, race, fullName)
   client.invites = {}
   local SPELLS = { [3491] = "Big Bronze Knife", [2741] = "Bronze Axe", [3297] = "Mining Pick", [12259] = "Silvered Bronze Leggings",
     [589] = "Shadow Word: Pain", [585] = "Smite", [2050] = "Lesser Heal", [17] = "Power Word: Shield", [635] = "Holy Light",
-    [21084] = "Seal of Righteousness", [20271] = "Judgement", [465] = "Devotion Aura", [879] = "Exorcism", [8326] = "Ghost" }
+    [21084] = "Seal of Righteousness", [331] = "Healing Wave", [20271] = "Judgement", [465] = "Devotion Aura", [879] = "Exorcism", [8326] = "Ghost" }
   env.C_Spell = { GetSpellName = function(id) return SPELLS[id] end }
   env.GetProfessions = function() local p = client.profs; return p[1] and 1 or nil, p[2] and 2 or nil, nil, nil, nil end
   env.GetProfessionInfo = function(i) local p = client.profs[i]; if p then return p.name, 0, p.skill, p.max end end

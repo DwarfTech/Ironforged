@@ -1067,6 +1067,11 @@ do
   local sh = table.concat(CK.Available(), ",")
   check(sh:find("ironbreaker", 1, true) and sh:find("brawler", 1, true) and sh:find("hammerer", 1, true) and not sh:find("doomseeker", 1, true),
     "shamans get Ironbreaker, Brawler and Hammerer")
+  check(sh:find("cleaver", 1, true) and sh:find("earthbreaker", 1, true), "shamans get Cleaver and Earthbreaker")
+  K.class = "ROGUE"
+  check(not table.concat(CK.Available(), ","):find("cleaver", 1, true), "rogues can't use axes, so no Cleaver")
+  K.class = "WARRIOR"
+  check(table.concat(CK.Available(), ","):find("hammerer", 1, true), "warriors get Hammerer")
   K.class = "PRIEST"
   local avail = table.concat(CK.Available(), ",")
   check(avail:find("lightbringer", 1, true) and not avail:find("ironbreaker", 1, true), "only your class's challenges are offered")
@@ -1156,6 +1161,26 @@ do
   check(status(vb) == "active", "Power Word: Shield is fine for Voidbringer")
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g4", 2050); H.run(1)
   check(status(vb) == "failed", "a heal fails Voidbringer")
+  clear()
+
+  -- Cleaver: axes only; Earthbreaker: two-handed axe or mace, no shield, no heals
+  H.ITEM_TYPES[9007] = { 2, 0 }  -- one-handed axe
+  H.ITEM_TYPES[9008] = { 2, 1 }  -- two-handed axe
+  K.class, K.level = "SHAMAN", 20
+  K.equip[16], K.equip[17] = 9007, 9004
+  local cv = CK.Start("cleaver"); H.run(2)
+  check(K.equip[16] == 9007 and K.equip[17] == nil, "Cleaver keeps the axe and takes off the mace")
+  check(not CK.Start("hammerer"), "Cleaver and Hammerer can't be taken on together")
+  clear()
+  K.equip[16], K.equip[17] = 9007, 9001
+  local eb = CK.Start("earthbreaker"); H.run(2)
+  check(K.equip[16] == nil and K.equip[17] == nil, "Earthbreaker takes off a one-handed axe and a shield")
+  K.equip[16] = 9008; H.run(12)
+  check(K.equip[16] == 9008 and status(eb) == "active", "Earthbreaker keeps a two-handed axe")
+  K.spellNames = true
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "s1", 331); H.run(1)
+  check(status(eb) == "failed", "Healing Wave fails Earthbreaker")
+  K.equip[16] = nil
   clear()
 
   -- Oathbreaker (paladin)
@@ -1380,7 +1405,7 @@ do
   local list = table.concat(made, "|")
   check(list:find("B:Slayer", 1, true) and list:find("B:My own challenge|--|T:Warrior challenges|B:Ironbreaker", 1, true),
     "class challenges sit under their own heading in the menu (" .. list .. ")")
-  check(not list:find("B:Hammerer", 1, true), "other classes' challenges aren't in the menu")
+  check(not list:find("B:Brute", 1, true), "other classes' challenges aren't in the menu")
   K.env.MenuUtil = nil; K.class = nil
   if dlg then dlg:Hide() end
 end
