@@ -453,6 +453,7 @@ function C.Diagnose()
         if n > 0 then parts[#parts + 1] = ((C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)) or ("item " .. id)) .. " x" .. n end
       end
       ns.Print("    food you've cooked and not eaten: " .. (#parts > 0 and table.concat(parts, ", ") or "none"))
+      ns.Print("    last meal the addon saw: " .. tostring(C.lastEat or "none since login"))
     end
     if p.needProfs then
       local have, readable = myProfessions()

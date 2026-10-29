@@ -16,11 +16,36 @@ local function now() return GetTime and GetTime() or 0 end
 -- Eating casts a spell called "Food" (or "Refreshment" for food and drink together).
 local EAT_SPELLS = { Food = true, Refreshment = true }
 
-local function isFood(id)
+-- The spell an item casts when used ("Food", "Drink", a potion's effect...), or nil if unknown.
+local function itemSpell(id)
+  local fn = (C_Item and C_Item.GetItemSpell) or GetItemSpell
+  if not fn then return nil end
+  local ok, name = pcall(fn, id)
+  if ok and type(name) == "string" and not isSecret(name) then return name end
+  return nil
+end
+
+local function itemClass(id)
   local fn = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
-  if not fn then return false end
+  if not fn then return nil end
   local ok, _, _, _, _, _, cls, sub = pcall(fn, id)
-  return ok and cls == 0 and sub == 5
+  if ok then return cls, sub end
+end
+
+-- Food is what you eat: an item whose use is the "Food" spell. Classic files most food as plain
+-- "Consumable", so the item category alone isn't enough; newer data has a Food & Drink category.
+local function isFood(id)
+  local sp = itemSpell(id)
+  if sp then return EAT_SPELLS[sp] == true end
+  local cls, sub = itemClass(id)
+  return cls == 0 and sub == 5
+end
+
+-- Could be food: food for sure, or a consumable whose use the game hasn't told us yet.
+local function maybeFood(id)
+  if isFood(id) then return true end
+  local cls = itemClass(id)
+  return cls == 0 and itemSpell(id) == nil
 end
 
 ----------------------------------------------------------------------
@@ -41,7 +66,7 @@ ns.RegisterEvent("CHAT_MSG_LOOT", function(text)
   local prefix = type(LOOT_ITEM_CREATED_SELF) == "string" and LOOT_ITEM_CREATED_SELF:match("^(.-)%%s") or "You create: "
   if text:sub(1, #prefix) ~= prefix and not text:find("^You create") then return end
   local id = tonumber(text:match("|Hitem:(%d+)"))
-  if not id or not isFood(id) then return end
+  if not id or not maybeFood(id) then return end
   local n = tonumber(text:match("|r[xX](%d+)")) or tonumber(text:match("[xX](%d+)%.?$")) or 1
   local l = ledger()
   l[id] = (l[id] or 0) + n
@@ -57,7 +82,7 @@ local function bagFood()
     local n = (C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerNumSlots(bag)) or 0
     for slot = 1, n do
       local info = C_Container.GetContainerItemInfo(bag, slot)
-      if info and info.itemID and not isSecret(info.itemID) and isFood(info.itemID) then
+      if info and info.itemID and not isSecret(info.itemID) and maybeFood(info.itemID) then
         out[info.itemID] = (out[info.itemID] or 0) + (info.stackCount or 1)
       end
     end
@@ -75,12 +100,19 @@ end
 
 local function resolve()
   if not eatAt then return end
-  if now() - eatAt > 3 then eatAt = nil; return end -- couldn't tell what was eaten; let it go
+  if now() - eatAt > 3 then -- couldn't tell what was eaten; let it go
+    eatAt = nil
+    C.lastEat = "you ate, but no food left your bags that the addon could see"
+    return
+  end
   -- When food you cooked also left the bags just then, give the benefit of the doubt: that's what you ate.
   local l0 = ledger()
   local pick
   for i, r in ipairs(recent) do
     if math.abs(r.t - eatAt) <= 3 and (l0[r.id] or 0) > 0 then pick = i; break end
+  end
+  if not pick then -- something that's food for sure
+    for i, r in ipairs(recent) do if math.abs(r.t - eatAt) <= 3 and isFood(r.id) then pick = i; break end end
   end
   if not pick then
     for i, r in ipairs(recent) do if math.abs(r.t - eatAt) <= 3 then pick = i; break end end
@@ -93,6 +125,8 @@ local function resolve()
       local c = chef()
       if not c then return end
       local l = ledger()
+      local nm = (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(r.id)) or ("item " .. r.id)
+      C.lastEat = nm .. ((l[r.id] or 0) > 0 and " (you cooked it)" or " (not cooked by you)")
       if (l[r.id] or 0) > 0 then
         l[r.id] = l[r.id] - 1
       else
@@ -138,7 +172,7 @@ local GLOW = { cooked = { 0.2, 1, 0.2 }, mixed = { 1, 0.85, 0.1 }, notyours = { 
 
 -- "cooked", "mixed", "notyours", or nil for anything that isn't food.
 function C.FoodVerdict(id, inBags)
-  if not id or isSecret(id) or not isFood(id) then return nil end
+  if not id or isSecret(id) or not maybeFood(id) then return nil end
   local made = ledger()[id] or 0
   if made <= 0 then return "notyours" end
   if inBags and inBags > made then return "mixed" end

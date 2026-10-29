@@ -1440,6 +1440,21 @@ do
   K.bags[1].count = 2; H.fire(K, "BAG_UPDATE_DELAYED"); H.run(0.5)
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f3", 433); H.run(2)
   check(status() == "failed", "eating food you didn't cook fails Iron Chef")
+  -- classic data: cheese is a plain "Consumable" (subclass 0); its use spell says it's food
+  for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
+  H.ITEM_TYPES[414] = { 0, 0 }; H.ITEM_SPELLS[414] = "Food"   -- Dalaran Sharp
+  H.ITEM_TYPES[118] = { 0, 1 }; H.ITEM_SPELLS[118] = "Healing Potion"
+  H.ITEM_SPELLS[159] = "Drink"
+  K.bags[4] = { id = 414, name = "Dalaran Sharp", count = 3 }
+  K.bags[5] = { id = 118, name = "Minor Healing Potion", count = 2 }
+  H.fire(K, "BAG_UPDATE_DELAYED")
+  local ic3 = CK.Start("ironchef"); H.run(1)
+  check(CK.FoodVerdict(414, 3) == "notyours" and CK.FoodVerdict(159, 1) == nil and CK.FoodVerdict(118, 2) == nil,
+    "classic cheese glows red; water and potions don't glow")
+  K.bags[4].count = 2; H.fire(K, "BAG_UPDATE_DELAYED")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f4", 433); H.run(2)
+  check(K.ns.Data.Get("challenges", ic3).status == "failed", "eating classic cheese you didn't make fails Iron Chef")
+  K.bags[4], K.bags[5] = nil, nil
   -- the bag glow: green for food you cooked, red for food you didn't, yellow for a mixed stack
   local ic2 = CK.Start("ironchef"); H.run(1)
   check(CK.FoodVerdict(2683, 2) == "cooked", "cooked food glows green")

@@ -5,7 +5,7 @@ for line in io.lines(ADDON_DIR .. "/Ironforged.toc") do
   if line:match("%.lua%s*$") then FILES[#FILES + 1] = line:gsub("%s+$", "") end
 end
 
-local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000, ITEM_TYPES = {} }
+local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000, ITEM_TYPES = {}, ITEM_SPELLS = {} }
 -- the server knows a character by its full "First Surname" name; the realm is dropped when whispering
 function H.charName(full) return full end
 function H.baseName(n) -- same rule as the addon: a trailing "-Realm" goes; "First-Surname" becomes "First Surname"
@@ -177,6 +177,7 @@ local function makeClient(shortName, race, fullName)
     local t = H.ITEM_TYPES[id]
     if t then return id, nil, nil, nil, nil, t[1], t[2] end
   end }
+  env.GetItemSpell = function(id) return H.ITEM_SPELLS[id] end
   env.UnitClass = function(u) local c = client.class or "WARRIOR"; return c:sub(1, 1) .. c:sub(2):lower(), c, 1 end
   env.IsStealthed = function() return client.stealthed and true or false end
   env.IsPlayerSpell = function(id) return client.known and client.known[id] and true or false end
