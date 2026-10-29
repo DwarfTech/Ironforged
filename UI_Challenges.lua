@@ -74,6 +74,30 @@ local function showChallenge(key)
       UI.Confirm("Give up on " .. d.name .. "?", function() C.Abandon(key) end)
     end }
   end
+  local A = ns.Appeals
+  if d.history and d.history ~= "" then lines[#lines + 1] = " "; lines[#lines + 1] = "|cffd4a017History:|r " .. d.history end
+  local appeal = A and A.Get(key)
+  if appeal and d.status == "failed" and (tonumber(appeal.failed) or 0) == (tonumber(d.ended) or 0) then
+    lines[#lines + 1] = " "
+    if not appeal.ruling then
+      lines[#lines + 1] = "|cffffd040Appeal pending:|r " .. appeal.text
+    elseif appeal.ruling == "denied" then
+      lines[#lines + 1] = "|cffff4040Appeal denied|r by " .. ns.Name(appeal.judge or "?") .. ": " .. appeal.text
+    end
+  end
+  if mine and A and A.CanAppeal(key) then
+    buttons[#buttons + 1] = { text = "Appeal", onClick = function()
+      UI.OpenForm({
+        title = "Appeal: " .. d.name, width = 480,
+        fields = {
+          { type = "info", value = "Failed: " .. (d.reason or "") .. "\n\nTell the Thane and the Longbeards what happened. If they agree it was a mishap or a bug, they can restore the challenge." },
+          { key = "text", label = "What happened", type = "multiline", value = "", maxLen = 300, height = 70 },
+        },
+        saveText = "Send appeal",
+        onSave = function(v) return A.File(key, v.text) end,
+      })
+    end }
+  end
   if mine and d.status ~= "active" then
     buttons[#buttons + 1] = { text = "Remove", onClick = function()
       UI.Confirm("Remove this challenge from the list?", function() C.Remove(key) end)
@@ -82,6 +106,30 @@ local function showChallenge(key)
   UI.OpenForm({ title = d.name, width = 520, fields = { { type = "info", value = table.concat(lines, "\n") } }, buttons = buttons })
 end
 UI.ShowChallenge = showChallenge
+
+-- The Thane and Longbeards: the oldest appeal waiting for a ruling.
+function UI.ShowNextAppeal()
+  local A = ns.Appeals
+  local list = A and A.Pending() or {}
+  local p = list[1]
+  if not p then ns.Print("No appeals waiting."); return end
+  local ch = p.challenge
+  local lines = {
+    "|cffd4a017Dwarf:|r " .. ns.Name(p.member),
+    "|cffd4a017Challenge:|r " .. ch.name .. " (from level " .. tostring(ch.startLevel or "?") .. ")",
+    "|cffd4a017Failed:|r " .. ns.FormatDate(ch.ended) .. ". " .. (ch.reason or ""),
+    "|cffd4a017Appealed:|r " .. ns.FormatDate(p.data.ts),
+    " ",
+    p.data.text,
+  }
+  if #list > 1 then lines[#lines + 1] = " "; lines[#lines + 1] = "|cff999999" .. (#list - 1) .. " more waiting.|r" end
+  UI.OpenForm({ title = "Appeal from " .. ns.Name(p.member), width = 520,
+    fields = { { type = "info", value = table.concat(lines, "\n") } },
+    buttons = {
+      { text = "Restore", onClick = function() A.Rule(p.key, "restored") end },
+      { text = "Deny", onClick = function() A.Rule(p.key, "denied") end },
+    } })
+end
 
 local function refresh(f)
   local me = ns.PlayerName()
@@ -100,6 +148,11 @@ local function refresh(f)
     end
   end
   f.list:SetItems(items, "You haven't taken on a challenge yet.")
+  local A = ns.Appeals
+  local judge = A and ns.IsLongbeardOrGM(me)
+  local pending = judge and #A.Pending() or 0
+  f.appealB:SetShown(judge and pending > 0)
+  f.appealB:SetText("Appeals (" .. pending .. ")")
   f.count:SetText("|cffffd040" .. counts.active .. " under way|r   |cff40ff40" .. counts.completed .. " completed|r   |cffff4040" .. counts.failed .. " failed|r")
 end
 
@@ -111,6 +164,9 @@ local function build(f, w, h)
   f.finC:SetChecked(true)
   f.count = UI.Label(f, "", "GameFontHighlightSmall")
   f.count:SetPoint("TOPRIGHT", -6, -10)
+  f.appealB = UI.Button(f, "Appeals", 100, 22, function() UI.ShowNextAppeal() end)
+  f.appealB:SetPoint("RIGHT", f.count, "LEFT", -12, 0)
+  f.appealB:Hide()
 
   f.list = UI.List(f, w, h - 58, {
     { title = "Challenge", width = 250 }, { title = "Started", width = 100 }, { title = "From level", width = 80 },

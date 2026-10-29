@@ -25,6 +25,7 @@ AutoInvite.lua
 Challenges.lua
 ClassChallenges.lua
 IronChef.lua
+Appeals.lua
 UI_Widgets.lua
 UI_Minimap.lua
 Cheers.lua

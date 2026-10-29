@@ -34,6 +34,7 @@ Data.COLLECTIONS = {
   "lfd",          -- key = leader .. "#" .. id; Looking for Dwarf group posts
   "lfdjoin",      -- key = post key .. "#" .. member; who signed up for a post
   "challenges",   -- key = member .. "#" .. id; challenges a member took on, written by their own client
+  "appeals",      -- key = challenge key; a member's appeal of a failed challenge, and the ruling on it
 }
 -- Collections that are NOT part of login digests or guild-wide broadcasts. Each member's own
 -- client writes them and pushes them (by whisper) to the online Longbeards, who hand them out
@@ -49,6 +50,7 @@ Data.ALWAYS_SYNC = {
   grudges = true, avenged = true,                                         -- Book of Grudges
   pvp = true,                                                             -- War Hall
   titles = true,                                                          -- Titles
+  appeals = true,                                                         -- Challenge appeals
 }
 
 local VALID = {}
@@ -304,6 +306,12 @@ function Data.CanWrite(author, coll, key, data)
     local member = splitKey(key)
     if data == nil then return member == author or officer end
     return member == author and ns.roster[author] ~= nil
+  elseif coll == "appeals" then
+    -- the member files (or withdraws) it; the guild master and Longbeards rule on it
+    local member = splitKey(key)
+    if ns.IsLongbeardOrGM(author) then return true end
+    if member ~= author or ns.roster[author] == nil then return false end
+    return data == nil or data.ruling == nil
   elseif coll == "challenges" then
     local member = splitKey(key)
     if data == nil then return member == author or officer end
@@ -363,7 +371,7 @@ function Data.Subject(coll, key, data)
   if coll == "clanship" or coll == "requests" or coll == "pvp" or coll == "profiles" or coll == "selfreport"
     or coll == "racecheck" or coll == "members" or coll == "progress" or coll == "taskmarks" then
     return key
-  elseif coll == "titles" or coll == "crafts" or coll == "challenges" or coll == "invitelog"
+  elseif coll == "titles" or coll == "crafts" or coll == "challenges" or coll == "appeals" or coll == "invitelog"
     or coll == "gambles" or coll == "lfd" then
     return (splitKey(key))
   elseif coll == "invites" or coll == "applications" or coll == "rsvp" or coll == "lfdjoin" then

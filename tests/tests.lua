@@ -1476,6 +1476,43 @@ do
   for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
 end
 
+-- Appeals: the member appeals a failure; the guild master or a Longbeard rules
+do
+  local CK, AK, AA = K.ns.Challenges, K.ns.Appeals, A.ns.Appeals
+  for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
+  local ol = CK.Start("onelife"); H.run(3)
+  H.fire(K, "PLAYER_DEAD"); H.run(3)
+  check(K.ns.Data.Get("challenges", ol).status == "failed", "appeal setup: One Life failed")
+  check(AK.CanAppeal(ol), "a failed challenge can be appealed")
+  check(not AK.File(ol, ""), "an appeal needs a reason")
+  check(AK.File(ol, "Disconnected mid-fight and came back dead"), "appeal filed")
+  H.run(4)
+  check(#AA.Pending() == 1 and AA.Pending()[1].key == ol, "the guild master sees the appeal")
+  check(not AK.CanAppeal(ol), "one appeal per failure")
+  check(not D.ns.Appeals.Rule(ol, "restored"), "regular members can't rule on appeals")
+  check(not K.ns.Data.Put("appeals", ol, { text = "x", ts = 1, ruling = "restored" }, true), "you can't rule on your own appeal")
+  check(AA.Rule(ol, "restored"), "the guild master restores it")
+  H.run(6)
+  local d1 = K.ns.Data.Get("challenges", ol)
+  check(d1.status == "active" and d1.history and d1.history:find("restored on appeal", 1, true), "a restored challenge is under way again, with a note")
+  check(D.ns.Data.Get("challenges", ol).status == "active", "guildmates see it restored")
+  check(#AA.Pending() == 0, "no appeals left waiting")
+  -- fail again, appeal again, denied this time
+  H.run(5)
+  H.fire(K, "PLAYER_DEAD"); H.run(3)
+  check(AK.CanAppeal(ol), "a new failure can be appealed again")
+  AK.File(ol, "Lagged into a cliff"); H.run(4)
+  AA.Rule(ol, "denied"); H.run(6)
+  local denied = false
+  for _, m in ipairs(K.chat) do if m:find("Appeal denied", 1, true) then denied = true end end
+  check(K.ns.Data.Get("challenges", ol).status == "failed" and denied, "a denied appeal leaves it failed, and the member is told")
+  check(not AK.CanAppeal(ol), "and it can't be appealed again")
+  local okS = pcall(K.ns.UI.ShowChallenge, ol)
+  local okN = pcall(A.ns.UI.ShowNextAppeal)
+  check(okS and okN, "appeal screens open")
+  CK.Remove(ol); H.run(2)
+end
+
 -- Call for aid from a solo start: four invites, then a raid, then the rest
 do
   local LKa = K.ns.LFD
