@@ -1010,9 +1010,17 @@ do
   for _, c in ipairs(CK.MyEnforced()) do CK.Abandon(c.key) end
   H.run(2)
   K.bags[5] = { id = 2596, name = "Skin of Dwarven Stout", count = 3 }
+  local savedLevel = K.level
+  K.level = 4
   local dk = CK.Start("drunken"); H.run(3)
   local df = K.env.IronforgedDrunkFrame
-  check(dk and df and df:IsShown(), "Drunken asks for a first drink when it starts")
+  check(dk and not (df and df:IsShown()), "Drunken can start below level 10 without asking for ale")
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(40)
+  check(K.ns.Data.Get("challenges", dk).status == "active", "sobering up below level 10 doesn't fail Drunken")
+  K.level = 10
+  H.fire(K, "PLAYER_LEVEL_UP", 10); H.run(4)
+  df = K.env.IronforgedDrunkFrame
+  check(df and df:IsShown(), "at level 10 Drunken asks for a drink")
   H.fire(K, "CHAT_MSG_SYSTEM", "You feel tipsy."); H.run(1)
   check(not df:IsShown(), "feeling tipsy clears the popup")
   H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(2)
@@ -1027,6 +1035,7 @@ do
   local dd = K.ns.Data.Get("challenges", dk)
   check(dd.status == "failed" and dd.reason:find("Sobered up", 1, true), "staying sober for 30 seconds fails Drunken")
   K.bags[5] = nil
+  K.level = savedLevel
 end
 
 -- Late joiner converges

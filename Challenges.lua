@@ -25,7 +25,7 @@ C.PRESETS = {
   dwarffound = { name = "Dwarf Found", dwarfOnly = true,
     rules = "Trade and group only with dwarves. Everyone else is a stranger." },
   drunken = { name = "Drunken", drunk = true,
-    rules = "Stay drunk all the way to max level. When your buzz wears off you have 30 seconds to drink, or the challenge fails. Carry plenty of ale." },
+    rules = "Stay drunk all the way to max level. From level 10 on, when your buzz wears off you have 30 seconds to drink, or the challenge fails. Carry plenty of ale." },
 }
 C.ORDER = { "slayer", "selfmade", "onelife", "dwarffound", "drunken" }
 

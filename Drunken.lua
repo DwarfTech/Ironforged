@@ -2,7 +2,8 @@
 -- The game can't be asked how drunk you are, but it says so in a system message whenever it
 -- changes ("You feel tipsy.", "You feel sober again."). When the buzz wears off, a popup with a
 -- drink button gives you 30 seconds to drink (any ale, stout, wine or spirit in your bags), or the
--- challenge fails. The clock stops while you're in combat or dead.
+-- challenge fails. The clock stops while you're in combat or dead. You can take it on at level 1,
+-- but it only holds you to it from level 10, when ale is easier to come by.
 local ADDON, ns = ...
 local UI = ns.UI
 
@@ -11,6 +12,7 @@ ns.Drunken = D
 
 D.GRACE = 30        -- seconds to drink once you're sober
 D.START_GRACE = 60  -- seconds to get a buzz going when the challenge starts, or when you log in
+D.FROM_LEVEL = 10   -- enforced from this level on
 
 local function isSecret(v) return issecretvalue and issecretvalue(v) end
 
@@ -27,14 +29,15 @@ local countdown          -- { left = seconds, reason = "sober"|"start" }
 local lastTotal          -- drinks in bags, to notice one being drunk
 local frame
 
+local function level() return (UnitLevel and UnitLevel("player")) or 0 end
+
+-- My Drunken challenge, once it is being enforced (level 10 and up).
 local function active()
   local C = ns.Challenges
-  if not C then return nil end
+  if not C or level() < D.FROM_LEVEL then return nil end
   for _, c in ipairs(C.MyEnforced()) do if c.preset.drunk then return c end end
 end
 D.Active = active
-
-local function level() return (UnitLevel and UnitLevel("player")) or 0 end
 local function inCombat() return InCombatLockdown and InCombatLockdown() end
 local function dead() return UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") end
 
@@ -202,6 +205,20 @@ ns.RegisterEvent("PLAYER_ENTERING_WORLD", function(isLogin, isReload)
   local saved = me and ns.db and ns.db.drunk and ns.db.drunk[me]
   if isReload and saved == "buzzed" then state = "buzzed" elseif state ~= "buzzed" or isLogin then state = "unknown" end
   if C_Timer then C_Timer.After(8, function() pcall(check) end) end
+end)
+
+-- Reaching level 10 starts the first clock.
+ns.RegisterEvent("PLAYER_LEVEL_UP", function(newLevel)
+  if (tonumber(newLevel) or 0) ~= D.FROM_LEVEL then return end
+  if C_Timer then
+    C_Timer.After(2, function()
+      local C = ns.Challenges
+      for _, c in ipairs(C and C.MyEnforced() or {}) do
+        if c.preset.drunk then ns.Print("|cffd4a017Drunken:|r level " .. D.FROM_LEVEL .. "! From now on the addon holds you to it.") end
+      end
+      pcall(check)
+    end)
+  end
 end)
 
 -- Taking on the challenge starts the first clock.
