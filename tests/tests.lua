@@ -1361,6 +1361,32 @@ do
   K.class, K.level = nil, savedLevel
 end
 
+-- The challenge menu: class challenges under their own heading
+do
+  local made = {}
+  K.env.MenuUtil = { CreateContextMenu = function(owner, gen)
+    local root = {}
+    function root:CreateTitle(t) made[#made + 1] = "T:" .. t end
+    function root:CreateDivider() made[#made + 1] = "--" end
+    function root:CreateButton(t, fn) made[#made + 1] = "B:" .. t end
+    gen(owner, root)
+  end }
+  K.class = "WARRIOR"
+  local UIk = K.ns.UI
+  local realOpen, spec = UIk.OpenForm, nil
+  UIk.OpenForm = function(sp) spec = sp end
+  UIk.StartChallengeForm()
+  UIk.OpenForm = realOpen
+  local dlg
+  if spec then UIk.Pick(K.env.UIParent, spec.fields[1].options, function() end, "Challenge") end
+  local list = table.concat(made, "|")
+  check(list:find("B:Slayer", 1, true) and list:find("B:My own challenge|--|T:Warrior challenges|B:Ironbreaker", 1, true),
+    "class challenges sit under their own heading in the menu (" .. list .. ")")
+  check(not list:find("B:Hammerer", 1, true), "other classes' challenges aren't in the menu")
+  K.env.MenuUtil = nil; K.class = nil
+  if dlg then dlg:Hide() end
+end
+
 -- Call for aid from a solo start: four invites, then a raid, then the rest
 do
   local LKa = K.ns.LFD

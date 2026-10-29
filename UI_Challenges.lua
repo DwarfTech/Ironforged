@@ -10,9 +10,19 @@ local state = { finished = true }
 local function startForm(selected)
   local avail = C.Available()
   selected = selected or avail[1]
-  local opts = {}
-  for _, id in ipairs(avail) do opts[#opts + 1] = { text = C.PRESETS[id].name, value = id } end
+  -- general challenges, your own, then this class's challenges under their own heading
+  local opts, classOpts = {}, {}
+  for _, id in ipairs(avail) do
+    local o = { text = C.PRESETS[id].name, value = id }
+    if C.PRESETS[id].classes then classOpts[#classOpts + 1] = o else opts[#opts + 1] = o end
+  end
   opts[#opts + 1] = { text = "My own challenge", value = "custom" }
+  if #classOpts > 0 then
+    local className = UnitClass and UnitClass("player")
+    if type(className) ~= "string" or (issecretvalue and issecretvalue(className)) then className = "Class" end
+    opts[#opts + 1] = { header = true, text = className .. " challenges" }
+    for _, o in ipairs(classOpts) do opts[#opts + 1] = o end
+  end
   local fields = {
     { key = "preset", label = "Challenge", type = "choice", value = selected, options = opts,
       onChange = function(v) if v ~= selected then startForm(v) end end },

@@ -205,22 +205,31 @@ function UI.SearchPick(owner, options, onPick, title)
   return p
 end
 
+-- An option with header = true is a section title in the menu, not something to pick.
 function UI.Pick(owner, options, onPick, title)
+  local pickable = {}
+  for _, opt in ipairs(options) do if not opt.header then pickable[#pickable + 1] = opt end end
   -- long lists (the roster) get a picker with a search box
-  if #options > 15 then UI.SearchPick(owner, options, onPick, title); return end
+  if #pickable > 15 then UI.SearchPick(owner, pickable, onPick, title); return end
   if MenuUtil and MenuUtil.CreateContextMenu then
     MenuUtil.CreateContextMenu(owner, function(_, root)
       if title and root.CreateTitle then root:CreateTitle(title) end
       if #options > 18 and root.SetScrollMode then root:SetScrollMode(360) end
-      for _, opt in ipairs(options) do
-        root:CreateButton(opt.text, function() onPick(opt.value, opt.text) end)
+      for i, opt in ipairs(options) do
+        if opt.header then
+          if i > 1 and root.CreateDivider then root:CreateDivider() end
+          if root.CreateTitle then root:CreateTitle(opt.text) end
+        else
+          root:CreateButton(opt.text, function() onPick(opt.value, opt.text) end)
+        end
       end
     end)
     return
   end
   -- Fallback: cycle to the next option.
-  owner._pickIndex = ((owner._pickIndex or 0) % #options) + 1
-  local opt = options[owner._pickIndex]
+  if #pickable == 0 then return end
+  owner._pickIndex = ((owner._pickIndex or 0) % #pickable) + 1
+  local opt = pickable[owner._pickIndex]
   if opt then onPick(opt.value, opt.text) end
 end
 
