@@ -48,10 +48,10 @@ local PALADIN_ALL = set({
 -- The challenges
 ----------------------------------------------------------------------
 local P = C.PRESETS
-local WARRIOR, PALADIN, HUNTER, ROGUE, PRIEST = "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST"
+local WARRIOR, PALADIN, HUNTER, ROGUE, PRIEST, SHAMAN = "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN"
 
-P.ironbreaker = { name = "Ironbreaker", classes = set({ WARRIOR, PALADIN }), fromLevel = 5, needShield = true,
-  rules = "Warriors and Paladins. From level 5, always wear a shield. Take it off and you have a minute to put one back on." }
+P.ironbreaker = { name = "Ironbreaker", classes = set({ WARRIOR, PALADIN, SHAMAN }), fromLevel = 5, needShield = true,
+  rules = "Warriors, Paladins and Shamans. From level 5, always wear a shield. Take it off and you have a minute to put one back on." }
 P.doomseeker = { name = "Doomseeker", classes = set({ WARRIOR }), fromLevel = 5, noShield = true, noDefStance = true,
   canStart = function()
     if C.KnowsDefensiveStance and C.KnowsDefensiveStance() then
@@ -61,12 +61,12 @@ P.doomseeker = { name = "Doomseeker", classes = set({ WARRIOR }), fromLevel = 5,
     return true
   end,
   rules = "Warriors. From level 5, never use a shield and never learn Defensive Stance. Skip the Defensive Stance quests: learning the stance fails the challenge." }
-P.brawler = { name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN }), weapons = set({ 13 }),
+P.brawler = { name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN, SHAMAN }), weapons = set({ 13 }),
   weaponWhat = { what = "weapon other than a fist weapon", fail = "a weapon other than a fist weapon" },
-  rules = "Warriors, Hunters, Rogues and Paladins. Fight with fist weapons or bare hands only. No other weapons, ranged included." }
-P.hammerer = { name = "Hammerer", classes = set({ ROGUE }), fromLevel = 10, weapons = set({ 4, 5 }),
+  rules = "Warriors, Hunters, Rogues, Paladins and Shamans. Fight with fist weapons or bare hands only. No other weapons, ranged included." }
+P.hammerer = { name = "Hammerer", classes = set({ ROGUE, SHAMAN }), fromLevel = 10, weapons = set({ 4, 5 }),
   weaponWhat = { what = "weapon that isn't a mace", fail = "a weapon that wasn't a mace" },
-  rules = "Rogues. From level 10, maces are your only weapons. No other weapons, ranged included." }
+  rules = "Rogues and Shamans. From level 10, maces are your only weapons. No other weapons, ranged included." }
 P.beastmaster = { name = "Beastmaster", classes = set({ HUNTER }), fromLevel = 10, noRanged = true,
   rules = "Hunters. From level 10, no ranged weapon. You and your pet fight up close." }
 P.rifleman = { name = "Rifleman", classes = set({ HUNTER }), noPet = true,

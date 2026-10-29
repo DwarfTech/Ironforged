@@ -1063,6 +1063,11 @@ do
   -- class limits
   K.class = "PRIEST"
   check(not CK.Start("ironbreaker"), "a priest can't take on a warrior challenge")
+  K.class = "SHAMAN"
+  local sh = table.concat(CK.Available(), ",")
+  check(sh:find("ironbreaker", 1, true) and sh:find("brawler", 1, true) and sh:find("hammerer", 1, true) and not sh:find("doomseeker", 1, true),
+    "shamans get Ironbreaker, Brawler and Hammerer")
+  K.class = "PRIEST"
   local avail = table.concat(CK.Available(), ",")
   check(avail:find("lightbringer", 1, true) and not avail:find("ironbreaker", 1, true), "only your class's challenges are offered")
   check(not avail:find("selfmade", 1, true), "Outlander isn't offered any more")
