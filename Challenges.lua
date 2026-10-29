@@ -18,16 +18,18 @@ C.SLOT_NAMES = { [1] = "Head", [3] = "Shoulder", [4] = "Shirt", [19] = "Tabard",
 C.PRESETS = {
   slayer = { name = "Slayer", noSlots = { 3, 4, 5, 19 }, pvp = true,
     rules = "No chest or shoulder armor, no shirt or tabard, and stay flagged for PvP all the way to max level." },
-  selfmade = { name = "Outlander", noAH = true, noTrade = true, noMail = true,
+  -- retired: no new runs (Dwarf Found took over its mail and auction house rules); runs already
+  -- under way keep going
+  selfmade = { name = "Outlander", noAH = true, noTrade = true, noMail = true, retired = true,
     rules = "No auction house, no trading and no mail. Everything you have, you earned." },
   onelife = { name = "One Life", oneLife = true,
     rules = "Die once and the challenge is over." },
-  dwarffound = { name = "Dwarf Found", dwarfOnly = true,
-    rules = "Trade and group only with dwarves. Everyone else is a stranger." },
+  dwarffound = { name = "Dwarf Found", dwarfOnly = true, noMail = true, noAH = true,
+    rules = "Trade and group only with dwarves; everyone else is a stranger. No mailbox and no auction house." },
   drunken = { name = "Drunken", drunk = true, fromLevel = 10,
     rules = "Stay drunk all the way to max level. From level 10 on, when your buzz wears off you have 30 seconds to drink, or the challenge fails. Carry plenty of ale." },
 }
-C.ORDER = { "slayer", "selfmade", "onelife", "dwarffound", "drunken" }
+C.ORDER = { "slayer", "onelife", "dwarffound", "drunken" }
 
 C.STATUS = {
   active = "|cffffd040Under way|r", completed = "|cff40ff40Completed|r",
@@ -133,6 +135,7 @@ function C.Start(presetId, name, rules)
   local preset = presetId and C.PRESETS[presetId]
   if presetId and not preset then return false end
   if preset then
+    if preset.retired then ns.Print(preset.name .. " is no longer offered."); return false end
     if not C.ClassAllowed(preset) then ns.Print(preset.name .. " isn't a challenge for your class."); return false end
     if preset.canStart and not preset.canStart() then return false end
     for _, c in ipairs(C.MyPresets()) do

@@ -763,10 +763,13 @@ H.run(70)
 local sd = D.ns.Data.Get("challenges", slayerKey)
 check(sd.status == "failed" and sd.reason:find("chest", 1, true), "wearing chest armor fails Slayer")
 K.bags = savedBags; K.equip[5] = nil
--- Outlander (was Self-Made) and One Life
-local smKey = CK.Start("selfmade")
+-- Outlander is retired: no new runs, but one already under way is still enforced
+check(not CK.Start("selfmade"), "Outlander can't be started any more")
+local smKey = K.ns.PlayerName() .. "#oldoutlander"
+K.ns.Data.Put("challenges", smKey, { name = "Outlander", rules = CK.PRESETS.selfmade.rules, preset = "selfmade", ts = K.ns.Now(),
+  startLevel = 1, lvl = 1, status = "active" }); H.run(2)
 H.fire(K, "TRADE_SHOW"); H.fire(K, "MAIL_SHOW"); H.fire(K, "AUCTION_HOUSE_SHOW")
-check(K.closed.trade and K.closed.mail and K.closed.ah, "Outlander shuts trade, mail and the auction house")
+check(K.closed.trade and K.closed.mail and K.closed.ah, "an Outlander run already under way still shuts trade, mail and the auction house")
 local olKey = CK.Start("onelife")
 H.fire(K, "PLAYER_DEAD"); H.run(2)
 check(K.ns.Data.Get("challenges", olKey).status == "failed", "One Life ends on death")
@@ -775,6 +778,9 @@ H.fire(K, "PLAYER_LEVEL_UP", 60); H.run(2)
 check(D.ns.Data.Get("challenges", smKey).status == "completed" and D.ns.Data.Get("challenges", smKey).lvl == 60, "completed at max level")
 -- Dwarf Found
 local dfKey = CK.Start("dwarffound")
+K.closed.mail, K.closed.ah = nil, nil
+H.fire(K, "MAIL_SHOW"); H.fire(K, "AUCTION_HOUSE_SHOW")
+check(K.closed.mail and K.closed.ah, "Dwarf Found shuts the mailbox and the auction house")
 K.units.NPC = { name = "Hilda", race = "Human" }
 K.closed.trade = nil
 H.fire(K, "TRADE_SHOW")
@@ -1059,7 +1065,7 @@ do
   check(not CK.Start("ironbreaker"), "a priest can't take on a warrior challenge")
   local avail = table.concat(CK.Available(), ",")
   check(avail:find("lightbringer", 1, true) and not avail:find("ironbreaker", 1, true), "only your class's challenges are offered")
-  check(CK.PRESETS.selfmade.name == "Outlander", "Self-Made is now called Outlander")
+  check(not avail:find("selfmade", 1, true), "Outlander isn't offered any more")
 
   -- Ironbreaker: a shield from level 5
   K.class = "WARRIOR"; K.level = 3
