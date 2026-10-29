@@ -763,10 +763,10 @@ H.run(70)
 local sd = D.ns.Data.Get("challenges", slayerKey)
 check(sd.status == "failed" and sd.reason:find("chest", 1, true), "wearing chest armor fails Slayer")
 K.bags = savedBags; K.equip[5] = nil
--- Self-Made and One Life
+-- Outlander (was Self-Made) and One Life
 local smKey = CK.Start("selfmade")
 H.fire(K, "TRADE_SHOW"); H.fire(K, "MAIL_SHOW"); H.fire(K, "AUCTION_HOUSE_SHOW")
-check(K.closed.trade and K.closed.mail and K.closed.ah, "Self-Made shuts trade, mail and the auction house")
+check(K.closed.trade and K.closed.mail and K.closed.ah, "Outlander shuts trade, mail and the auction house")
 local olKey = CK.Start("onelife")
 H.fire(K, "PLAYER_DEAD"); H.run(2)
 check(K.ns.Data.Get("challenges", olKey).status == "failed", "One Life ends on death")
@@ -1036,6 +1036,143 @@ do
   check(dd.status == "failed" and dd.reason:find("Sobered up", 1, true), "staying sober for 30 seconds fails Drunken")
   K.bags[5] = nil
   K.level = savedLevel
+end
+
+-- Class challenges
+do
+  local CK = K.ns.Challenges
+  local function clear() for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1) end
+  local function status(k) return K.ns.Data.Get("challenges", k).status end
+  local savedLevel = K.level
+  H.ITEM_TYPES[9001] = { 4, 6 }   -- shield
+  H.ITEM_TYPES[9002] = { 2, 7 }   -- one-handed sword
+  H.ITEM_TYPES[9003] = { 2, 13 }  -- fist weapon
+  H.ITEM_TYPES[9004] = { 2, 4 }   -- one-handed mace
+  H.ITEM_TYPES[9005] = { 2, 3 }   -- gun
+  H.ITEM_TYPES[9006] = { 2, 19 }  -- wand
+  clear()
+  for i = 1, 16 do if K.bags[i] and K.bags[i].name == "Junk" then K.bags[i] = nil end end
+
+  -- class limits
+  K.class = "PRIEST"
+  check(not CK.Start("ironbreaker"), "a priest can't take on a warrior challenge")
+  local avail = table.concat(CK.Available(), ",")
+  check(avail:find("lightbringer", 1, true) and not avail:find("ironbreaker", 1, true), "only your class's challenges are offered")
+  check(CK.PRESETS.selfmade.name == "Outlander", "Self-Made is now called Outlander")
+
+  -- Ironbreaker: a shield from level 5
+  K.class = "WARRIOR"; K.level = 3
+  local ib = CK.Start("ironbreaker"); H.run(12)
+  check(status(ib) == "active", "Ironbreaker isn't enforced before level 5")
+  K.level = 5; H.fire(K, "PLAYER_LEVEL_UP", 5); H.run(2)
+  local warnedShield = false
+  for _, m in ipairs(K.chat) do if m:find("put a shield on within a minute", 1, true) then warnedShield = true end end
+  check(warnedShield, "Ironbreaker warns when there's no shield")
+  K.equip[17] = 9001; H.run(70)
+  check(status(ib) == "active", "a shield in time keeps Ironbreaker going")
+  K.equip[17] = nil; H.run(75)
+  check(status(ib) == "failed", "no shield for a minute fails Ironbreaker")
+  clear()
+
+  -- Doomseeker: no shield (taken off), no Defensive Stance, warned about the quests
+  K.equip[17] = 9001
+  local ds = CK.Start("doomseeker"); H.run(2)
+  check(K.equip[17] == nil, "Doomseeker takes your shield off")
+  K.questTitle = "Vejrek"; H.fire(K, "QUEST_DETAIL"); H.run(1)
+  check(K.env.IronforgedNotice:IsShown() and K.env.IronforgedNotice.id == "doomseeker", "Doomseeker warns about the Defensive Stance quests")
+  K.known = { [71] = true }; H.fire(K, "LEARNED_SPELL_IN_TAB"); H.run(2)
+  check(status(ds) == "failed", "learning Defensive Stance fails Doomseeker")
+  K.known = nil; K.questTitle = nil; K.env.IronforgedNotice:Hide()
+  clear()
+
+  -- Brawler: fist weapons only
+  K.equip[16] = 9002
+  local br = CK.Start("brawler"); H.run(2)
+  check(K.equip[16] == nil, "Brawler takes off a sword")
+  K.equip[16] = 9003; H.run(12)
+  check(K.equip[16] == 9003 and status(br) == "active", "Brawler keeps a fist weapon")
+  K.equip[16] = nil
+  clear()
+
+  -- Hammerer (rogue, level 10): maces only
+  K.class = "ROGUE"; K.level = 10
+  K.equip[16], K.equip[17] = 9004, 9002
+  CK.Start("hammerer"); H.run(2)
+  check(K.equip[16] == 9004 and K.equip[17] == nil, "Hammerer keeps the mace and takes off the sword")
+  K.equip[16] = nil
+  clear()
+
+  -- Brute: stealth for more than 5 seconds fails
+  local bu = CK.Start("brute"); H.run(1)
+  K.stealthed = true; H.fire(K, "UPDATE_STEALTH"); H.run(3)
+  K.stealthed = false; H.fire(K, "UPDATE_STEALTH"); H.run(4)
+  check(status(bu) == "active", "breaking stealth within 5 seconds is fine")
+  K.stealthed = true; H.fire(K, "UPDATE_STEALTH"); H.run(6)
+  check(status(bu) == "failed", "staying stealthed fails Brute")
+  K.stealthed = false
+  clear()
+
+  -- Beastmaster (hunter, level 10): no ranged weapon
+  K.class = "HUNTER"
+  K.equip[18] = 9005
+  CK.Start("beastmaster"); H.run(2)
+  check(K.equip[18] == nil, "Beastmaster takes off the gun")
+  clear()
+
+  -- Rifleman: abandon the pet, dismissing isn't enough
+  local rf = CK.Start("rifleman"); H.run(1)
+  K.units.pet = { name = "Snarl" }; H.fire(K, "UNIT_PET", "player"); H.run(2)
+  K.env.PetAbandon(); H.fire(K, "UNIT_PET", "player"); H.run(70)
+  check(status(rf) == "active", "abandoning the pet keeps Rifleman going")
+  K.units.pet = { name = "Snarl II" }; H.fire(K, "UNIT_PET", "player"); H.run(2)
+  K.units.pet = nil; H.fire(K, "UNIT_PET", "player"); H.run(70) -- dismissed, not abandoned
+  check(status(rf) == "failed", "dismissing the pet isn't enough for Rifleman")
+  clear()
+
+  -- Lightbringer and Voidbringer: spells by name
+  K.class = "PRIEST"
+  K.equip[18] = 9006
+  local lb = CK.Start("lightbringer"); H.run(2)
+  check(K.equip[18] == nil, "Lightbringer takes off the wand")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g1", 585); H.run(1)
+  check(status(lb) == "active", "Smite is fine for Lightbringer")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g2", 589); H.run(1)
+  check(status(lb) == "failed", "Shadow Word: Pain fails Lightbringer")
+  clear()
+  local vb = CK.Start("voidbringer"); H.run(1)
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g3", 17); H.run(1)
+  check(status(vb) == "active", "Power Word: Shield is fine for Voidbringer")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g4", 2050); H.run(1)
+  check(status(vb) == "failed", "a heal fails Voidbringer")
+  clear()
+
+  -- Oathbreaker and Runesmith (paladin)
+  K.class = "PALADIN"
+  local ob = CK.Start("oathbreaker"); H.run(1)
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g5", 879); H.run(1)
+  check(status(ob) == "active", "Exorcism is fine for Oathbreaker")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g6", 465); H.run(1)
+  check(status(ob) == "failed", "Devotion Aura fails Oathbreaker")
+  clear()
+  local savedProfs = K.profs
+  K.profs = { { name = "Blacksmithing", skill = 50, max = 75 }, { name = "Enchanting", skill = 40, max = 75 } }
+  local rs = CK.Start("runesmith"); H.run(12)
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g7", 21084); H.run(1)
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g8", 20271); H.run(1)
+  check(status(rs) == "active", "seals and Judgement are fine for Runesmith")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g9", 635); H.run(1)
+  check(status(rs) == "failed", "Holy Light fails Runesmith")
+  clear()
+  K.profs = { { name = "Blacksmithing", skill = 50, max = 75 } }
+  local rs2 = CK.Start("runesmith"); H.run(12)
+  local warnedProf = false
+  for _, m in ipairs(K.chat) do if m:find("you need Enchanting", 1, true) then warnedProf = true end end
+  check(warnedProf, "Runesmith asks for both professions")
+  H.run(610)
+  check(status(rs2) == "failed", "Runesmith without Enchanting fails after 10 minutes")
+  clear()
+  K.profs = savedProfs
+  K.class, K.level = nil, savedLevel
 end
 
 -- Late joiner converges

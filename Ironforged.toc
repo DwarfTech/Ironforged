@@ -23,6 +23,7 @@ Professions.lua
 LookingForDwarf.lua
 AutoInvite.lua
 Challenges.lua
+ClassChallenges.lua
 UI_Widgets.lua
 UI_Minimap.lua
 Cheers.lua

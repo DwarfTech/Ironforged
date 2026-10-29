@@ -18,13 +18,13 @@ C.SLOT_NAMES = { [1] = "Head", [3] = "Shoulder", [4] = "Shirt", [19] = "Tabard",
 C.PRESETS = {
   slayer = { name = "Slayer", noSlots = { 3, 4, 5, 19 }, pvp = true,
     rules = "No chest or shoulder armor, no shirt or tabard, and stay flagged for PvP all the way to max level." },
-  selfmade = { name = "Self-Made", noAH = true, noTrade = true, noMail = true,
+  selfmade = { name = "Outlander", noAH = true, noTrade = true, noMail = true,
     rules = "No auction house, no trading and no mail. Everything you have, you earned." },
   onelife = { name = "One Life", oneLife = true,
     rules = "Die once and the challenge is over." },
   dwarffound = { name = "Dwarf Found", dwarfOnly = true,
     rules = "Trade and group only with dwarves. Everyone else is a stranger." },
-  drunken = { name = "Drunken", drunk = true,
+  drunken = { name = "Drunken", drunk = true, fromLevel = 10,
     rules = "Stay drunk all the way to max level. From level 10 on, when your buzz wears off you have 30 seconds to drink, or the challenge fails. Carry plenty of ale." },
 }
 C.ORDER = { "slayer", "selfmade", "onelife", "dwarffound", "drunken" }
@@ -72,7 +72,7 @@ function C.Of(member)
 end
 
 -- My active challenges with a ready-made rule set: { key, data, preset }
-function C.MyEnforced()
+function C.MyPresets()
   local me = ns.PlayerName()
   local out = {}
   if not me or not Data.Ready() then return out end
@@ -80,6 +80,37 @@ function C.MyEnforced()
     if Data.SplitKey(k) == me and d.status == "active" and d.preset and C.PRESETS[d.preset] then
       out[#out + 1] = { key = k, data = d, preset = C.PRESETS[d.preset] }
     end
+  end
+  return out
+end
+
+-- The ones being enforced right now: some only hold you to their rules from a certain level.
+function C.MyEnforced()
+  local out = {}
+  for _, c in ipairs(C.MyPresets()) do
+    if level() >= (c.preset.fromLevel or 1) then out[#out + 1] = c end
+  end
+  return out
+end
+
+-- Some challenges are for certain classes only.
+local function myClass()
+  local ok, _, file = pcall(UnitClass or function() end, "player")
+  if ok and type(file) == "string" and not (issecretvalue and issecretvalue(file)) then return file end
+end
+C.MyClass = myClass
+
+function C.ClassAllowed(preset)
+  if not preset.classes then return true end
+  local cls = myClass()
+  return cls == nil or preset.classes[cls] == true
+end
+
+-- Ready-made challenges this character may take on, in order.
+function C.Available()
+  local out = {}
+  for _, id in ipairs(C.ORDER) do
+    if C.PRESETS[id] and C.ClassAllowed(C.PRESETS[id]) then out[#out + 1] = id end
   end
   return out
 end
@@ -102,7 +133,8 @@ function C.Start(presetId, name, rules)
   local preset = presetId and C.PRESETS[presetId]
   if presetId and not preset then return false end
   if preset then
-    for _, c in ipairs(C.MyEnforced()) do
+    if not C.ClassAllowed(preset) then ns.Print(preset.name .. " isn't a challenge for your class."); return false end
+    for _, c in ipairs(C.MyPresets()) do
       if c.data.preset == presetId then ns.Print("You're already on the " .. preset.name .. " challenge."); return false end
     end
     name, rules = preset.name, preset.rules
@@ -200,37 +232,54 @@ local function worn(slot)
   return GetInventoryItemID and GetInventoryItemID("player", slot) ~= nil
 end
 
+C.GRACE = GRACE
+C.Unequip = unequip
+C.ENFORCERS = {} -- extra checks other files add: fn(challenge)
+
+-- Equipment a rule set forbids right now: { [slot] = { what = "shield", fail = "a shield" } }
+local function forbiddenGear(p)
+  local out = {}
+  for _, slot in ipairs(p.noSlots or {}) do
+    if worn(slot) then
+      local bare = { [4] = "shirt", [19] = "tabard" } -- not armor, so named on their own
+      local what = bare[slot] or ((C.SLOT_NAMES[slot] or "that"):lower() .. " armor")
+      out[slot] = { what = what, fail = bare[slot] and ("a " .. bare[slot]) or what }
+    end
+  end
+  if C.GearRules then
+    for slot, w in pairs(C.GearRules(p)) do out[slot] = w end
+  end
+  return out
+end
+
 local warned = {}
 function C.Enforce()
   local active = C.MyEnforced()
   if #active == 0 then wipe(wornSince); return end
   local now = GetTime and GetTime() or 0
+  local seen = {}
   for _, c in ipairs(active) do
     local p = c.preset
-    for _, slot in ipairs(p.noSlots or {}) do
-      if worn(slot) then
-        local slotName = C.SLOT_NAMES[slot] or "that"
-        local bare = { [4] = "shirt", [19] = "tabard" } -- not armor, so named on their own
-        local what = bare[slot] or (slotName:lower() .. " armor")
-        if unequip(slot) then
-          ns.Print("|cffd4a017" .. p.name .. ":|r no " .. what .. ". It's back in your bags.")
-          wornSince[slot] = nil
-        else
-          wornSince[slot] = wornSince[slot] or now
-          if not warned[slot] then
-            warned[slot] = true
-            ns.Print("|cffff4040" .. p.name .. ":|r take off your " .. what .. " within a minute or the challenge fails" ..
-              ((freeBagSlot() == nil) and " (your bags are full)." or "."))
-          end
-          if now - wornSince[slot] >= GRACE then C.Fail(c.key, "Wore " .. (bare[slot] and ("a " .. bare[slot]) or (slotName:lower() .. " armor")) .. " at level " .. level() .. ".") end
-        end
-      else
+    for slot, w in pairs(forbiddenGear(p)) do
+      seen[slot] = true
+      if unequip(slot) then
+        ns.Print("|cffd4a017" .. p.name .. ":|r no " .. w.what .. ". It's back in your bags.")
         wornSince[slot] = nil
-        warned[slot] = nil
+      else
+        wornSince[slot] = wornSince[slot] or now
+        if not warned[slot] then
+          warned[slot] = true
+          ns.Print("|cffff4040" .. p.name .. ":|r take off your " .. w.what .. " within a minute or the challenge fails" ..
+            ((freeBagSlot() == nil) and " (your bags are full)." or "."))
+        end
+        if now - wornSince[slot] >= GRACE then C.Fail(c.key, "Wore " .. w.fail .. " at level " .. level() .. ".") end
       end
     end
     if p.pvp then C.KeepFlagged(p.name, c.key) end
+    for _, f in ipairs(C.ENFORCERS) do f(c) end
   end
+  for slot in pairs(wornSince) do if not seen[slot] then wornSince[slot] = nil end end
+  for slot in pairs(warned) do if not seen[slot] then warned[slot] = nil end end
 end
 
 -- Slayer: PvP stays on. Blizzard only lets the player switch PvP on or off (an addon that tries is
@@ -427,6 +476,12 @@ end)
 ns.RegisterEvent("PLAYER_LEVEL_UP", function(newLevel)
   local me = ns.PlayerName()
   local lvl = tonumber(newLevel) or level()
+  for _, c in ipairs(C.MyPresets()) do
+    if c.preset.fromLevel and c.preset.fromLevel == lvl then
+      ns.Print("|cffd4a017" .. c.preset.name .. ":|r level " .. lvl .. "! From now on the addon holds you to it.")
+    end
+  end
+  if C_Timer then C_Timer.After(1, function() pcall(C.Enforce) end) end
   for k, d in Data.Each("challenges") do
     if Data.SplitKey(k) == me and d.status == "active" then
       if lvl >= C.MaxLevel() then
@@ -517,14 +572,15 @@ ns.RegisterEvent("PLAYER_XP_UPDATE", function(unit)
 end)
 ns.RegisterEvent("PLAYER_LOGOUT", function() C.SaveSnapshot() end)
 
--- Records saved before challenges could start at any level say "Start at level 1." in their rules.
--- Each member's client rewrites its own to today's wording.
+-- Ready-made challenges keep today's name and wording (Self-Made became Outlander, rules get
+-- reworded). Each member's client rewrites its own records.
 function C.RefreshOldRules()
   local me = ns.PlayerName()
   if not me then return end
   for k, d in Data.Each("challenges") do
-    if Data.SplitKey(k) == me and d.preset and C.PRESETS[d.preset] and type(d.rules) == "string" and d.rules:find("level 1", 1, true) then
-      update(k, { rules = C.PRESETS[d.preset].rules })
+    local p = d.preset and C.PRESETS[d.preset]
+    if Data.SplitKey(k) == me and p and (d.name ~= p.name or d.rules ~= p.rules) then
+      update(k, { name = p.name, rules = p.rules })
     end
   end
 end

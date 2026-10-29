@@ -8,9 +8,10 @@ local state = { finished = true }
 -- The form changes with the pick: a ready-made challenge shows its rules; "My own challenge"
 -- shows boxes for a name and rules.
 local function startForm(selected)
-  selected = selected or C.ORDER[1]
+  local avail = C.Available()
+  selected = selected or avail[1]
   local opts = {}
-  for _, id in ipairs(C.ORDER) do opts[#opts + 1] = { text = C.PRESETS[id].name, value = id } end
+  for _, id in ipairs(avail) do opts[#opts + 1] = { text = C.PRESETS[id].name, value = id } end
   opts[#opts + 1] = { text = "My own challenge", value = "custom" }
   local fields = {
     { key = "preset", label = "Challenge", type = "choice", value = selected, options = opts,
@@ -19,7 +20,8 @@ local function startForm(selected)
   local p = C.PRESETS[selected]
   if p then
     fields[#fields + 1] = { type = "info", value = "|cffd4a017Rules:|r " .. p.rules ..
-      "\n\n|cff999999The addon enforces these rules, and the challenge completes itself at max level. You can start at any level; your tooltip shows the level you started at.|r" }
+      "\n\n|cff999999The addon enforces these rules" .. ((p.fromLevel or 1) > 1 and (" from level " .. p.fromLevel) or "") ..
+      ", and the challenge completes itself at max level. You can start at any level; your tooltip shows the level you started at.|r" }
   else
     fields[#fields + 1] = { key = "name", label = "Name", type = "text", value = "", maxLen = 40 }
     fields[#fields + 1] = { key = "rules", label = "Rules", type = "multiline", value = "", maxLen = 400, height = 70 }

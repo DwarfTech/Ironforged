@@ -5,7 +5,7 @@ for line in io.lines(ADDON_DIR .. "/Ironforged.toc") do
   if line:match("%.lua%s*$") then FILES[#FILES + 1] = line:gsub("%s+$", "") end
 end
 
-local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000 }
+local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000, ITEM_TYPES = {} }
 -- the server knows a character by its full "First Surname" name; the realm is dropped when whispering
 function H.charName(full) return full end
 function H.baseName(n) -- same rule as the addon: a trailing "-Realm" goes; "First-Surname" becomes "First Surname"
@@ -171,6 +171,16 @@ local function makeClient(shortName, race, fullName)
     return { lines = lines }
   end }
   env.GetItemInfoInstant = function() return 1, "Armor", "Plate", "INVTYPE_CHEST" end
+  -- item id -> { classID, subclassID } for the challenges' weapon and shield rules
+  env.C_Item = { GetItemInfoInstant = function(id)
+    local t = H.ITEM_TYPES[id]
+    if t then return id, nil, nil, nil, nil, t[1], t[2] end
+  end }
+  env.UnitClass = function(u) local c = client.class or "WARRIOR"; return c:sub(1, 1) .. c:sub(2):lower(), c, 1 end
+  env.IsStealthed = function() return client.stealthed and true or false end
+  env.IsPlayerSpell = function(id) return client.known and client.known[id] and true or false end
+  env.PetAbandon = function() client.units.pet = nil end
+  env.GetTitleText = function() return client.questTitle end
   env.hooksecurefunc = function(a, b, c)
     if type(a) == "table" then local orig = a[b]; a[b] = function(...) local r = orig(...); c(...); return r end
     else local orig = env[a]; env[a] = function(...) local r = orig(...); b(...); return r end end
@@ -287,7 +297,9 @@ local function makeClient(shortName, race, fullName)
   client.profs = {}
   client.trade = nil
   client.invites = {}
-  local SPELLS = { [3491] = "Big Bronze Knife", [2741] = "Bronze Axe", [3297] = "Mining Pick", [12259] = "Silvered Bronze Leggings" }
+  local SPELLS = { [3491] = "Big Bronze Knife", [2741] = "Bronze Axe", [3297] = "Mining Pick", [12259] = "Silvered Bronze Leggings",
+    [589] = "Shadow Word: Pain", [585] = "Smite", [2050] = "Lesser Heal", [17] = "Power Word: Shield", [635] = "Holy Light",
+    [21084] = "Seal of Righteousness", [20271] = "Judgement", [465] = "Devotion Aura", [879] = "Exorcism", [8326] = "Ghost" }
   env.C_Spell = { GetSpellName = function(id) return SPELLS[id] end }
   env.GetProfessions = function() local p = client.profs; return p[1] and 1 or nil, p[2] and 2 or nil, nil, nil, nil end
   env.GetProfessionInfo = function(i) local p = client.profs[i]; if p then return p.name, 0, p.skill, p.max end end

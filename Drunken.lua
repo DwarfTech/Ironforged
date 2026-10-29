@@ -12,7 +12,6 @@ ns.Drunken = D
 
 D.GRACE = 30        -- seconds to drink once you're sober
 D.START_GRACE = 60  -- seconds to get a buzz going when the challenge starts, or when you log in
-D.FROM_LEVEL = 10   -- enforced from this level on
 
 local function isSecret(v) return issecretvalue and issecretvalue(v) end
 
@@ -34,7 +33,7 @@ local function level() return (UnitLevel and UnitLevel("player")) or 0 end
 -- My Drunken challenge, once it is being enforced (level 10 and up).
 local function active()
   local C = ns.Challenges
-  if not C or level() < D.FROM_LEVEL then return nil end
+  if not C then return nil end
   for _, c in ipairs(C.MyEnforced()) do if c.preset.drunk then return c end end
 end
 D.Active = active
@@ -208,17 +207,8 @@ ns.RegisterEvent("PLAYER_ENTERING_WORLD", function(isLogin, isReload)
 end)
 
 -- Reaching level 10 starts the first clock.
-ns.RegisterEvent("PLAYER_LEVEL_UP", function(newLevel)
-  if (tonumber(newLevel) or 0) ~= D.FROM_LEVEL then return end
-  if C_Timer then
-    C_Timer.After(2, function()
-      local C = ns.Challenges
-      for _, c in ipairs(C and C.MyEnforced() or {}) do
-        if c.preset.drunk then ns.Print("|cffd4a017Drunken:|r level " .. D.FROM_LEVEL .. "! From now on the addon holds you to it.") end
-      end
-      pcall(check)
-    end)
-  end
+ns.RegisterEvent("PLAYER_LEVEL_UP", function()
+  if C_Timer then C_Timer.After(2, function() pcall(check) end) end
 end)
 
 -- Taking on the challenge starts the first clock.
