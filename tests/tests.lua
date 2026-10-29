@@ -1410,6 +1410,40 @@ do
   if dlg then dlg:Hide() end
 end
 
+-- Iron Chef: only food you cooked
+do
+  local CK = K.ns.Challenges
+  for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
+  H.ITEM_TYPES[2683] = { 0, 5 } -- Spiced Wolf Meat
+  H.ITEM_TYPES[4540] = { 0, 5 } -- Tough Hunk of Bread
+  H.ITEM_TYPES[159] = { 0, 5 }  -- Refreshing Spring Water
+  local savedBags = K.bags
+  K.bags = { [1] = { id = 4540, name = "Tough Hunk of Bread", count = 4 }, [2] = { id = 159, name = "Refreshing Spring Water", count = 5 } }
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true)
+  local ic = CK.Start("ironchef"); H.run(1)
+  local function status() return K.ns.Data.Get("challenges", ic).status end
+  -- cook three, eat one: fine
+  K.bags[3] = { id = 2683, name = "Spiced Wolf Meat", count = 3 }
+  H.fire(K, "CHAT_MSG_LOOT", "You create: |cffffffff|Hitem:2683::::::::|h[Spiced Wolf Meat]|h|rx3."); H.fire(K, "BAG_UPDATE_DELAYED"); H.run(1)
+  check((CK.CookedLedger()[2683] or 0) == 3, "cooking adds to the Iron Chef ledger")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f1", 433)
+  K.bags[3].count = 2; H.fire(K, "BAG_UPDATE_DELAYED"); H.run(2)
+  check(status() == "active" and CK.CookedLedger()[2683] == 2, "eating food you cooked is fine")
+  -- drinking water is fine
+  K.bags[2].count = 4; H.fire(K, "BAG_UPDATE_DELAYED")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f2", 430); H.run(2)
+  check(status() == "active", "drinking water is fine")
+  -- selling bread isn't eating it
+  K.bags[1].count = 3; H.fire(K, "BAG_UPDATE_DELAYED"); H.run(5)
+  check(status() == "active", "food leaving your bags without eating doesn't count")
+  -- eating the starter bread fails
+  K.bags[1].count = 2; H.fire(K, "BAG_UPDATE_DELAYED"); H.run(0.5)
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f3", 433); H.run(2)
+  check(status() == "failed", "eating food you didn't cook fails Iron Chef")
+  K.bags = savedBags
+  for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
+end
+
 -- Call for aid from a solo start: four invites, then a raid, then the rest
 do
   local LKa = K.ns.LFD

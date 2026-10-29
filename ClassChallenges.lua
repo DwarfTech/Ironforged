@@ -447,6 +447,13 @@ function C.Diagnose()
       ns.Print("    gear (slot=class/subclass): " .. table.concat(parts, ", "))
     end
     if p.noDefStance then ns.Print("    knows Defensive Stance: " .. tostring(knowsDefensiveStance())) end
+    if p.ironChef and C.CookedLedger then
+      local parts = {}
+      for id, n in pairs(C.CookedLedger()) do
+        if n > 0 then parts[#parts + 1] = ((C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)) or ("item " .. id)) .. " x" .. n end
+      end
+      ns.Print("    food you've cooked and not eaten: " .. (#parts > 0 and table.concat(parts, ", ") or "none"))
+    end
     if p.needProfs then
       local have, readable = myProfessions()
       local names = {}
