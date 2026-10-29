@@ -1440,6 +1440,23 @@ do
   K.bags[1].count = 2; H.fire(K, "BAG_UPDATE_DELAYED"); H.run(0.5)
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f3", 433); H.run(2)
   check(status() == "failed", "eating food you didn't cook fails Iron Chef")
+  -- the bag glow: green for food you cooked, red for food you didn't, yellow for a mixed stack
+  local ic2 = CK.Start("ironchef"); H.run(1)
+  check(CK.FoodVerdict(2683, 2) == "cooked", "cooked food glows green")
+  check(CK.FoodVerdict(4540, 2) == "notyours", "bought or looted food glows red")
+  check(CK.FoodVerdict(2683, 9) == "mixed", "a stack holding more than you cooked glows yellow")
+  check(CK.FoodVerdict(159, 1) == "notyours" or CK.FoodVerdict(159, 1) == nil, "water is food & drink in the game's eyes")
+  -- classic-style bag frame: buttons get a glow texture
+  local cf = K.env.CreateFrame("Frame", "ContainerFrame1")
+  cf.GetID = function() return 0 end; cf.GetName = function() return "ContainerFrame1" end; cf.size = 3
+  for s = 1, 3 do local btn = K.env.CreateFrame("Button", "ContainerFrame1Item" .. s); btn.GetID = function() return s end end
+  local okG = pcall(CK.RefreshFoodGlow)
+  local g3, g1 = K.env.ContainerFrame1Item3.IronforgedChefGlow, K.env.ContainerFrame1Item1.IronforgedChefGlow
+  check(okG and type(g3) == "table" and g3:IsShown(), "Iron Chef puts a glow on food in the bags")
+  check(type(g1) == "table" and g1:IsShown(), "bread gets its glow too")
+  CK.Abandon(ic2); H.run(1)
+  pcall(CK.RefreshFoodGlow)
+  check(not K.env.ContainerFrame1Item3.IronforgedChefGlow:IsShown(), "the glow goes away when the challenge ends")
   K.bags = savedBags
   for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
 end

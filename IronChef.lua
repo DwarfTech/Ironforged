@@ -128,3 +128,96 @@ ns.RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", function(unit, _, spellID)
   pcall(resolve)
   if C_Timer then C_Timer.After(1, function() pcall(resolve) end) end
 end)
+
+----------------------------------------------------------------------
+-- Bag glow while Iron Chef is under way: green = you cooked it, red = you didn't,
+-- yellow = a stack holding more than you cooked (the game can't tell your pieces from bought ones).
+-- Works on the game's own bags; bag replacement addons draw their own buttons.
+----------------------------------------------------------------------
+local GLOW = { cooked = { 0.2, 1, 0.2 }, mixed = { 1, 0.85, 0.1 }, notyours = { 1, 0.15, 0.15 } }
+
+-- "cooked", "mixed", "notyours", or nil for anything that isn't food.
+function C.FoodVerdict(id, inBags)
+  if not id or isSecret(id) or not isFood(id) then return nil end
+  local made = ledger()[id] or 0
+  if made <= 0 then return "notyours" end
+  if inBags and inBags > made then return "mixed" end
+  return "cooked"
+end
+
+local function glowOn(button, color)
+  local g = button.IronforgedChefGlow
+  if type(g) ~= "table" then
+    g = button:CreateTexture(nil, "OVERLAY")
+    g:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+    g:SetBlendMode("ADD")
+    local w = (button.GetWidth and button:GetWidth()) or 37
+    g:SetSize(w * 1.8, w * 1.8)
+    g:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.IronforgedChefGlow = g
+  end
+  g:SetVertexColor(color[1], color[2], color[3], 1)
+  g:Show()
+end
+
+local function glowOff(button)
+  if type(button.IronforgedChefGlow) == "table" then button.IronforgedChefGlow:Hide() end
+end
+
+-- Every item button in the game's open bag frames: fn(button, bag, slot).
+local function eachBagButton(fn)
+  local frames = {}
+  for i = 1, (NUM_CONTAINER_FRAMES or 13) do
+    local f = _G["ContainerFrame" .. i]
+    if f then frames[#frames + 1] = f end
+  end
+  if ContainerFrameCombinedBags then frames[#frames + 1] = ContainerFrameCombinedBags end
+  for _, f in ipairs(frames) do
+    if f:IsShown() then
+      local okE, iter, state, ctl
+      if f.EnumerateValidItems then okE, iter, state, ctl = pcall(f.EnumerateValidItems, f) end
+      if okE and type(iter) == "function" then -- newer bag frames
+        for _, b in iter, state, ctl do
+          local bag = b.GetBagID and b:GetBagID()
+          if bag then fn(b, bag, b:GetID()) end
+        end
+      else -- classic-style: ContainerFrame1Item1..N, bag = the frame's ID
+        local name = f:GetName()
+        for s = 1, (f.size or 36) do
+          local b = _G[name .. "Item" .. s]
+          if b then fn(b, f:GetID(), b:GetID()) end
+        end
+      end
+    end
+  end
+end
+
+local function refreshGlow()
+  local on = chef() ~= nil
+  local counts = on and bagFood() or {}
+  eachBagButton(function(b, bag, slot)
+    if not on then glowOff(b); return end
+    local info = C_Container and C_Container.GetContainerItemInfo and C_Container.GetContainerItemInfo(bag, slot)
+    local verdict = info and C.FoodVerdict(info.itemID, counts[info.itemID])
+    if verdict then glowOn(b, GLOW[verdict]) else glowOff(b) end
+  end)
+end
+C.RefreshFoodGlow = refreshGlow
+
+local glowPending = false
+local function glowSoon()
+  if glowPending or not C_Timer then return end
+  glowPending = true
+  C_Timer.After(0.1, function() glowPending = false; pcall(refreshGlow) end)
+end
+for _, ev in ipairs({ "BAG_UPDATE_DELAYED", "BAG_OPEN", "BAG_CLOSED", "PLAYER_ENTERING_WORLD", "CHAT_MSG_LOOT" }) do
+  ns.RegisterEvent(ev, glowSoon)
+end
+ns.On("DATA_CHANGED", function(coll) if coll == "challenges" then glowSoon() end end)
+-- the bag frames redraw their buttons when opened or changed; glow again after they do
+if hooksecurefunc then
+  if ContainerFrame_Update then hooksecurefunc("ContainerFrame_Update", glowSoon) end
+  if ToggleBackpack then hooksecurefunc("ToggleBackpack", glowSoon) end
+  if OpenAllBags then hooksecurefunc("OpenAllBags", glowSoon) end
+  if ToggleAllBags then hooksecurefunc("ToggleAllBags", glowSoon) end
+end
