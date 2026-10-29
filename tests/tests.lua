@@ -1556,7 +1556,16 @@ do
   for tok in pairs(ta) do if not ts[tok] then missing = missing + 1 end end
   check(missing == 0, "late joiner holds every Clans/Promotions/Events/Grudges/War Hall/Titles row in its current version (" .. missing .. " missing)")
   check(AD.ALWAYS_SYNC.clans and AD.ALWAYS_SYNC.events and AD.ALWAYS_SYNC.requests and AD.ALWAYS_SYNC.grudges and AD.ALWAYS_SYNC.pvp and AD.ALWAYS_SYNC.titles and not AD.ALWAYS_SYNC.profiles, "always-sync groups")
-  check(not AD.Digests().events and not AD.Digests().grudges and AD.Digests().profiles, "always-sync collections left out of login digests")
+  check(not AD.Digests().events and not AD.Digests().grudges and AD.Digests().members, "always-sync collections left out of login digests")
+  -- backstories are frozen: kept, but never synced, accepted or written
+  local store = AD.Raw("profiles")
+  store["Kurdran"] = { d = { backstory = "Born under the mountain" }, t = A.ns.Stamp(), b = "Kurdran" }
+  check(not AD.Digests().profiles, "backstories are left out of sync")
+  check(not AD.Put("profiles", A.ns.PlayerName(), { backstory = "new" }, true), "backstories can't be written any more")
+  A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", r = { d = { backstory = "overwritten" }, t = A.ns.Stamp() + 5, b = "Kurdran" } })
+  check(AD.Get("profiles", "Kurdran").backstory == "Born under the mountain", "incoming backstories are ignored and the saved one is kept")
+  AD.PruneDeparted()
+  check(AD.Get("profiles", "Kurdran") ~= nil, "saved backstories are never pruned")
 end
 do
   -- messages from another protocol version are ignored

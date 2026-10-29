@@ -13,7 +13,7 @@ local state = { key = nil }
 -- Suggested tasks by rank name, used when the giver leaves the task list blank.
 local STARTER_TASKS = {
   { "ironguard", { "Claim the blood of the Horde", "Attend one of the guild's RP events" } },
-  { "vanguard", { "Write your backstory in the Ironforged addon", "Attend a guild event" } },
+  { "vanguard", { "Attend a guild event", "Take on a challenge in the Ironforged addon" } },
   { "veteran", { "60 days active in the community", "Complete a complicated Veteran trial or a mighty achievement with the guild" } },
   { "general", { "6 months active in the community", "Lead guildmates into battle" } },
   { "noble", { "1 year active in the community", "Complete the Noble trial" } },

@@ -136,7 +136,7 @@ Comm.PickRelays = pickRelays
 -- Outgoing helpers
 ----------------------------------------------------------------------
 function Comm.BroadcastRecord(coll, key, rec)
-  if ns.Data.LOCAL_ONLY[coll] then return end -- crafts are pulled by hash, never pushed
+  if ns.Data.LOCAL_ONLY[coll] or ns.Data.FROZEN[coll] then return end -- crafts are pulled by hash; frozen never travel
   if ns.Data.ALWAYS_SYNC[coll] then
     Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD") -- everyone, immediately
     return
@@ -337,7 +337,7 @@ local function handleDigest(sender, msg, channel)
   local mine = ns.Data.Digests()
   local differs = {}
   for _, coll in ipairs(ns.Data.COLLECTIONS) do
-    if not ns.Data.LOCAL_ONLY[coll] and not ns.Data.ALWAYS_SYNC[coll] and msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
+    if not ns.Data.LOCAL_ONLY[coll] and not ns.Data.ALWAYS_SYNC[coll] and not ns.Data.FROZEN[coll] and msg.dg[coll] ~= mine[coll] then differs[#differs + 1] = coll end
   end
   local since = type(msg.sn) == "number" and msg.sn or nil
   local function recent(rec) return not since or (rec.t or 0) >= since end
@@ -659,6 +659,7 @@ function Comm.Inject(sender, payload, channel)
 end
 
 -- /sendmsg [Sender Name]: send a test backstory from a guildmate (default Frugo Forever).
+-- Backstories are frozen since 2.18.0, so this now shows the receive path turning them away.
 SLASH_IFSENDMSG1 = "/sendmsg"
 SlashCmdList.IFSENDMSG = function(arg)
   arg = ns.Trim(arg or "")

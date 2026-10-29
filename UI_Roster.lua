@@ -79,7 +79,6 @@ function UI.ShowMember(name, opts)
   UI.shownMember = { name = name, opts = opts }
   local info = ns.roster[name] or {}
   local m = Data.Member(name)
-  local p = Data.Profile(name) or {}
   local report = Data.SelfReport(name)
   local lines = {}
   local function add(label, value)
@@ -134,11 +133,6 @@ function UI.ShowMember(name, opts)
   add("Public note", info.publicNote)
   if info.officerNote and info.officerNote ~= "" then add("Officer note", info.officerNote) end
   add("Hold record", m.note)
-  if p.backstory and p.backstory ~= "" then
-    lines[#lines + 1] = " "
-    lines[#lines + 1] = "|cffd4a017Backstory:|r"
-    lines[#lines + 1] = p.backstory
-  end
 
   local buttons = {}
   if ns.IAmOfficer() and not opts.noManage then

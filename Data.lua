@@ -53,6 +53,10 @@ Data.ALWAYS_SYNC = {
   appeals = true,                                                         -- Challenge appeals
 }
 
+-- Collections kept as they are in saved variables but no longer used: never synced, sent, accepted,
+-- written or pruned. Backstories were retired in 2.18.0; the text people wrote is kept.
+Data.FROZEN = { profiles = true }
+
 local VALID = {}
 for _, c in ipairs(Data.COLLECTIONS) do VALID[c] = true end
 Data.VALID = VALID
@@ -406,8 +410,10 @@ function Data.PruneDeparted()
   if not store or not Data.RosterTrusted() then return 0 end
   local removed = 0
   for coll, c in pairs(store.colls) do
+    if not Data.FROZEN[coll] then
     for key, rec in pairs(c) do
       if Data.Departed(coll, key, rec) then c[key] = nil; removed = removed + 1 end
+    end
     end
   end
   if removed > 0 then ns.Fire("DATA_CHANGED") end
@@ -442,7 +448,7 @@ end
 -- records that passed these checks when they were written, and some rights (a Clan Leader's)
 -- can end later, so history relayed by an officer is accepted as-is.
 function Data.Merge(coll, key, rec, relayed)
-  if not store or not VALID[coll] or type(key) ~= "string" or #key > 120 then return false end
+  if not store or not VALID[coll] or Data.FROZEN[coll] or type(key) ~= "string" or #key > 120 then return false end
   if not validRecord(rec) then return false end
   -- no stamps from the future (a minute of slack for clock jitter), and no tombstones old enough to be pruned
   if rec.t > (ns.Now() + 60) * 1000 then return false, "future" end
@@ -467,6 +473,7 @@ end
 ----------------------------------------------------------------------
 function Data.Put(coll, key, data, quiet)
   if not store then ns.Print("Guild data isn't loaded yet."); return false end
+  if Data.FROZEN[coll] then return false end
   local me = ns.PlayerName()
   if not Data.CanWrite(me, coll, key, data) then
     if not quiet then ns.Print("You don't have the standing to change that.") end
@@ -480,7 +487,7 @@ function Data.Put(coll, key, data, quiet)
 end
 
 function Data.Delete(coll, key)
-  if not store then return false end
+  if not store or Data.FROZEN[coll] then return false end
   local me = ns.PlayerName()
   if not Data.CanWrite(me, coll, key, nil) then
     ns.Print("You don't have the standing to change that.")
@@ -529,7 +536,7 @@ end
 function Data.Digests()
   local out = {}
   for _, c in ipairs(Data.COLLECTIONS) do
-    if not Data.LOCAL_ONLY[c] and not Data.ALWAYS_SYNC[c] then out[c] = Data.Digest(c) end
+    if not Data.LOCAL_ONLY[c] and not Data.ALWAYS_SYNC[c] and not Data.FROZEN[c] then out[c] = Data.Digest(c) end
   end
   return out
 end
