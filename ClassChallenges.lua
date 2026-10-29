@@ -88,15 +88,8 @@ P.oathbreaker = { name = "Oathbreaker", classes = set({ PALADIN }), noShield = t
     if PALADIN_DEFENSIVE[n] then return "a defensive ability" end
   end,
   rules = "Paladins. No shield, no healing spells, and no defensive abilities: Divine Shield, Divine Protection, Blessing of Protection, Devotion Aura and the like." }
-P.runesmith = { name = "Runesmith", classes = set({ PALADIN }), fromLevel = 10, needProfs = { "Blacksmithing", "Enchanting" },
-  spellRule = function(n)
-    if n:find("^Seal of ") or n:find("^Judgement") or n == "Summon Warhorse" or n == "Summon Charger" then return nil end
-    if PALADIN_ALL[n] then return "a spell other than a seal or Judgement" end
-  end,
-  rules = "Paladins. From level 10, you must know Blacksmithing and Enchanting, and the only spells you may cast are seals and Judgement (your mount is fine)." }
-
 for _, id in ipairs({ "ironbreaker", "doomseeker", "brawler", "hammerer", "beastmaster", "rifleman", "brute",
-  "lightbringer", "voidbringer", "oathbreaker", "runesmith" }) do
+  "lightbringer", "voidbringer", "oathbreaker" }) do
   C.ORDER[#C.ORDER + 1] = id
 end
 
@@ -167,7 +160,7 @@ table.insert(C.ENFORCERS, function(c)
 end)
 
 ----------------------------------------------------------------------
--- Runesmith: the two professions
+-- Required professions (needProfs), for any challenge that wants them
 ----------------------------------------------------------------------
 -- Professions this character knows, and whether the game could tell us at all.
 local function myProfessions()

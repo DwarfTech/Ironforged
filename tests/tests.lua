@@ -1153,7 +1153,7 @@ do
   check(status(vb) == "failed", "a heal fails Voidbringer")
   clear()
 
-  -- Oathbreaker and Runesmith (paladin)
+  -- Oathbreaker (paladin)
   K.class = "PALADIN"
   local ob = CK.Start("oathbreaker"); H.run(1)
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g5", 879); H.run(1)
@@ -1161,24 +1161,6 @@ do
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g6", 465); H.run(1)
   check(status(ob) == "failed", "Devotion Aura fails Oathbreaker")
   clear()
-  local savedProfs = K.profs
-  K.profs = { { name = "Blacksmithing", skill = 50, max = 75 }, { name = "Enchanting", skill = 40, max = 75 } }
-  local rs = CK.Start("runesmith"); H.run(12)
-  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g7", 21084); H.run(1)
-  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g8", 20271); H.run(1)
-  check(status(rs) == "active", "seals and Judgement are fine for Runesmith")
-  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g9", 635); H.run(1)
-  check(status(rs) == "failed", "Holy Light fails Runesmith")
-  clear()
-  K.profs = { { name = "Blacksmithing", skill = 50, max = 75 } }
-  local rs2 = CK.Start("runesmith"); H.run(12)
-  local warnedProf = false
-  for _, m in ipairs(K.chat) do if m:find("you need Enchanting", 1, true) then warnedProf = true end end
-  check(warnedProf, "Runesmith asks for both professions")
-  H.run(610)
-  check(status(rs2) == "failed", "Runesmith without Enchanting fails after 10 minutes")
-  clear()
-  K.profs = savedProfs
   K.class, K.level = nil, savedLevel
 end
 
