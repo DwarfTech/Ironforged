@@ -132,7 +132,7 @@ local function makeClient(shortName, race, fullName)
   end
   env.GetGuildRosterLastOnline = function() return 0, 0, 0, 0 end
   env.C_GuildInfo = { GuildRoster = function() client.rosterRequested = true end, Invite = function() end }
-  env.InCombatLockdown = function() return false end
+  env.InCombatLockdown = function() return client.inCombat and true or false end
   client.race = race or "Dwarf"
   client.items = {}
   client.units = {}
@@ -148,6 +148,7 @@ local function makeClient(shortName, race, fullName)
     return "Alliance"
   end
   env.UnitIsDeadOrGhost = function(u)
+    if u == "player" then return client.dead and true or false end
     if u == "target" and client.target then return client.target.dead and true or false end
     if client.units[u] then return client.units[u].dead and true or false end
     return false
@@ -180,6 +181,8 @@ local function makeClient(shortName, race, fullName)
   env.IsStealthed = function() return client.stealthed and true or false end
   env.IsPlayerSpell = function(id) return client.known and client.known[id] and true or false end
   env.PetAbandon = function() client.units.pet = nil end
+  env.GetNumGroupMembers = function() return client.groupSize or 0 end
+  env.UnitInParty = function(n) return client.partyNames and client.partyNames[n] or false end
   env.GetTitleText = function() return client.questTitle end
   env.hooksecurefunc = function(a, b, c)
     if type(a) == "table" then local orig = a[b]; a[b] = function(...) local r = orig(...); c(...); return r end

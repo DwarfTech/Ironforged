@@ -136,6 +136,11 @@ function C.Start(presetId, name, rules)
     if not C.ClassAllowed(preset) then ns.Print(preset.name .. " isn't a challenge for your class."); return false end
     for _, c in ipairs(C.MyPresets()) do
       if c.data.preset == presetId then ns.Print("You're already on the " .. preset.name .. " challenge."); return false end
+      local other = c.preset
+      if (preset.needShield and other.noShield) or (preset.noShield and other.needShield) then
+        ns.Print(preset.name .. " and " .. other.name .. " can't both be kept: one needs a shield, the other forbids it.")
+        return false
+      end
     end
     name, rules = preset.name, preset.rules
   else

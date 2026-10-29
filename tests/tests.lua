@@ -1175,6 +1175,144 @@ do
   K.class, K.level = nil, savedLevel
 end
 
+-- Edge cases: combat, death, reloads, level edges, conflicts
+do
+  local CK = K.ns.Challenges
+  local function clear() for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1) end
+  local function status(k) return K.ns.Data.Get("challenges", k).status end
+  local savedLevel = K.level
+  clear()
+
+  -- a sword put on in combat can't come off until the fight ends; that isn't a failure
+  K.class, K.level = "WARRIOR", 20
+  local br = CK.Start("brawler"); H.run(1)
+  K.inCombat = true; K.equip[16] = 9002
+  H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(30)
+  check(K.equip[16] == 9002 and status(br) == "active", "a forbidden weapon worn in combat gets a grace period")
+  K.inCombat = false; H.fire(K, "PLAYER_REGEN_ENABLED"); H.run(1)
+  check(K.equip[16] == nil and status(br) == "active", "it comes off when the fight ends")
+  -- but staying in combat past the grace fails
+  K.inCombat = true; K.equip[16] = 9002; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(75)
+  check(status(br) == "failed", "a forbidden weapon kept on for a minute fails, even in combat")
+  K.inCombat = false; K.equip[16] = nil
+  clear()
+
+  -- level edges: Hammerer isn't enforced at 9
+  K.class, K.level = "ROGUE", 9
+  K.equip[16] = 9002
+  local hm = CK.Start("hammerer"); H.run(12)
+  check(K.equip[16] == 9002 and status(hm) == "active", "Hammerer leaves your sword alone below level 10")
+  K.level = 10; H.fire(K, "PLAYER_LEVEL_UP", 10); H.run(3)
+  check(K.equip[16] == nil, "Hammerer takes the sword off on reaching level 10")
+  clear()
+
+  -- spells before the start level, and other people's spells, don't count
+  K.class, K.level = "PRIEST", 2
+  local vb = CK.Start("voidbringer"); H.run(1)
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "e1", 585); H.run(1)
+  check(status(vb) == "active", "Smite at level 2 doesn't fail Voidbringer (enforced from 4)")
+  K.level = 4
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "party1", "e2", 2050); H.run(1)
+  check(status(vb) == "active", "a party member's heal doesn't count against you")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "e3", 8326); H.run(1)
+  check(status(vb) == "active", "spells on no list are fine")
+  clear()
+
+  -- challenges that can't both be kept aren't allowed together
+  K.class, K.level = "WARRIOR", 20
+  local a1 = CK.Start("ironbreaker"); H.run(1)
+  check(a1 and not CK.Start("doomseeker"), "Ironbreaker and Doomseeker can't be taken on together")
+  clear()
+  K.class = "PALADIN"
+  CK.Start("oathbreaker"); H.run(1)
+  check(not CK.Start("ironbreaker"), "Oathbreaker and Ironbreaker can't be taken on together")
+  clear()
+
+  -- one failing challenge leaves the others alone
+  K.class = "PRIEST"
+  local lb = CK.Start("lightbringer"); local d1 = CK.Start("drunken"); H.run(2)
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel tipsy."); H.run(1)
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "e4", 589); H.run(1)
+  check(status(lb) == "failed" and status(d1) == "active", "failing one challenge leaves the others running")
+
+  -- Drunken: the clock stops in combat and while dead
+  K.bags[6] = { id = 2596, name = "Skin of Dwarven Stout", count = 2 }
+  K.inCombat = true
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(45)
+  check(status(d1) == "active", "Drunken waits while you're in combat")
+  K.inCombat = false; K.dead = true; H.run(45)
+  check(status(d1) == "active", "Drunken waits while you're dead")
+  K.dead = false; H.run(20)
+  check(status(d1) == "active", "the clock picks up again after")
+  H.run(15)
+  check(status(d1) == "failed", "and runs out")
+  clear()
+
+  -- Drunken: giving up mid-countdown hides the popup and fails nothing
+  local d2 = CK.Start("drunken"); H.run(3)
+  check(K.env.IronforgedDrunkFrame:IsShown(), "popup up for a new Drunken run")
+  CK.Abandon(d2); H.run(3)
+  check(not K.env.IronforgedDrunkFrame:IsShown() and status(d2) == "abandoned", "giving up clears the popup")
+  H.run(70)
+  check(status(d2) == "abandoned", "an abandoned Drunken run can't fail later")
+
+  -- Drunken: a reload keeps the buzz; a fresh login asks again
+  local d3 = CK.Start("drunken"); H.run(2)
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel tipsy."); H.run(1)
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(10)
+  check(not K.env.IronforgedDrunkFrame:IsShown(), "a /reload keeps your buzz")
+  H.fire(K, "PLAYER_ENTERING_WORLD", true, false); H.run(10)
+  check(K.env.IronforgedDrunkFrame:IsShown(), "a fresh login asks for a drink")
+  K.bags[6].count = 1; H.fire(K, "BAG_UPDATE", 0); H.run(2)
+  check(not K.env.IronforgedDrunkFrame:IsShown() and status(d3) == "active", "drinking after login is enough")
+  K.bags[6] = nil
+  clear()
+
+  -- Rifleman: a pet you were told to abandon is still owed after a reload
+  K.class = "HUNTER"
+  local rf = CK.Start("rifleman"); H.run(1)
+  K.units.pet = { name = "Snarl" }; H.fire(K, "UNIT_PET", "player"); H.run(2)
+  K.units.pet = nil; H.fire(K, "UNIT_PET", "player")
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(30)
+  K.env.PetAbandon(); H.run(45)
+  check(status(rf) == "active", "abandoning after a reload still counts")
+  clear()
+
+  -- a record saved as Self-Made is renamed Outlander
+  local me = K.ns.PlayerName()
+  local old = me .. "#oldsm"
+  K.ns.Data.Put("challenges", old, { name = "Self-Made", rules = "Start at level 1.", preset = "selfmade", ts = 1, status = "active", startLevel = 1, lvl = 1 })
+  CK.RefreshOldRules(); H.run(2)
+  check(K.ns.Data.Get("challenges", old).name == "Outlander", "old Self-Made challenges are renamed Outlander")
+  check(D.ns.Data.Get("challenges", old) and D.ns.Data.Get("challenges", old).name == "Outlander", "the rename reaches guildmates")
+  clear()
+  K.class, K.level = nil, savedLevel
+end
+
+-- Call for aid from a solo start: four invites, then a raid, then the rest
+do
+  local LKa = K.ns.LFD
+  local ak = LKa.CallForAid(); H.run(2)
+  for _, c in ipairs({ D, M, A }) do c.ns.LFD.Join(ak, "dps") end
+  H.run(3)
+  local n = #LKa.Joins(ak)
+  K.invites = {}; K.inGroup, K.inRaid, K.leader = false, false, false
+  -- pretend a few more signed up so there are more than four
+  for i = 1, 3 do K.ns.Data.Merge("lfdjoin", ak .. "#" .. ({ "Hilda", "Thorin", "Frugo" })[i], { d = { role = "dps", ts = 1 }, t = K.ns.Stamp(), b = ({ "Hilda", "Thorin", "Frugo" })[i] }, true) end
+  local online = 0
+  for _, j in ipairs(LKa.Joins(ak)) do if K.ns.roster[j.member] and K.ns.roster[j.member].online then online = online + 1 end end
+  LKa.InviteAll(ak)
+  check(#K.invites == math.min(4, online), "solo: only four invites go out at first (" .. #K.invites .. " of " .. online .. " online)")
+  if online > 4 then
+    K.inGroup, K.leader = true, true
+    K.partyNames = {}; for _, nm in ipairs(K.invites) do K.partyNames[nm] = true end
+    H.fire(K, "GROUP_ROSTER_UPDATE"); H.run(1)
+    check(K.inRaid and #K.invites == online, "once the party forms it becomes a raid and the rest are invited")
+  end
+  LKa.Close(ak, true); H.run(2)
+  K.inGroup, K.inRaid, K.leader, K.partyNames, K.invites = false, false, false, nil, {}
+end
+
 -- Late joiner converges
 local F = H.makeClient("Frugo", nil, "Frugo-Mega"); F.guidOverride = "Player-Frugo-Mega"
 H.boot(F)
@@ -1232,6 +1370,7 @@ H.run(90)
 check(Bc.ns.PlayerName() == "Buttercup Clamstone", "surnamed member recognised")
 check(Bc.ns.Data.Digest("grudges") == AD.Digest("grudges"), "surnamed member syncs (whispered records arrive)")
 check(A.ns.Name("Buttercup Clamstone-Forever") == "Buttercup Clamstone" and A.ns.Name("Buttercup Clamstone") == "Buttercup Clamstone" and A.ns.Name("Thorin-Forever") == "Thorin", "character name is first name and surname without the realm")
+H.run(60) -- let the newcomers' catch-up traffic drain first
 A.inRaid, K.inRaid, D.inRaid, Bc.inRaid = true, true, true, true
 A.ns.Gamble.Open(100); H.run(2)
 Bc.ns.Gamble.Join(); K.ns.Gamble.Join(); H.run(2)
