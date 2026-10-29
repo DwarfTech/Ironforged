@@ -100,6 +100,16 @@ function Cheers.FindDrink()
   return best, names[best], counts[best]
 end
 
+-- Food & drink (consumable subclass 5), when the game can say; unknown counts as yes.
+local function isDrinkItem(id)
+  local fn = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+  if not fn then return true end
+  local ok, _, _, _, _, _, cls, sub = pcall(fn, id)
+  if not ok or cls == nil then return true end
+  return cls == 0 and sub == 5
+end
+Cheers.IsDrinkItem = isDrinkItem
+
 -- Every drink in your bags, counted together (to notice when one is drunk).
 function Cheers.DrinkTotal()
   local n = 0
@@ -108,7 +118,7 @@ function Cheers.DrinkTotal()
       local id, count, link = slotInfo(bag, slot)
       if id and not isSecret(id) then
         local name = linkName(link) or ""
-        if KNOWN_RANK[id] or nameHas(name, ALE_WORDS) or nameHas(name, SPIRIT_WORDS) then n = n + (count or 1) end
+        if (KNOWN_RANK[id] or nameHas(name, ALE_WORDS) or nameHas(name, SPIRIT_WORDS)) and isDrinkItem(id) then n = n + (count or 1) end
       end
     end
   end

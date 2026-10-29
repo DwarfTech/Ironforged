@@ -181,6 +181,7 @@ local function makeClient(shortName, race, fullName)
   env.IsStealthed = function() return client.stealthed and true or false end
   env.IsPlayerSpell = function(id) return client.known and client.known[id] and true or false end
   env.PetAbandon = function() client.units.pet = nil end
+  env.HasPetUI = function() local p = client.units.pet; return p ~= nil, p ~= nil and not p.temp end
   env.GetNumGroupMembers = function() return client.groupSize or 0 end
   env.UnitInParty = function(n) return client.partyNames and client.partyNames[n] or false end
   env.GetTitleText = function() return client.questTitle end

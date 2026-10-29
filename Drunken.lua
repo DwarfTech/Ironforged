@@ -15,13 +15,31 @@ D.START_GRACE = 60  -- seconds to get a buzz going when the challenge starts, or
 
 local function isSecret(v) return issecretvalue and issecretvalue(v) end
 
--- The game's own drunk messages (with the English text as a fallback).
+-- The game's own drunk messages (English text as a fallback). Drinking an item says which one
+-- ("You feel tipsy from the Thunder Ale."), so those forms are matched too.
 local SOBER = { [DRUNK_MESSAGE_SELF1 or "You feel sober again."] = true, ["You feel sober again."] = true }
 local BUZZ = {}
+local BUZZ_PATTERNS = {}
+local function asPattern(s)
+  return "^" .. s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"):gsub("%%%%s", ".+"):gsub("%%%%d", "%%d+") .. "$"
+end
 for _, m in ipairs({ DRUNK_MESSAGE_SELF2 or "You feel tipsy.", DRUNK_MESSAGE_SELF3 or "You feel drunk.",
   DRUNK_MESSAGE_SELF4 or "You feel completely smashed.", "You feel tipsy.", "You feel drunk.", "You feel completely smashed." }) do
   BUZZ[m] = true
 end
+for i = 2, 4 do
+  local m = _G["DRUNK_MESSAGE_ITEM_SELF" .. i]
+  if type(m) == "string" then BUZZ_PATTERNS[#BUZZ_PATTERNS + 1] = asPattern(m) end
+end
+for _, w in ipairs({ "tipsy", "drunk", "completely smashed" }) do
+  BUZZ_PATTERNS[#BUZZ_PATTERNS + 1] = "^You feel " .. w .. " from .+%.$"
+end
+local function isBuzz(text)
+  if BUZZ[text] then return true end
+  for _, p in ipairs(BUZZ_PATTERNS) do if text:find(p) then return true end end
+  return false
+end
+D._isBuzz = isBuzz
 
 local state = "unknown"  -- "buzzed", "sober" or "unknown" (just logged in)
 local countdown          -- { left = seconds, reason = "sober"|"start" }
@@ -45,6 +63,18 @@ local function save()
   if not me or not ns.db then return end
   ns.db.drunk = ns.db.drunk or {}
   ns.db.drunk[me] = state
+end
+
+-- The countdown survives a /reload or relog: seconds left are saved, so reloading can't reset it.
+local function saveClock()
+  local me = ns.PlayerName()
+  if not me or not ns.db then return end
+  ns.db.drunkClock = ns.db.drunkClock or {}
+  ns.db.drunkClock[me] = countdown and { left = countdown.left, reason = countdown.reason } or nil
+end
+local function savedClock()
+  local me = ns.PlayerName()
+  return me and ns.db and ns.db.drunkClock and ns.db.drunkClock[me]
 end
 
 ----------------------------------------------------------------------
@@ -129,6 +159,7 @@ end
 ----------------------------------------------------------------------
 local function stop()
   countdown = nil
+  saveClock()
   hide()
 end
 
@@ -151,15 +182,20 @@ local function tick()
     ns.Challenges.Fail(c.key, "Sobered up at level " .. level() .. ".")
     return
   end
-  if frame and frame:IsShown() then refresh() elseif build() then refresh(); frame:Show() end
+  if frame and frame:IsShown() then refresh()
+  elseif not inCombat() and build() then refresh(); frame:Show() end
+  saveClock()
 end
 D._tick = tick
 
 local function start(secs, reason)
   if countdown or not active() then return end
+  local saved = savedClock()
+  if saved and tonumber(saved.left) then secs, reason = math.min(secs, tonumber(saved.left)), saved.reason or reason end
   countdown = { left = secs, reason = reason }
   lastTotal = ns.Cheers and ns.Cheers.DrinkTotal() or 0
-  if build() then refresh(); frame:Show() end
+  saveClock()
+  if not inCombat() and build() then refresh(); frame:Show() end
   if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
   ns.Print("|cffff4040Drunken:|r " .. (reason == "start" and "get a buzz going" or "your buzz is wearing off") ..
     "! Drink within " .. secs .. " seconds or the challenge fails.")
@@ -178,7 +214,7 @@ D.Check = check
 ----------------------------------------------------------------------
 ns.RegisterEvent("CHAT_MSG_SYSTEM", function(text)
   if type(text) ~= "string" or isSecret(text) then return end
-  if BUZZ[text] then
+  if isBuzz(text) then
     buzzed(false)
   elseif SOBER[text] then
     state = "sober"
@@ -188,10 +224,21 @@ ns.RegisterEvent("CHAT_MSG_SYSTEM", function(text)
 end)
 
 -- A drink leaving your bags counts at once, even before (or without) the game's "tipsy" message.
+-- Not while a vendor, bank, mailbox, trade or auction house is open: that's selling or storing it.
+local openWindows = {}
+for _, pair in ipairs({ { "MERCHANT_SHOW", "MERCHANT_CLOSED", "merchant" }, { "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "bank" },
+  { "MAIL_SHOW", "MAIL_CLOSED", "mail" }, { "TRADE_SHOW", "TRADE_CLOSED", "trade" },
+  { "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "ah" }, { "GUILDBANKFRAME_OPENED", "GUILDBANKFRAME_CLOSED", "gbank" } }) do
+  ns.RegisterEvent(pair[1], function() openWindows[pair[3]] = true end)
+  ns.RegisterEvent(pair[2], function() openWindows[pair[3]] = nil end)
+end
+local function storing() return next(openWindows) ~= nil end
+ns.RegisterEvent("PLAYER_ENTERING_WORLD", function() wipe(openWindows) end)
+
 local function bagsChanged()
   if not countdown or not ns.Cheers then return end
   local total = ns.Cheers.DrinkTotal()
-  if lastTotal and total < lastTotal then buzzed(true); return end
+  if lastTotal and total < lastTotal and not storing() then buzzed(true); return end
   lastTotal = total
 end
 ns.RegisterEvent("BAG_UPDATE_DELAYED", bagsChanged)

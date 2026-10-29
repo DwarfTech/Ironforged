@@ -53,6 +53,13 @@ local WARRIOR, PALADIN, HUNTER, ROGUE, PRIEST = "WARRIOR", "PALADIN", "HUNTER", 
 P.ironbreaker = { name = "Ironbreaker", classes = set({ WARRIOR, PALADIN }), fromLevel = 5, needShield = true,
   rules = "Warriors and Paladins. From level 5, always wear a shield. Take it off and you have a minute to put one back on." }
 P.doomseeker = { name = "Doomseeker", classes = set({ WARRIOR }), fromLevel = 5, noShield = true, noDefStance = true,
+  canStart = function()
+    if C.KnowsDefensiveStance and C.KnowsDefensiveStance() then
+      ns.Print("Doomseeker: you already know Defensive Stance, so this one is out of reach for this character.")
+      return false
+    end
+    return true
+  end,
   rules = "Warriors. From level 5, never use a shield and never learn Defensive Stance. Skip the Defensive Stance quests: learning the stance fails the challenge." }
 P.brawler = { name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN }), weapons = set({ 13 }),
   weaponWhat = { what = "weapon other than a fist weapon", fail = "a weapon other than a fist weapon" },
@@ -133,19 +140,28 @@ function C.GearRules(p)
 end
 
 -- Ironbreaker: a shield, always.
-local shieldGoneSince, shieldWarned
+-- The minute is kept in saved variables (server time), so a /reload doesn't restart it.
+local shieldWarned
+local function shieldClock(v)
+  local me = ns.PlayerName()
+  if not me or not ns.db then return nil end
+  ns.db.shieldGone = ns.db.shieldGone or {}
+  if v ~= nil then ns.db.shieldGone[me] = v or nil end
+  return ns.db.shieldGone[me]
+end
 table.insert(C.ENFORCERS, function(c)
   if not c.preset.needShield then return end
-  if hasShield() then shieldGoneSince, shieldWarned = nil, nil; return end
-  if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return end
-  shieldGoneSince = shieldGoneSince or now()
+  if hasShield() then shieldClock(false); shieldWarned = nil; return end
+  -- dead: a fresh minute once you're back on your feet
+  if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then shieldClock(false); shieldWarned = nil; return end
+  local since = shieldClock() or shieldClock(ns.Now())
   if not shieldWarned then
     shieldWarned = true
     ns.Print("|cffff4040" .. c.preset.name .. ":|r put a shield on within a minute or the challenge fails.")
     if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
   end
-  if now() - shieldGoneSince >= C.GRACE then
-    shieldGoneSince, shieldWarned = nil, nil
+  if ns.Now() - since >= C.GRACE then
+    shieldClock(false); shieldWarned = nil
     C.Fail(c.key, "Went without a shield at level " .. level() .. ".")
   end
 end)
@@ -153,16 +169,30 @@ end)
 ----------------------------------------------------------------------
 -- Runesmith: the two professions
 ----------------------------------------------------------------------
+-- Professions this character knows, and whether the game could tell us at all.
 local function myProfessions()
   local out = {}
-  if not (GetProfessions and GetProfessionInfo) then return out, false end
-  local a, b, c, d, e = GetProfessions()
-  local any = false
-  for _, idx in pairs({ a, b, c, d, e }) do
-    local ok, name = pcall(GetProfessionInfo, idx)
-    if ok and type(name) == "string" then out[name] = true; any = true end
+  if GetProfessions and GetProfessionInfo then
+    local ok, a, b, c, d, e = pcall(GetProfessions)
+    if ok then
+      for _, idx in pairs({ a, b, c, d, e }) do
+        local okI, name = pcall(GetProfessionInfo, idx)
+        if okI and type(name) == "string" then out[name] = true end
+      end
+      return out, true
+    end
   end
-  return out, any
+  if GetNumSkillLines and GetSkillLineInfo then -- classic-style skill list
+    local okN, n = pcall(GetNumSkillLines)
+    if okN and type(n) == "number" and n > 0 then
+      for i = 1, n do
+        local okI, name, isHeader = pcall(GetSkillLineInfo, i)
+        if okI and type(name) == "string" and not isHeader then out[name] = true end
+      end
+      return out, true
+    end
+  end
+  return out, false
 end
 
 local profsMissingSince, profsWarned
@@ -170,7 +200,7 @@ table.insert(C.ENFORCERS, function(c)
   local need = c.preset.needProfs
   if not need then return end
   local have, readable = myProfessions()
-  if not readable and next(have) == nil then return end
+  if not readable then return end
   local missing = {}
   for _, n in ipairs(need) do if not have[n] then missing[#missing + 1] = n end end
   if #missing == 0 then profsMissingSince, profsWarned = nil, nil; return end
@@ -190,7 +220,11 @@ end)
 -- Spells
 ----------------------------------------------------------------------
 local function spellName(id)
-  if not id or isSecret(id) then return nil end
+  if isSecret(id) then
+    if ns.debug then ns.Print("debug: the game hid a spell you cast; spell challenges can't see it") end
+    return nil
+  end
+  if not id then return nil end
   local n
   if C_Spell and C_Spell.GetSpellName then
     local ok, v = pcall(C_Spell.GetSpellName, id)
@@ -239,6 +273,7 @@ local function knowsDefensiveStance()
   return false
 end
 
+C.KnowsDefensiveStance = knowsDefensiveStance
 table.insert(C.ENFORCERS, function(c)
   if c.preset.noDefStance and knowsDefensiveStance() then
     C.Fail(c.key, "Learned Defensive Stance at level " .. level() .. ".")
@@ -246,7 +281,8 @@ table.insert(C.ENFORCERS, function(c)
 end)
 local function stanceCheck() if C_Timer then C_Timer.After(0.5, function() pcall(C.Enforce) end) end end
 ns.RegisterEvent("SPELLS_CHANGED", stanceCheck)
-ns.RegisterEvent("LEARNED_SPELL_IN_TAB", stanceCheck)
+ns.RegisterEvent("LEARNED_SPELL_IN_TAB", stanceCheck)        -- older clients
+ns.RegisterEvent("LEARNED_SPELL_IN_SKILL_LINE", stanceCheck) -- newer clients
 
 local function doomseeker()
   for _, c in ipairs(C.MyEnforced()) do if c.preset.noDefStance then return c end end
@@ -279,7 +315,7 @@ local stealthSince
 local function stealthed()
   if not IsStealthed then return false end
   local ok, v = pcall(IsStealthed)
-  return ok and v == true
+  return ok and not isSecret(v) and v and true or false
 end
 
 local function checkStealth()
@@ -320,10 +356,29 @@ local function rifleman()
   for _, c in ipairs(C.MyEnforced()) do if c.preset.noPet then return c end end
 end
 
+-- Only a hunter's own tamed pet counts (not a quest or item companion, or something possessed).
+local function hunterPet()
+  if not (UnitExists and UnitExists("pet")) then return false end
+  if HasPetUI then
+    local ok, has, isHunter = pcall(HasPetUI)
+    if ok and has ~= nil then return (has and isHunter) and true or false end
+  end
+  return true
+end
+
+local abandonHooked = false
+
 local function checkPet()
   local c = rifleman()
   if not c then return end
-  local hasPet = UnitExists and UnitExists("pet")
+  if not abandonHooked then
+    if hunterPet() and not C._petReminded then
+      C._petReminded = true
+      ns.Print("|cffff4040Rifleman:|r no pets! (This game version doesn't let the addon see you abandon one, so it can only remind you.)")
+    end
+    return
+  end
+  local hasPet = hunterPet()
   local owed = petOwed()
   if hasPet and not owed then
     owed = ns.Now()
@@ -351,8 +406,8 @@ local function abandoned()
     ns.Print("|cffd4a017Rifleman:|r pet abandoned. Just you and your gun.")
   end
 end
-if hooksecurefunc and PetAbandon then hooksecurefunc("PetAbandon", abandoned) end
-if hooksecurefunc and C_PetInfo and C_PetInfo.PetAbandon then hooksecurefunc(C_PetInfo, "PetAbandon", abandoned) end
+if hooksecurefunc and PetAbandon then hooksecurefunc("PetAbandon", abandoned); abandonHooked = true end
+if hooksecurefunc and C_PetInfo and C_PetInfo.PetAbandon then hooksecurefunc(C_PetInfo, "PetAbandon", abandoned); abandonHooked = true end
 
 ns.RegisterEvent("UNIT_PET", function(unit) if unit == "player" then pcall(checkPet) end end)
 table.insert(C.ENFORCERS, function(c) if c.preset.noPet then checkPet() end end)

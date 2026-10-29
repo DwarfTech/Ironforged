@@ -1010,6 +1010,7 @@ do
   for _, c in ipairs(CK.MyEnforced()) do CK.Abandon(c.key) end
   H.run(2)
   K.bags[5] = { id = 2596, name = "Skin of Dwarven Stout", count = 3 }
+  for _, ev in ipairs({ "MERCHANT_CLOSED", "BANKFRAME_CLOSED", "MAIL_CLOSED", "TRADE_CLOSED", "AUCTION_HOUSE_CLOSED" }) do H.fire(K, ev) end
   local savedLevel = K.level
   K.level = 4
   local dk = CK.Start("drunken"); H.run(3)
@@ -1285,6 +1286,71 @@ do
   CK.RefreshOldRules(); H.run(2)
   check(K.ns.Data.Get("challenges", old).name == "Outlander", "old Self-Made challenges are renamed Outlander")
   check(D.ns.Data.Get("challenges", old) and D.ns.Data.Get("challenges", old).name == "Outlander", "the rename reaches guildmates")
+  clear()
+  K.class, K.level = nil, savedLevel
+end
+
+-- Fixes from the code review
+do
+  local CK = K.ns.Challenges
+  local function clear() for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1) end
+  local function status(k) return K.ns.Data.Get("challenges", k).status end
+  local savedLevel = K.level
+  clear()
+  K.class, K.level = "WARRIOR", 20
+
+  -- an item that won't move (only a quiver slot free) is warned about and fails after the grace
+  local savedPick, savedInv = K.env.C_Container.PickupContainerItem, K.env.PickupInventoryItem
+  K.env.C_Container.PickupContainerItem = function() end -- the game puts it back where it was
+  K.env.PickupInventoryItem = function() end
+  local br = CK.Start("brawler"); H.run(1)
+  K.equip[16] = 9002; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(8)
+  local stuckWarn = false
+  for _, m in ipairs(K.chat) do if m:find("take off your weapon other than a fist weapon within a minute", 1, true) then stuckWarn = true end end
+  K.equip[16] = K.equip[16] or 9002
+  check(stuckWarn and status(br) == "active", "a weapon that won't come off is warned about, not counted as removed")
+  H.run(65)
+  check(status(br) == "failed", "and fails once the minute is up")
+  K.env.C_Container.PickupContainerItem = savedPick; K.env.PickupInventoryItem = savedInv; K.equip[16] = nil
+  clear()
+
+  -- Doomseeker can't be started by a warrior who already knows Defensive Stance
+  K.known = { [71] = true }
+  check(not CK.Start("doomseeker"), "Doomseeker refused when Defensive Stance is already known")
+  K.known = nil
+
+  -- Ironbreaker: a /reload doesn't restart the minute; dying gives a fresh one
+  local ib = CK.Start("ironbreaker"); H.run(40)
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(25)
+  check(status(ib) == "failed", "a /reload doesn't restart Ironbreaker's minute")
+  clear()
+  local ib2 = CK.Start("ironbreaker"); H.run(40)
+  K.dead = true; H.run(120); K.dead = false; H.run(40)
+  check(status(ib2) == "active", "time spent dead doesn't count against Ironbreaker")
+  clear()
+
+  -- Drunken: the drink-named message counts; selling an ale doesn't; a reload keeps the clock
+  K.class = "PRIEST"
+  K.bags[7] = { id = 2686, name = "Thunder Ale", count = 5 }
+  local dr = CK.Start("drunken"); H.run(3)
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel tipsy from the Thunder Ale."); H.run(1)
+  check(not K.env.IronforgedDrunkFrame:IsShown(), "\"You feel tipsy from the Thunder Ale.\" counts as a buzz")
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(5)
+  H.fire(K, "MERCHANT_SHOW"); K.bags[7].count = 4; H.fire(K, "BAG_UPDATE", 0); H.run(2)
+  check(K.env.IronforgedDrunkFrame:IsShown(), "selling an ale to a vendor isn't drinking it")
+  H.fire(K, "MERCHANT_CLOSED")
+  H.run(10)
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(16)
+  check(status(dr) == "failed", "a /reload doesn't restart Drunken's 30 seconds")
+  K.bags[7] = nil
+  clear()
+
+  -- Rifleman: a quest or item companion isn't a hunter pet
+  K.class = "HUNTER"
+  local rf = CK.Start("rifleman"); H.run(1)
+  K.units.pet = { name = "Escort", temp = true }; H.fire(K, "UNIT_PET", "player"); H.run(70)
+  check(status(rf) == "active", "a temporary companion doesn't fail Rifleman")
+  K.units.pet = nil
   clear()
   K.class, K.level = nil, savedLevel
 end

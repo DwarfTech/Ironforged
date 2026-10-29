@@ -134,6 +134,7 @@ function C.Start(presetId, name, rules)
   if presetId and not preset then return false end
   if preset then
     if not C.ClassAllowed(preset) then ns.Print(preset.name .. " isn't a challenge for your class."); return false end
+    if preset.canStart and not preset.canStart() then return false end
     for _, c in ipairs(C.MyPresets()) do
       if c.data.preset == presetId then ns.Print("You're already on the " .. preset.name .. " challenge."); return false end
       local other = c.preset
@@ -207,12 +208,21 @@ local wornSince = {}  -- slot -> time first seen on
 local function freeBagSlot()
   local CC = C_Container
   for bag = 0, 4 do
+    -- quivers, ammo pouches and profession bags won't take armor or weapons
+    local bagType = 0
+    local freeFn = (CC and CC.GetContainerNumFreeSlots) or GetContainerNumFreeSlots
+    if bag > 0 and freeFn then
+      local ok, _, t = pcall(freeFn, bag)
+      if ok and type(t) == "number" then bagType = t end
+    end
+    if bagType == 0 then
     local n = (CC and CC.GetContainerNumSlots and CC.GetContainerNumSlots(bag)) or (GetContainerNumSlots and GetContainerNumSlots(bag)) or 0
     for s = 1, n do
       local info
       if CC and CC.GetContainerItemInfo then info = CC.GetContainerItemInfo(bag, s)
       elseif GetContainerItemInfo then info = GetContainerItemInfo(bag, s) end
       if not info then return bag, s end
+    end
     end
   end
 end
@@ -257,21 +267,28 @@ local function forbiddenGear(p)
   return out
 end
 
-local warned = {}
+local warned, moving = {}, {}
 function C.Enforce()
   local active = C.MyEnforced()
-  if #active == 0 then wipe(wornSince); return end
+  if #active == 0 then wipe(wornSince); wipe(warned); wipe(moving); return end
   local now = GetTime and GetTime() or 0
   local seen = {}
   for _, c in ipairs(active) do
     local p = c.preset
     for slot, w in pairs(forbiddenGear(p)) do
       seen[slot] = true
+      wornSince[slot] = wornSince[slot] or now
+      -- Keep trying to move it. It only counts as gone once the slot is empty, so if it's still on a
+      -- few seconds later (no room in a plain bag, combat, a locked slot) you're warned, and after
+      -- the grace period the challenge fails.
       if unequip(slot) then
-        ns.Print("|cffd4a017" .. p.name .. ":|r no " .. w.what .. ". It's back in your bags.")
-        wornSince[slot] = nil
-      else
-        wornSince[slot] = wornSince[slot] or now
+        if not moving[slot] then
+          moving[slot] = true
+          ns.Print("|cffd4a017" .. p.name .. ":|r no " .. w.what .. ". Back in your bags it goes.")
+        end
+        if C_Timer then C_Timer.After(1, function() pcall(C.Enforce) end) end
+      end
+      if now - wornSince[slot] >= 3 then
         if not warned[slot] then
           warned[slot] = true
           ns.Print("|cffff4040" .. p.name .. ":|r take off your " .. w.what .. " within a minute or the challenge fails" ..
@@ -285,6 +302,7 @@ function C.Enforce()
   end
   for slot in pairs(wornSince) do if not seen[slot] then wornSince[slot] = nil end end
   for slot in pairs(warned) do if not seen[slot] then warned[slot] = nil end end
+  for slot in pairs(moving) do if not seen[slot] then moving[slot] = nil end end
 end
 
 -- Slayer: PvP stays on. Blizzard only lets the player switch PvP on or off (an addon that tries is

@@ -146,9 +146,12 @@ local function convertToRaid()
   return fn and pcall(fn) or false
 end
 
+-- Room is needed beyond a party of five: the group I have now plus everyone the post asks for.
 local function wantsRaid(postKey)
   local d = postKey and Data.Get("lfd", postKey)
-  return d ~= nil and (tonumber(d.need) or 0) > 4
+  if not d then return false end
+  local have = (GetNumGroupMembers and GetNumGroupMembers()) or 0
+  return math.max(1, have) + (tonumber(d.need) or 0) > 5
 end
 
 local function grouped(member)
@@ -172,16 +175,25 @@ end
 -- A party holds five, so with no group yet only four go out; the rest follow once the party has
 -- formed and been turned into a raid.
 local inviteRest
+local invited = {} -- postKey -> { member = true }: invites already sent this session
 function L.InviteAll(postKey)
+  local d = Data.Get("lfd", postKey)
   local raid = wantsRaid(postKey)
   if raid then convertToRaid() end
   local room = (raid and not (IsInRaid and IsInRaid(HOME)) and not (IsInGroup and IsInGroup(HOME))) and 4 or nil
-  local n, left = 0, 0
+  local cap = tonumber(d and d.need) or 39
+  invited[postKey] = invited[postKey] or {}
+  local n, left, taken = 0, 0, 0
   for _, j in ipairs(L.Joins(postKey)) do
-    if ns.roster[j.member] and ns.roster[j.member].online and not grouped(j.member) then
-      if room and n >= room then
+    if taken >= cap then break end -- first come, first served up to what the post asked for
+    if ns.roster[j.member] and ns.roster[j.member].online then
+      taken = taken + 1
+      if grouped(j.member) or invited[postKey][j.member] then
+        -- already in, or already asked
+      elseif room and n >= room then
         left = left + 1
       elseif L.Invite(j.member, postKey) then
+        invited[postKey][j.member] = true
         n = n + 1
       end
     end
@@ -190,14 +202,15 @@ function L.InviteAll(postKey)
     inviteRest = postKey
     ns.Print("Inviting the first four. The other " .. left .. " follow once your party forms and becomes a raid.")
   end
-  if n == 0 and left == 0 then ns.Print("No one signed up is online to invite.") end
+  if n == 0 and left == 0 then ns.Print("No one new to invite.") end
 end
 
+-- Only while invites are waiting on the party to form: turn it into a raid, then send the rest.
 ns.RegisterEvent("GROUP_ROSTER_UPDATE", function()
   local mine = L.MyPost()
-  if not mine or not wantsRaid(mine) then return end
+  if not mine or inviteRest ~= mine then return end
   convertToRaid()
-  if inviteRest == mine and IsInRaid and IsInRaid(HOME) then
+  if IsInRaid and IsInRaid(HOME) then
     inviteRest = nil
     L.InviteAll(mine)
   end

@@ -426,10 +426,13 @@ local frame = CreateFrame("Frame")
 ns.eventFrame = frame
 local handlers = {}
 
+-- An event this client doesn't have (renamed between game versions) is skipped, never an error.
 function ns.RegisterEvent(event, fn)
+  if C_EventUtils and C_EventUtils.IsEventValid and not C_EventUtils.IsEventValid(event) then return false end
+  if not pcall(frame.RegisterEvent, frame, event) then return false end
   handlers[event] = handlers[event] or {}
   table.insert(handlers[event], fn)
-  frame:RegisterEvent(event)
+  return true
 end
 
 frame:SetScript("OnEvent", function(_, event, ...)
