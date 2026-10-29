@@ -10,25 +10,6 @@ local Data = ns.Data
 local MAX_TASKS = 10
 local state = { key = nil }
 
--- Suggested tasks by rank name, used when the giver leaves the task list blank.
-local STARTER_TASKS = {
-  { "ironguard", { "Claim the blood of the Horde", "Attend one of the guild's RP events" } },
-  { "vanguard", { "Attend a guild event", "Take on a challenge in the Ironforged addon" } },
-  { "veteran", { "60 days active in the community", "Complete a complicated Veteran trial or a mighty achievement with the guild" } },
-  { "general", { "6 months active in the community", "Lead guildmates into battle" } },
-  { "noble", { "1 year active in the community", "Complete the Noble trial" } },
-  { "overlord", { "3 years active in the community", "Complete the Overlord trial" } },
-  { "lord", { "2 years active in the community", "Show lasting dedication to the guild", "Complete the Lord trial" } },
-}
-
-local function starterTasks(rank)
-  local name = (ns.ranks[rank] or ""):lower()
-  for _, s in ipairs(STARTER_TASKS) do
-    if name:find(s[1], 1, true) then return s[2] end
-  end
-  return { "Complete the trial set by your officer" }
-end
-
 local function taskId(text)
   return string.format("%x", ns.Hash(text) % 0xFFFFFF)
 end
@@ -83,7 +64,7 @@ local function trialForm(member, key)
   fields[#fields + 1] = { key = "rank", label = "Earns the rank", type = "choice", value = t.rank, options = rankOptions(), none = "(choose a rank)" }
   fields[#fields + 1] = { key = "title", label = "Trial name (optional)", type = "text", value = t.title, maxLen = 50 }
   fields[#fields + 1] = { key = "desc", label = "Details (optional)", type = "multiline", value = t.desc, maxLen = 400, height = 50 }
-  fields[#fields + 1] = { key = "tasks", label = "Tasks, one per line (blank = suggested tasks)", type = "multiline",
+  fields[#fields + 1] = { key = "tasks", label = "Tasks, one per line", type = "multiline",
     value = table.concat(taskLines, "\n"), maxLen = 1200, height = 130 }
 
   UI.OpenForm({
@@ -100,7 +81,7 @@ local function trialForm(member, key)
         return false
       end
       local tasks = parseTasks(v.tasks)
-      if #tasks == 0 then tasks = parseTasks(table.concat(starterTasks(v.rank), "\n")) end
+      if #tasks == 0 then ns.Print("List at least one task, one per line."); return false end
       local title = ns.Clean(v.title, 50)
       if title == "" then title = ns.RankName(v.rank) .. " Trial" end
       local newKey = key or who -- a character has one trial at a time
