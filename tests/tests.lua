@@ -1004,6 +1004,31 @@ H.clock = H.clock + 1900
 check(D.ns.LFD.IsOpen(aidKey) == false, "calls for aid close after half an hour")
 K.invites = {}
 
+-- Drunken: stay drunk, or drink within 30 seconds of sobering up
+do
+  local CK = K.ns.Challenges
+  for _, c in ipairs(CK.MyEnforced()) do CK.Abandon(c.key) end
+  H.run(2)
+  K.bags[5] = { id = 2596, name = "Skin of Dwarven Stout", count = 3 }
+  local dk = CK.Start("drunken"); H.run(3)
+  local df = K.env.IronforgedDrunkFrame
+  check(dk and df and df:IsShown(), "Drunken asks for a first drink when it starts")
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel tipsy."); H.run(1)
+  check(not df:IsShown(), "feeling tipsy clears the popup")
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(2)
+  check(df:IsShown() and df.title.__text == "Your buzz is wearing off!", "sobering up brings the popup back")
+  check(K.env.IronforgedDrunkDrink:GetAttribute("item") == "item:2686", "the popup's button drinks the best ale in your bags")
+  K.bags[5].count = 2
+  H.fire(K, "BAG_UPDATE", 0); H.run(2)
+  check(not df:IsShown() and K.ns.Data.Get("challenges", dk).status == "active", "a drink in time keeps the challenge going")
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(20)
+  check(K.ns.Data.Get("challenges", dk).status == "active", "still under way partway through the 30 seconds")
+  H.run(15)
+  local dd = K.ns.Data.Get("challenges", dk)
+  check(dd.status == "failed" and dd.reason:find("Sobered up", 1, true), "staying sober for 30 seconds fails Drunken")
+  K.bags[5] = nil
+end
+
 -- Late joiner converges
 local F = H.makeClient("Frugo", nil, "Frugo-Mega"); F.guidOverride = "Player-Frugo-Mega"
 H.boot(F)

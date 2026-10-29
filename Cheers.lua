@@ -100,6 +100,21 @@ function Cheers.FindDrink()
   return best, names[best], counts[best]
 end
 
+-- Every drink in your bags, counted together (to notice when one is drunk).
+function Cheers.DrinkTotal()
+  local n = 0
+  for bag = 0, (NUM_BAG_SLOTS or 4) do
+    for slot = 1, numSlots(bag) do
+      local id, count, link = slotInfo(bag, slot)
+      if id and not isSecret(id) then
+        local name = linkName(link) or ""
+        if KNOWN_RANK[id] or nameHas(name, ALE_WORDS) or nameHas(name, SPIRIT_WORDS) then n = n + (count or 1) end
+      end
+    end
+  end
+  return n
+end
+
 local function countOf(itemID)
   local n = 0
   for bag = 0, (NUM_BAG_SLOTS or 4) do

@@ -26,6 +26,7 @@ Challenges.lua
 UI_Widgets.lua
 UI_Minimap.lua
 Cheers.lua
+Drunken.lua
 UI_Main.lua
 UI_Roster.lua
 UI_Clans.lua
