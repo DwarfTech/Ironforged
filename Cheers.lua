@@ -76,6 +76,8 @@ local function linkName(link)
   return type(link) == "string" and link:match("%[(.-)%]") or nil
 end
 
+local isDrinkItem
+
 -- The best drink in your bags: itemID, name, total count.
 function Cheers.FindDrink()
   local best, bestScore, counts, names = nil, nil, {}, {}
@@ -88,6 +90,7 @@ function Cheers.FindDrink()
         if KNOWN_RANK[id] then score = KNOWN_RANK[id]
         elseif nameHas(name, ALE_WORDS) then score = 100
         elseif nameHas(name, SPIRIT_WORDS) then score = 200 end
+        if score and not isDrinkItem(id) then score = nil end -- food, whatever its name says
         if score then
           counts[id] = (counts[id] or 0) + (count or 1)
           names[id] = name
@@ -100,13 +103,19 @@ function Cheers.FindDrink()
   return best, names[best], counts[best]
 end
 
--- Food & drink (consumable subclass 5), when the game can say; unknown counts as yes.
-local function isDrinkItem(id)
+-- A drink you can actually drink: a consumable (when the game can say) that isn't food. Food is
+-- anything whose use is the "Food" spell, so "Beer Basted Boar Ribs" is food whatever its name.
+function isDrinkItem(id)
+  local spellFn = (C_Item and C_Item.GetItemSpell) or GetItemSpell
+  if spellFn then
+    local okS, sp = pcall(spellFn, id)
+    if okS and (sp == "Food" or sp == "Refreshment") then return false end
+  end
   local fn = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
   if not fn then return true end
-  local ok, _, _, _, _, _, cls, sub = pcall(fn, id)
+  local ok, _, _, _, _, _, cls = pcall(fn, id)
   if not ok or cls == nil then return true end
-  return cls == 0 and sub == 5
+  return cls == 0
 end
 Cheers.IsDrinkItem = isDrinkItem
 

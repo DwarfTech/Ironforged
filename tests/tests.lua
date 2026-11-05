@@ -1062,7 +1062,28 @@ do
   check(K.env.IronforgedDrunkDrink:GetAttribute("item") == "item:2686", "the popup's button drinks the best ale in your bags")
   K.bags[5].count = 2
   H.fire(K, "BAG_UPDATE", 0); H.run(2)
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel tipsy from the Skin of Dwarven Stout."); H.run(1)
   check(not df:IsShown() and K.ns.Data.Get("challenges", dk).status == "active", "a drink in time keeps the challenge going")
+  -- Beer Basted Boar Ribs: food with "beer" in its name doesn't count as drinking
+  H.ITEM_SPELLS[2888] = "Food"; H.ITEM_TYPES[2888] = { 0, 0 }
+  K.bags[8] = { id = 2888, name = "Beer Basted Boar Ribs", count = 3 }
+  H.fire(K, "BAG_UPDATE", 0); H.run(1)
+  check(K.ns.Cheers.IsDrinkItem(2888) == false, "Beer Basted Boar Ribs are food, not a drink")
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(2)
+  K.bags[8].count = 2; H.fire(K, "BAG_UPDATE", 0); H.run(2)
+  check(df:IsShown(), "eating the ribs doesn't clear the sober popup")
+  check(K.env.IronforgedDrunkDrink:GetAttribute("item") ~= "item:2888", "the drink button never picks the ribs")
+  -- an ale that leaves the bags without the game confirming a buzz doesn't count (once known sober)
+  K.bags[5].count = 1; H.fire(K, "BAG_UPDATE", 0); H.run(12)
+  local noBuzz = false
+  for _, m in ipairs(K.chat) do if m:find("didn't give you a buzz", 1, true) then noBuzz = true end end
+  check(noBuzz and df:IsShown(), "no buzz message after a drink: the countdown carries on")
+  H.run(30)
+  check(K.ns.Data.Get("challenges", dk).status == "failed", "staying sober after eating ribs fails Drunken")
+  K.bags[8] = nil
+  K.ns.Challenges.Abandon(dk); H.run(1)
+  dk = K.ns.Challenges.Start("drunken"); H.run(3)
+  H.fire(K, "CHAT_MSG_SYSTEM", "You feel tipsy."); H.run(1)
   H.fire(K, "CHAT_MSG_SYSTEM", "You feel sober again."); H.run(20)
   check(K.ns.Data.Get("challenges", dk).status == "active", "still under way partway through the 30 seconds")
   H.run(15)

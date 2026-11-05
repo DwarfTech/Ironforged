@@ -176,6 +176,11 @@ local function tick()
   if not countdown then return end
   local c = active()
   if not c then stop(); return end
+  if countdown.waitUntil then
+    if (GetTime and GetTime() or 0) < countdown.waitUntil then return end -- waiting for the buzz to land
+    countdown.waitUntil = nil
+    ns.Print("|cffff4040Drunken:|r that didn't give you a buzz. Drink something stronger!")
+  end
   if not (inCombat() or dead()) then countdown.left = countdown.left - 1 end
   if countdown.left <= 0 then
     stop()
@@ -235,10 +240,22 @@ end
 local function storing() return next(openWindows) ~= nil end
 ns.RegisterEvent("PLAYER_ENTERING_WORLD", function() wipe(openWindows) end)
 
+-- When the game has already told us you're sober, a drink only counts once it says you feel the
+-- buzz: something leaving your bags gets 10 seconds for that message. At login (buzz unknown) the
+-- drink counts at once, since an already-tipsy dwarf gets no new message.
+D.CONFIRM = 10
 local function bagsChanged()
   if not countdown or not ns.Cheers then return end
   local total = ns.Cheers.DrinkTotal()
-  if lastTotal and total < lastTotal and not storing() then buzzed(true); return end
+  if lastTotal and total < lastTotal and not storing() then
+    lastTotal = total
+    if state == "sober" then
+      countdown.waitUntil = (GetTime and GetTime() or 0) + D.CONFIRM
+    else
+      buzzed(true)
+    end
+    return
+  end
   lastTotal = total
 end
 ns.RegisterEvent("BAG_UPDATE_DELAYED", bagsChanged)
