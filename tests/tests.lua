@@ -1592,6 +1592,48 @@ do
   CK.Remove(ol); H.run(2)
 end
 
+-- Ironbreaker and fishing, the ways people actually do it
+do
+  local CK = K.ns.Challenges
+  for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
+  local function status(k) return K.ns.Data.Get("challenges", k).status end
+  local function equip(slot, id) K.equip[slot] = id; H.fire(K, "PLAYER_EQUIPMENT_CHANGED", slot); H.run(1) end
+  local savedLevel, savedClass = K.level, K.class
+  K.class, K.level = "WARRIOR", 20
+  H.ITEM_TYPES[9001] = { 4, 6 }; H.ITEM_TYPES[9002] = { 2, 7 }; H.ITEM_TYPES[6256] = { 2, 20 }
+  K.equip[16], K.equip[17] = 9002, 9001
+  local ib = CK.Start("ironbreaker"); H.run(12)
+  -- 1. sword and shield on, then the pole goes on (the game takes the shield off with it)
+  K.equip[17] = nil; equip(16, 6256); H.run(300)
+  check(status(ib) == "active", "Ironbreaker: five minutes fishing with the pole is fine")
+  -- 2. back to sword, shield goes on a few seconds later
+  equip(16, 9002); H.run(8); equip(17, 9001); H.run(120)
+  check(status(ib) == "active", "Ironbreaker: putting the sword and then the shield back on is fine")
+  -- 3. shield off first, 50 seconds, then the pole: the pole stops the clock
+  equip(17, nil); H.run(50); equip(16, 6256); H.run(300)
+  check(status(ib) == "active", "Ironbreaker: taking the shield off before fishing is fine")
+  -- 4. pole off and no shield: a fresh minute starts then
+  equip(16, 9002); H.run(50)
+  check(status(ib) == "active", "Ironbreaker: a fresh minute after fishing")
+  equip(17, 9001); H.run(30)
+  -- 5. a /reload while fishing
+  K.equip[17] = nil; equip(16, 6256); H.run(20)
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(200)
+  check(status(ib) == "active", "Ironbreaker: a /reload while fishing is fine")
+  -- 6. a pole the game files differently is still known by its name
+  H.ITEM_TYPES[6365] = { 2, 14 }
+  local realName = K.env.C_Item.GetItemNameByID
+  K.env.C_Item.GetItemNameByID = function(id) if id == 6365 then return "Strong Fishing Pole" end end
+  equip(16, 6365); H.run(200)
+  check(status(ib) == "active", "Ironbreaker: a pole recognised by its name")
+  K.env.C_Item.GetItemNameByID = realName
+  -- 7. and it still fails when you're really without a shield
+  equip(16, 9002); H.run(75)
+  check(status(ib) == "failed", "Ironbreaker still fails after a minute with no shield and no pole")
+  K.equip[16], K.equip[17] = nil, nil
+  K.class, K.level = savedClass, savedLevel
+end
+
 -- The greeting bar can be dragged by its grip, and right-click puts it back
 do
   local bar, grip = K.env.IronforgedGreetBar, K.env.IronforgedGreetGrip
