@@ -241,7 +241,7 @@ function Comm.ShareMine()
   local n = 0
   for _, coll in ipairs(CLAN_COLLS) do
     for key, rec in pairs(ns.Data.Raw(coll) or {}) do
-      if rec.b == me and n < 40 then
+      if rec.b == me and n < 10 then
         Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD")
         n = n + 1
       end
@@ -342,6 +342,8 @@ Comm.DesignatedResponder = designatedResponder
 ----------------------------------------------------------------------
 -- Incoming
 ----------------------------------------------------------------------
+local elect -- defined below: one of the online addon users chosen for a requester
+
 local function handleDigest(sender, msg, channel)
   if type(msg.dg) ~= "table" then return end
   local me = ns.PlayerName()
@@ -372,7 +374,10 @@ local function handleDigest(sender, msg, channel)
   local function recent(rec) return not since or (rec.t or 0) >= since end
 
   if #differs > 0 then
-    if designatedResponder(sender) == me or (channel == "WHISPER" and ns.IAmOfficer()) then
+    -- the chosen officer answers in full; with no officer online, one chosen member does instead
+    local responder = designatedResponder(sender)
+    if responder == me or (channel == "WHISPER" and ns.IAmOfficer())
+      or (responder == nil and channel == "GUILD" and elect(sender, 1, 1)) then
       for _, coll in ipairs(differs) do sendRecords(coll, function(_, rec) return recent(rec) end, sender) end
     else
       for _, coll in ipairs(differs) do
@@ -397,7 +402,7 @@ end
 
 -- Am I one of the `count` online addon users chosen for this requester? (The same choice on every
 -- client, each working from the peers it has heard; later attempts pick others, the third is open.)
-local function elect(sender, attempt, count)
+function elect(sender, attempt, count)
   if attempt >= 3 then return true end
   local me = ns.PlayerName()
   local t = now()
@@ -519,14 +524,19 @@ local function retryPending()
   return changed
 end
 
-local function acceptRecord(sender, coll, key, rec)
+-- `catchUp` is true for rows in a sync reply (op B): any guildmate may pass those along, as with
+-- always-synced rows, and each is still checked against the standing of its real author. Live
+-- edits (op P) from a member must be their own.
+local function acceptRecord(sender, coll, key, rec, catchUp)
   if type(rec) ~= "table" then return false end
   -- Always-synced rows may come from anyone (a login reply), but are still checked against the
   -- standing of the row's real author.
   if ns.Data.ALWAYS_SYNC[coll] or ns.Data.LOCAL_ONLY[coll] then return ns.Data.Merge(coll, key, rec, false) end
-  -- Non-officers may only pass along records they wrote themselves.
   local officer = ns.IsOfficer(sender)
-  if rec.b ~= sender and not officer then return false end
+  if rec.b ~= sender and not officer then
+    if catchUp then return ns.Data.Merge(coll, key, rec, false) end
+    return false
+  end
   return ns.Data.Merge(coll, key, rec, officer)
 end
 
@@ -580,7 +590,7 @@ local function dispatch(sender, msg, channel)
     local changed = false
     for key, rec in pairs(msg.recs) do
       if type(key) == "string" then
-        local ok, why = acceptRecord(sender, msg.c, key, rec)
+        local ok, why = acceptRecord(sender, msg.c, key, rec, true)
         if ok then changed = true
         elseif why == "perm" and ns.Data.ALWAYS_SYNC[msg.c] then parkRow(msg.c, key, rec) end
       end

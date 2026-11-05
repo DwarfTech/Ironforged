@@ -5,7 +5,7 @@ for line in io.lines(ADDON_DIR .. "/Ironforged.toc") do
   if line:match("%.lua%s*$") then FILES[#FILES + 1] = line:gsub("%s+$", "") end
 end
 
-local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000, ITEM_TYPES = {}, ITEM_SPELLS = {} }
+local H = { clients = {}, bus = {}, clock = 1000, server = 1792000000, ITEM_TYPES = {}, ITEM_SPELLS = {}, offline = {} }
 -- the server knows a character by its full "First Surname" name; the realm is dropped when whispering
 function H.charName(full) return full end
 function H.baseName(n) -- same rule as the addon: a trailing "-Realm" goes; "First-Surname" becomes "First Surname"
@@ -128,7 +128,7 @@ local function makeClient(shortName, race, fullName)
   env.GuildControlGetRankName = function(i) return RANKS[i] end
   env.GetGuildRosterInfo = function(i)
     local r = ROSTER[i]
-    return r[1], r[2], r[3], r[4], r[5], "Ironforge", "", "", true, 0, r[6], 0, 0, false, false, 0, "Player-" .. r[1]
+    return r[1], r[2], r[3], r[4], r[5], "Ironforge", "", "", not H.offline[r[1]], 0, r[6], 0, 0, false, false, 0, "Player-" .. r[1]
   end
   env.GetGuildRosterLastOnline = function() return 0, 0, 0, 0 end
   env.C_GuildInfo = { GuildRoster = function() client.rosterRequested = true end, Invite = function() end }
@@ -358,6 +358,7 @@ end
 function H.step(dt)
   H.clock = H.clock + dt
   for _, c in pairs(H.clients) do
+    if not H.offline[c.full] then
     local due = {}
     for i = #c.timers, 1, -1 do
       local t = c.timers[i]
@@ -369,6 +370,7 @@ function H.step(dt)
     for _, t in ipairs(due) do t.f() end
     for _, f in ipairs(c.frames) do
       if f.__scripts.OnUpdate then f.__scripts.OnUpdate(f, dt) end
+    end
     end
   end
   local gb = H.guildBus or {}
@@ -398,12 +400,31 @@ function H.step(dt)
   H.bus = {}
   for _, m in ipairs(bus) do
     for full, c in pairs(H.clients) do
-      if H.charName(full) ~= m.from and (m.channel == "GUILD" or (m.channel == "WHISPER" and H.baseName(m.target) == H.baseName(full))) then
+      if not H.offline[full] and not H.offline[m.from] and H.charName(full) ~= m.from and (m.channel == "GUILD" or (m.channel == "WHISPER" and H.baseName(m.target) == H.baseName(full))) then
         H.fire(c, "CHAT_MSG_ADDON", m.prefix, m.text, m.channel, m.from)
       end
     end
     H.delivered = (H.delivered or 0) + 1
   end
+end
+
+-- Log a character off: it stops sending and receiving, and everyone's roster shows it offline.
+function H.logout(client)
+  H.offline[client.full] = true
+  for full, c in pairs(H.clients) do if not H.offline[full] then H.fire(c, "GUILD_ROSTER_UPDATE") end end
+end
+
+-- Log back in: a fresh copy of the addon with the same saved variables, as after a real relog.
+function H.relog(client)
+  local saved = client.env.IronforgedDB
+  H.clients[client.full] = nil
+  H.offline[client.full] = nil
+  local short = client.name
+  local n = H.makeClient(short, client.race, client.full)
+  n.env.IronforgedDB = saved
+  H.boot(n)
+  for full, c in pairs(H.clients) do if c ~= n and not H.offline[full] then H.fire(c, "GUILD_ROSTER_UPDATE") end end
+  return n
 end
 
 function H.run(seconds)
