@@ -16,4 +16,4 @@ jobs:
         run: for f in *.lua; do lua5.1 -e "assert(loadfile('$f'))"; done
       - name: Run the test suite
         working-directory: tests
-        run: lua5.1 tests.lua .. && lua5.1 sync_offline.lua ..
+        run: lua5.1 tests.lua .. && lua5.1 sync_offline.lua .. && lua5.1 sync_stale.lua ..

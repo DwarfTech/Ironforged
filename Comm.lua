@@ -188,7 +188,7 @@ Comm.rowsGot = 0
 local rowSession
 
 local function markRowsSynced(s)
-  if s.synced or not ns.db then return end
+  if s.synced or s.incomplete or not ns.db then return end
   s.synced = true
   ns.db.rowSyncedAt = s.startMs
   if s.full then ns.db.rowFullSyncAt = s.startMs end
@@ -203,7 +203,8 @@ function Comm.RequestRows(attempt, since, startMs, full)
     rowSession = s
   end
   s.attempt = attempt
-  Comm.Send({ op = "H", a = attempt, sn = since, dg = ns.Data.AlwaysDigests(since), v = ns.VERSION }, "GUILD")
+  -- n: a fresh number each time, so different players are chosen to answer each check
+  Comm.Send({ op = "H", a = attempt, sn = since, n = math.random(1, 999999), dg = ns.Data.AlwaysDigests(since), v = ns.VERSION }, "GUILD")
   if C_Timer then
     C_Timer.After(attempt == 1 and 20 or 40, function()
       if rowSession ~= s or s.answered then return end
@@ -212,10 +213,14 @@ function Comm.RequestRows(attempt, since, startMs, full)
   end
 end
 
+-- Usually only rows changed since my last check are compared. Once a day, and every fourth
+-- check (about hourly), everything is compared, so a row I missed long ago still turns up.
+Comm.checks = 0
 local function rowSince()
   local db = ns.db
   if not db or not db.rowSyncedAt or not db.rowFullSyncAt then return nil end
-  if ns.Now() * 1000 - db.rowFullSyncAt > 7 * DAY_MS then return nil end
+  if ns.Now() * 1000 - db.rowFullSyncAt > DAY_MS then return nil end
+  if Comm.checks % 4 == 0 then return nil end
   return db.rowSyncedAt - SYNC_MARGIN_MS
 end
 
@@ -227,6 +232,7 @@ function Comm.CheckRows()
     ns.Data.DropAlwaysSyncRows()
     db.rowSyncedAt, db.rowFullSyncAt = nil, nil
   end
+  Comm.checks = Comm.checks + 1
   local rs = rowSince()
   Comm.RequestRows(1, rs, ns.Now() * 1000, rs == nil)
 end
@@ -402,7 +408,7 @@ end
 
 -- Am I one of the `count` online addon users chosen for this requester? (The same choice on every
 -- client, each working from the peers it has heard; later attempts pick others, the third is open.)
-function elect(sender, attempt, count)
+function elect(sender, attempt, count, nonce)
   if attempt >= 3 then return true end
   local me = ns.PlayerName()
   local t = now()
@@ -413,7 +419,7 @@ function elect(sender, attempt, count)
     end
   end
   table.sort(list)
-  local start = (ns.Hash(sender) + attempt - 1) % #list
+  local start = (ns.Hash(sender .. (type(nonce) == "number" and tostring(nonce) or "")) + attempt - 1) % #list
   for i = 0, math.min(count, #list) - 1 do
     if list[(start + i) % #list + 1] == me then return true end
   end
@@ -424,7 +430,7 @@ end
 local function handleDigestCheck(sender, msg)
   local attempt = tonumber(msg.a) or 1
   if limited("dg#" .. sender .. "#" .. attempt) then return end
-  if not elect(sender, attempt, 2) then return end
+  if not elect(sender, attempt, 2, msg.n) then return end
   local since = type(msg.sn) == "number" and msg.sn or nil
   local mine = ns.Data.AlwaysDigests(since)
   local differs = {}
@@ -495,6 +501,20 @@ local function handleHashes(sender, msg, targeted)
     ns.Data.EachAlwaysRow(since, consider, only)
   end
   flush()
+  -- Both sides: if the requester holds rows I lack (or newer ones), ask for them the same way.
+  -- Not when this was itself such a request back, so it never goes round in circles.
+  if targeted and not crafts and not msg.back then
+    local mine = ns.Data.ParseTokens(ns.Data.RowTokens(since, only))
+    local behind = false
+    for kh, stamp in pairs(theirs) do
+      if not mine[kh] or mine[kh] < stamp then behind = true; break end
+    end
+    if behind and not limited("pull#" .. sender) then
+      local list = {}
+      for coll in pairs(only) do list[#list + 1] = coll end
+      Comm.Send({ op = "HT", back = true, c = list, sn = since, h = ns.Data.RowTokens(since, only) }, "WHISPER", sender)
+    end
+  end
 end
 
 -- Rows that failed a permission check, usually because the row they depend on (the clan an invite
@@ -592,7 +612,10 @@ local function dispatch(sender, msg, channel)
       if type(key) == "string" then
         local ok, why = acceptRecord(sender, msg.c, key, rec, true)
         if ok then changed = true
-        elseif why == "perm" and ns.Data.ALWAYS_SYNC[msg.c] then parkRow(msg.c, key, rec) end
+        elseif why == "perm" and ns.Data.ALWAYS_SYNC[msg.c] then
+          parkRow(msg.c, key, rec)
+          if rowSession then rowSession.incomplete = true end -- check again next time from the same point
+        end
       end
     end
     if changed and retryPending() then changed = true end
