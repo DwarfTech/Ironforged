@@ -231,6 +231,35 @@ function Comm.CheckRows()
   Comm.RequestRows(1, rs, ns.Now() * 1000, rs == nil)
 end
 
+-- Re-send my own clan records (my choice of clan, clans I founded or lead, invites and removals I
+-- wrote) to the guild. Rows a guildmate already has change nothing there; rows they missed fill in.
+local CLAN_COLLS = { "clans", "invites", "clanship" }
+function Comm.ShareMine()
+  if not ns.Data.Ready() then return 0 end
+  local me = ns.PlayerName()
+  if not me then return 0 end
+  local n = 0
+  for _, coll in ipairs(CLAN_COLLS) do
+    for key, rec in pairs(ns.Data.Raw(coll) or {}) do
+      if rec.b == me and n < 40 then
+        Comm.Send({ op = "P", c = coll, k = key, r = rec }, "GUILD")
+        n = n + 1
+      end
+    end
+  end
+  return n
+end
+
+-- Opening the Clans tab: ask the guild for anything missing (at most every two minutes).
+local lastClanCheck = 0
+function Comm.ClanCatchUp()
+  local t = now()
+  if t - lastClanCheck < 120 then return false end
+  lastClanCheck = t
+  Comm.CheckRows()
+  return true
+end
+
 function Comm.RequestSync()
   Comm.stats.lastSync = ns.Now()
   Comm.syncStartMs = ns.Now() * 1000
@@ -468,7 +497,7 @@ end
 local pending = {}
 local function parkRow(coll, key, rec)
   if #pending >= 100 then table.remove(pending, 1) end
-  pending[#pending + 1] = { coll = coll, key = key, rec = rec, due = now() + 120 }
+  pending[#pending + 1] = { coll = coll, key = key, rec = rec, due = now() + 600 }
 end
 
 local function retryPending()
@@ -616,7 +645,8 @@ ns.On("DATA_READY", function()
   if C_Timer then
     C_Timer.After(6 + math.random() * 6, Comm.RequestSync)
     C_Timer.NewTicker(60, sweep)
-    C_Timer.NewTicker(45 * 60, function() Comm.CheckRows() end) -- catch up on anything a lost message left out
+    C_Timer.NewTicker(15 * 60, function() Comm.CheckRows() end) -- catch up on anything a lost message left out
+    C_Timer.After(30 + math.random() * 30, function() pcall(Comm.ShareMine) end)
   end
 end)
 

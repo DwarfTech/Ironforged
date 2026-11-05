@@ -66,11 +66,6 @@ ns.On("DATA_READY", function()
   local function greet()
     local me = ns.PlayerName()
     ns.Print(Flavor.Random("greeting", ns.Name(me)))
-    local apps = 0
-    for _, clanId in ipairs(ns.Data.ClansLedBy(me)) do apps = apps + #ns.Data.Applications(clanId) end
-    if apps > 0 then
-      ns.Print(apps .. (apps == 1 and " dwarf asks" or " dwarves ask") .. " to join your clan. See Applications in the Clans tab.")
-    end
     for _, clanId in ipairs(ns.Data.PendingInvites(me)) do
       ns.Print("Clan " .. (ns.Data.ClanName(clanId) or "?") .. " has invited you to join. Answer in the Clans tab.")
     end

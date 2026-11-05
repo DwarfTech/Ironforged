@@ -13,9 +13,9 @@ Data.COLLECTIONS = {
   "members",      -- officer-kept member records (title, main/alt, joined, notes)
   "titles",       -- key = member .. "#" .. KeyOf(title); titles awarded by officers
   "clans",        -- key = KeyOf(clan name); the record names its founder
-  "invites",      -- key = clan key .. "#" .. member; written by the clan leader
-  "applications", -- key = clan key .. "#" .. member; a member asking to join a clan
-  "clanship",     -- key = member; the member's own choice of clan (needs an invite to count)
+  "invites",      -- key = clan key .. "#" .. member; written by the clan leader: an invitation, or { removed = true }
+  "applications", -- key = clan key .. "#" .. member; old requests to join (no longer used; a pending one counts as joined)
+  "clanship",     -- key = member; the member's own choice of clan
   "progress",     -- key = member; the promotion trial given to a character (title, rank, tasks, done)
   "taskmarks",    -- key = member (same as progress); tasks the member themself marks done
   "requests",     -- key = member; promotion requests
@@ -169,7 +169,20 @@ function Data.IsClanLeader(name, clanId)
   return c ~= nil and c.leader == name
 end
 
--- The clan a member actually belongs to: the one they lead, or the one they joined with a standing invite.
+-- A Clan Leader (or officer) took this member out of the clan; they can't rejoin until invited again.
+function Data.RemovedFromClan(clanId, name)
+  local inv = clanId and name and Data.Get("invites", clanId .. "#" .. name)
+  return inv ~= nil and inv.removed == true
+end
+
+-- An invitation standing for this member (a removal marker isn't one).
+function Data.InvitedToClan(clanId, name)
+  local inv = clanId and name and Data.Get("invites", clanId .. "#" .. name)
+  return inv ~= nil and not inv.removed
+end
+
+-- The clan a member belongs to: the one they lead, or the one they joined. Anyone may join any
+-- clan; a Clan Leader can remove a member, who then can't rejoin until invited.
 function Data.ClanOf(name)
   if not name then return nil end
   local led
@@ -179,15 +192,15 @@ function Data.ClanOf(name)
     end
   end
   if led then return led end
-  -- Membership needs the leader's invite plus the member's consent: either they accepted
-  -- (clanship) or they applied and the leader accepted the application.
+  -- The member's own choice of clan.
   local cs = Data.Get("clanship", name)
   local id = cs and cs.clan
-  if id and Data.ClanRecognized(id) and Data.Get("invites", id .. "#" .. name) then return id end
+  if id and Data.ClanRecognized(id) and not Data.RemovedFromClan(id, name) then return id end
+  -- From before joining was open: a request to join counts as joining (leaving deletes it).
   local found
   for key in Data.Each("applications") do
     local clanId, member = splitKey(key)
-    if member == name and Data.ClanRecognized(clanId) and Data.Get("invites", key) then
+    if member == name and Data.ClanRecognized(clanId) and not Data.RemovedFromClan(clanId, name) then
       if not found or clanId < found then found = clanId end
     end
   end
@@ -234,7 +247,7 @@ function Data.PendingInvites(name)
   for key in Data.Each("invites") do
     local clanId, member = splitKey(key)
     if member == name and Data.ClanRecognized(clanId) and Data.ClanOf(name) ~= clanId
-      and not Data.Get("applications", key) then
+      and Data.InvitedToClan(clanId, name) then
       out[#out + 1] = clanId
     end
   end
@@ -300,7 +313,12 @@ function Data.CanWrite(author, coll, key, data)
     if not clanId then return false end
     if officer or Data.IsClanLeader(author, clanId) then return true end
     if Data.ClanDeleted(clanId) then return true end -- the clan is gone, so the row is inert
-    return data == nil and author == member -- the invited member may decline
+    -- the invited member may decline, but can't lift a removal
+    if data == nil and author == member then
+      local old = Data.Get("invites", key)
+      return not (old and old.removed)
+    end
+    return false
   elseif coll == "applications" then
     local clanId, member = splitKey(key)
     if not clanId then return false end

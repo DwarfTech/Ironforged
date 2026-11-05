@@ -225,6 +225,33 @@ H.run(5)
 check(AD.ClanOf("Kurdran") == c3, "accepted applicant is in the clan everywhere")
 check(AD.ClanOf("Hilda") == nil and #AD.Applications(c3) == 0, "denied applicant out, no open applications")
 
+-- Open joining: anyone joins any clan; the leader can remove, and only an invite lets them back
+local HD = Hh.ns.Data
+check(HD.Put("clanship", "Hilda", { clan = c3 }), "Hilda joins without applying")
+H.run(5)
+check(AD.ClanOf("Hilda") == c3 and KD.ClanOf("Hilda") == c3, "an open join shows for everyone")
+check(not DD.Put("invites", c3 .. "#Hilda", { removed = true, by = "Dagna" }, true), "only the leader (or an officer) removes members")
+check(MD.Put("invites", c3 .. "#Hilda", { removed = true, by = "Muradin" }), "the leader removes Hilda")
+H.run(5)
+check(AD.ClanOf("Hilda") == nil and HD.ClanOf("Hilda") == nil, "a removed member is out everywhere")
+check(not HD.Delete("invites", c3 .. "#Hilda"), "a removed member can't lift the removal")
+HD.Put("clanship", "Hilda", { clan = c3 }); H.run(5)
+check(AD.ClanOf("Hilda") == nil, "rejoining after removal doesn't count")
+check(MD.Put("invites", c3 .. "#Hilda", { by = "Muradin" }), "the leader invites her back")
+H.run(5)
+check(AD.ClanOf("Hilda") == c3, "an invite lets a removed member back in")
+-- an old request to join that was never answered now counts as joining
+local c4 = "stonefist"
+check(MD.Put("clans", c4, { name = "Stonefist", founder = "Muradin", leader = "Muradin" }), "clan for an old application")
+H.run(5)
+DD.Put("applications", c4 .. "#Dagna", { note = "old request", ts = 7 }); H.run(5)
+check(AD.ClanOf("Dagna") == c4, "an unanswered request to join counts as joined")
+-- a guildmate who missed clan records gets them when their authors re-share
+local raw = AD.Raw("clans"); raw[c4] = nil
+check(AD.ClanOf("Dagna") == nil, "(the officer has lost the clan record)")
+local shared = M.ns.Comm.ShareMine(); H.run(10)
+check(shared > 0 and AD.Get("clans", c4) ~= nil and AD.ClanOf("Dagna") == c4, "re-sharing fills in missing clan records")
+
 -- Non-dwarf invite: logged with inviter, announced, inviter shamed, Longbeard popup
 M.target = { name = "Orcy", race = "Orc" }
 M.env.C_GuildInfo.Invite("Orcy")
@@ -1600,7 +1627,7 @@ do
 end
 do
   -- messages from another protocol version are ignored
-  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.1", "version 2.18.1 on protocol 12")
+  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.2", "version 2.18.2 on protocol 12")
   local before = A.ns.Data.Get("profiles", "Kurdran")
   local ok = A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", p = 11,
     r = { d = { backstory = "from an old version" }, t = A.ns.Stamp() + 5000, b = "Kurdran" } })

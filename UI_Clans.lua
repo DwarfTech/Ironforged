@@ -1,7 +1,7 @@
 -- Ironforged: Clans tab.
--- Veterans and above found clans. Members join by the Clan Leader's invitation, or by
--- asking to join and being accepted from the Applications view.
--- Only Longbeards and the guild master can delete a clan.
+-- Any guildmate founds a clan, and anyone may join any clan from its page. A Clan Leader can
+-- invite kin (a nudge, not a requirement) and remove members; a removed member can't rejoin
+-- until invited again. Only Longbeards and the guild master can delete a clan.
 local ADDON, ns = ...
 local UI = ns.UI
 local Data = ns.Data
@@ -63,8 +63,8 @@ showClan = function(id)
   local isLeader = c.leader == me
   local members = Data.ClanMembers(id)
   local myClan = Data.ClanOf(me)
-  local invited = Data.Get("invites", id .. "#" .. me) ~= nil and myClan ~= id
-  local applied = Data.Get("applications", id .. "#" .. me) ~= nil and myClan ~= id
+  local invited = Data.InvitedToClan(id, me) and myClan ~= id
+  local removed = Data.RemovedFromClan(id, me)
 
   local names = {}
   for _, n in ipairs(members) do
@@ -79,18 +79,18 @@ showClan = function(id)
   if invited then
     lines[#lines + 1] = " "
     lines[#lines + 1] = "|cff40ff40" .. ns.Name(c.leader) .. " has invited you to join this clan.|r"
-  elseif applied then
+  elseif removed then
     lines[#lines + 1] = " "
-    lines[#lines + 1] = "|cffffd040You have asked to join. The Clan Leader will answer.|r"
+    lines[#lines + 1] = "|cffff4040You were removed from this clan. Only the Clan Leader can let you back in, by inviting you.|r"
   end
 
   local buttons = {}
   local function add(text, fn, keepOpen) buttons[#buttons + 1] = { text = text, onClick = fn, keepOpen = keepOpen } end
 
-  if invited then
-    add("Decline", function() Data.Delete("invites", id .. "#" .. me) end)
+  if invited then add("Decline", function() Data.Delete("invites", id .. "#" .. me) end) end
+  if myClan ~= id and not isLeader and not removed then
     add("Join clan", function()
-      if myClan and myClan ~= id and Data.IsClanLeader(me, myClan) then
+      if myClan and Data.IsClanLeader(me, myClan) then
         ns.Print("You lead another clan. Hand it over or disband it first.")
         return false
       end
@@ -98,30 +98,10 @@ showClan = function(id)
       ns.Print("You have sworn yourself to clan " .. c.name .. ".")
     end)
   end
-  if not invited and myClan ~= id and not isLeader then
-    if applied then
-      add("Withdraw", function() Data.Delete("applications", id .. "#" .. me) end)
-    else
-      add("Ask to join", function()
-        UI.OpenForm({
-          title = "Ask to join clan " .. c.name,
-          fields = {
-            { type = "info", font = "GameFontHighlightSmall", value = ns.Name(c.leader) .. " leads this clan and will accept or deny you." },
-            { key = "note", label = "Why you'd join", type = "multiline", value = "", maxLen = 200, height = 70 },
-          },
-          saveText = "Send",
-          onSave = function(v)
-            Data.Put("applications", id .. "#" .. me, { note = ns.Clean(v.note, 200), ts = ns.Now() })
-            ns.Print("Your request to join clan " .. c.name .. " has been sent.")
-          end,
-        })
-      end)
-    end
-  end
   if officer or isLeader then
     add("Invite", function()
       memberPicker(_G.IronforgedDialog, "Invite to " .. c.name, function(n)
-        return Data.ClanOf(n) ~= id and not Data.Get("invites", id .. "#" .. n)
+        return Data.ClanOf(n) ~= id and not Data.InvitedToClan(id, n)
       end, function(n)
         Data.Put("invites", id .. "#" .. n, { by = me })
         ns.Print("Invitation sent to " .. ns.Name(n) .. ".")
@@ -132,7 +112,8 @@ showClan = function(id)
       memberPicker(_G.IronforgedDialog, "Remove from " .. c.name, function(n)
         return n ~= c.leader and Data.ClanOf(n) == id
       end, function(n)
-        Data.Delete("invites", id .. "#" .. n)
+        Data.Put("invites", id .. "#" .. n, { removed = true, by = me })
+        ns.Print(ns.Name(n) .. " is no longer of clan " .. c.name .. ".")
         showClan(id)
       end)
       return false
@@ -162,59 +143,13 @@ showClan = function(id)
 end
 UI.ShowClan = showClan
 
-local state = { view = "clans" }
-
-local function visibleApplications(me)
-  if ns.IAmOfficer() then return Data.Applications() end
-  local out = {}
-  for _, clanId in ipairs(Data.ClansLedBy(me)) do
-    for _, a in ipairs(Data.Applications(clanId)) do out[#out + 1] = a end
-  end
-  return out
-end
-
-local function showApplication(key)
-  local a = Data.Get("applications", key)
-  if not a then return end
-  local clanId, member = Data.SplitKey(key)
-  local info = ns.roster[member] or {}
-  local lines = {
-    "|cffd4a017Wants to join:|r clan " .. (Data.ClanName(clanId) or "?"),
-    "|cffd4a017Rank:|r " .. (info.rankName or "?") .. "   |cffd4a017Level:|r " .. tostring(info.level or "?"),
-    "|cffd4a017Race:|r " .. ns.Gear.RaceStatus(member) .. "   |cffd4a017Asked:|r " .. ns.FormatDate(a.ts),
-  }
-  local current = Data.ClanOf(member)
-  if current then lines[#lines + 1] = "|cffffd040Already in clan " .. Data.ClanName(current) .. ".|r" end
-  if a.note and a.note ~= "" then lines[#lines + 1] = " "; lines[#lines + 1] = a.note end
-  UI.OpenForm({
-    title = ns.ColorName(member) .. " asks to join",
-    width = 500,
-    fields = { { type = "info", value = table.concat(lines, "\n") } },
-    buttons = {
-      { text = "Deny", onClick = function()
-        Data.Delete("applications", key)
-        ns.Print("Denied " .. ns.Name(member) .. ".")
-      end },
-      { text = "Accept", onClick = function()
-        if Data.Put("invites", key, { by = ns.PlayerName() }) then
-          ns.Print(ns.Name(member) .. " is now of clan " .. (Data.ClanName(clanId) or "?") .. ".")
-        end
-      end },
-    },
-  })
-end
 
 local function build(f, w, h)
   f.newButton = UI.Button(f, "Found a clan", 120, 22, function() editClan(nil) end)
   f.newButton:SetPoint("TOPLEFT", 4, -2)
-  f.appsButton = UI.Button(f, "Applications", 130, 22, function()
-    state.view = state.view == "apps" and "clans" or "apps"
-    UI.ScheduleRefresh()
-  end)
-  f.appsButton:SetPoint("TOPRIGHT", -4, -2)
   f.help = UI.Label(f, "", "GameFontHighlightSmall")
   f.help:SetPoint("TOPLEFT", 132, -7)
-  f.help:SetPoint("RIGHT", f.appsButton, "LEFT", -8, 0)
+  f.help:SetPoint("RIGHT", f, "RIGHT", -8, 0)
   f.help:SetWordWrap(false)
   f.list = UI.List(f, w, h - 30, {
     { title = "Clan", width = 150 }, { title = "Clan Leader", width = 110 }, { title = "Members", width = 60 },
@@ -222,36 +157,13 @@ local function build(f, w, h)
   }, function(id) showClan(id) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
   f.list:SetPoint("BOTTOMRIGHT", 0, 2)
-  f.apps = UI.List(f, w, h - 30, {
-    { title = "Applicant", width = 130 }, { title = "Rank", width = 90 }, { title = "Clan", width = 130 },
-    { title = "Asked", width = 80 }, { title = "Note", width = 150 },
-  }, function(key) showApplication(key) end)
-  f.apps:SetPoint("TOPLEFT", 0, -28)
-  f.apps:SetPoint("BOTTOMRIGHT", 0, 2)
-  f.apps:Hide()
 end
 
 local function refresh(f)
   local me = ns.PlayerName()
+  if ns.Comm and ns.Comm.ClanCatchUp and f:IsShown() then pcall(ns.Comm.ClanCatchUp) end
   f.newButton:SetShown(canFound(me))
-  local apps = visibleApplications(me)
-  local canAnswer = ns.IAmOfficer() or #Data.ClansLedBy(me) > 0
-  f.appsButton:SetShown(canAnswer)
-  if not canAnswer then state.view = "clans" end
-  f.appsButton:SetText(state.view == "apps" and "Back to clans" or ("Applications (" .. #apps .. ")"))
-  if state.view == "apps" then
-    f.list:Hide(); f.apps:Show()
-    f.help:SetText("Click an applicant to accept or deny them.")
-    local items = {}
-    for _, a in ipairs(apps) do
-      local info = ns.roster[a.member] or {}
-      items[#items + 1] = { data = a.key, cols = { ns.ColorName(a.member), info.rankName or "", Data.ClanName(a.clan) or "",
-        ns.FormatDate(a.data.ts), ((a.data.note or ""):gsub("\n", " ")) } }
-    end
-    f.apps:SetItems(items, "No one is asking to join right now.")
-    return
-  end
-  f.apps:Hide(); f.list:Show()
+  f.list:Show()
   local invites = Data.PendingInvites(me)
   if #invites > 0 then
     local names = {}
@@ -262,9 +174,9 @@ local function refresh(f)
     if clanId then
       f.help:SetText("You belong to clan |cffd4a017" .. Data.ClanName(clanId) .. "|r.")
     elseif canFound(me) then
-      f.help:SetText("Found a clan, then invite your kin from the clan's page.")
+      f.help:SetText("Click a clan to join it, or found your own.")
     else
-      f.help:SetText("Click a clan and press Ask to join.")
+      f.help:SetText("Click a clan and press Join clan.")
     end
   end
 
