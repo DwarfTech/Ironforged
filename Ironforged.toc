@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: |cffd4a017Ironforged|r
-## Notes: Dwarven guild management and roleplay: roster, clans, promotion trials, events, backstories, the Book of Grudges, a profession directory and Looking for Dwarf. Syncs between guildmates.
+## Notes: Dwarven guild management and roleplay: roster, clans, promotion trials, events, challenges, the Book of Grudges, a profession directory and Looking for Dwarf. Syncs between guildmates.
 ## Author: Firebird Bronze
 ## Version: 2.18.1
 ## SavedVariables: IronforgedDB
