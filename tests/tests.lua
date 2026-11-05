@@ -1571,6 +1571,26 @@ do
   CK.Remove(ol); H.run(2)
 end
 
+-- The greeting bar can be dragged by its grip, and right-click puts it back
+do
+  local bar, grip = K.env.IronforgedGreetBar, K.env.IronforgedGreetGrip
+  check(bar ~= nil and grip ~= nil, "the greeting bar has a drag grip")
+  if bar and grip then
+    bar.GetPoint = function() return "CENTER", K.env.UIParent, "CENTER", 120, -80 end
+    grip.__scripts.OnDragStart(grip); grip.__scripts.OnDragStop(grip)
+    local pos = K.ns.settings.greetPos
+    check(pos and pos.point == "CENTER" and pos.x == 120 and pos.y == -80, "dragging the bar saves its spot")
+    grip.__scripts.OnClick(grip, "RightButton")
+    check(K.ns.settings.greetPos == nil, "right-click puts the bar back under the target")
+    K.inCombat = true
+    local moved = false
+    bar.StartMoving = function() moved = true end
+    grip.__scripts.OnDragStart(grip)
+    check(not moved, "the bar can't be moved in combat")
+    K.inCombat = false
+  end
+end
+
 -- Call for aid from a solo start: four invites, then a raid, then the rest
 do
   local LKa = K.ns.LFD
