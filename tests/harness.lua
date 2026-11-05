@@ -332,8 +332,16 @@ local function makeClient(shortName, race, fullName)
 
   local ns = {}
   client.ns = ns
-  for _, file in ipairs(FILES) do
-    local chunk = assert(loadfile(ADDON_DIR .. "/" .. file))
+  -- H.versionDir: load this client from another copy of the addon (an older release)
+  local dir, files = ADDON_DIR, FILES
+  if H.versionDir then
+    dir, files = H.versionDir, {}
+    for line in io.lines(dir .. "/Ironforged.toc") do
+      if line:match("%.lua%s*$") then files[#files + 1] = line:gsub("%s+$", "") end
+    end
+  end
+  for _, file in ipairs(files) do
+    local chunk = assert(loadfile(dir .. "/" .. file))
     setfenv(chunk, env)
     chunk("Ironforged", ns)
   end
