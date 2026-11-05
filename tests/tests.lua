@@ -1102,12 +1102,32 @@ do
   K.known = nil; K.questTitle = nil; K.env.IronforgedNotice:Hide()
   clear()
 
-  -- Brawler: fist weapons only
+  -- Brawler: fist weapons only, but the wrong weapon only gets a reminder
   K.equip[16] = 9002
+  local before = #K.chat
   local br = CK.Start("brawler"); H.run(2)
-  check(K.equip[16] == nil, "Brawler takes off a sword")
+  local reminded = false
+  for i = before + 1, #K.chat do if K.chat[i]:find("doesn't count against you", 1, true) then reminded = true end end
+  check(K.equip[16] == 9002 and reminded, "Brawler reminds you about a sword and leaves it on")
+  H.run(120)
+  check(status(br) == "active", "a wrong weapon never fails Brawler")
+  local reminders = 0
+  for i = before + 1, #K.chat do if K.chat[i]:find("doesn't count against you", 1, true) then reminders = reminders + 1 end end
+  check(reminders == 1, "one reminder per weapon, not every few seconds")
+  K.equip[16] = nil; H.run(12)
+  check(status(br) == "active", "no weapon at all is fine")
+  -- fishing: a pole (by type, or by name on clients that file it differently) is always fine
+  H.ITEM_TYPES[6256] = { 2, 20 }; K.equip[16] = 6256; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(12)
+  check(status(br) == "active" and K.equip[16] == 6256 and K.ns.Challenges.Fishing(), "fishing doesn't break Brawler")
   K.equip[16] = 9003; H.run(12)
   check(K.equip[16] == 9003 and status(br) == "active", "Brawler keeps a fist weapon")
+  K.equip[16] = nil
+  clear()
+
+  -- Ironbreaker: a fishing pole takes both hands, so the shield clock rests while fishing
+  local ibf = CK.Start("ironbreaker"); H.run(1)
+  K.equip[16] = 6256; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(120)
+  check(status(ibf) == "active", "fishing without a shield doesn't fail Ironbreaker")
   K.equip[16] = nil
   clear()
 
@@ -1115,7 +1135,8 @@ do
   K.class = "ROGUE"; K.level = 10
   K.equip[16], K.equip[17] = 9004, 9002
   CK.Start("hammerer"); H.run(2)
-  check(K.equip[16] == 9004 and K.equip[17] == nil, "Hammerer keeps the mace and takes off the sword")
+  check(K.equip[16] == 9004 and K.equip[17] == 9002, "Hammerer leaves a sword on (a reminder only)")
+  K.equip[17] = nil
   K.equip[16] = nil
   clear()
 
@@ -1169,12 +1190,14 @@ do
   K.class, K.level = "SHAMAN", 20
   K.equip[16], K.equip[17] = 9007, 9004
   local cv = CK.Start("cleaver"); H.run(2)
-  check(K.equip[16] == 9007 and K.equip[17] == nil, "Cleaver keeps the axe and takes off the mace")
+  check(K.equip[16] == 9007 and K.equip[17] == 9004 and status(cv) == "active", "Cleaver leaves a mace on (a reminder only)")
+  K.equip[17] = nil
   check(not CK.Start("hammerer"), "Cleaver and Hammerer can't be taken on together")
   clear()
   K.equip[16], K.equip[17] = 9007, 9001
   local eb = CK.Start("earthbreaker"); H.run(2)
-  check(K.equip[16] == nil and K.equip[17] == nil, "Earthbreaker takes off a one-handed axe and a shield")
+  H.run(70)
+  check(K.equip[16] == 9007 and K.equip[17] == 9001 and status(eb) == "active", "Earthbreaker only reminds you about a one-hander and a shield")
   K.equip[16] = 9008; H.run(12)
   check(K.equip[16] == 9008 and status(eb) == "active", "Earthbreaker keeps a two-handed axe")
   K.spellNames = true
@@ -1202,27 +1225,33 @@ do
   local savedLevel = K.level
   clear()
 
-  -- a sword put on in combat can't come off until the fight ends; that isn't a failure
-  K.class, K.level = "WARRIOR", 20
-  local br = CK.Start("brawler"); H.run(1)
-  K.inCombat = true; K.equip[16] = 9002
+  -- a gun put on in combat can't come off until the fight ends; that isn't a failure (Beastmaster)
+  K.class, K.level = "HUNTER", 20
+  local br = CK.Start("beastmaster"); H.run(1)
+  K.inCombat = true; K.equip[18] = 9005
   H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(30)
-  check(K.equip[16] == 9002 and status(br) == "active", "a forbidden weapon worn in combat gets a grace period")
+  check(K.equip[18] == 9005 and status(br) == "active", "a forbidden weapon worn in combat gets a grace period")
   K.inCombat = false; H.fire(K, "PLAYER_REGEN_ENABLED"); H.run(1)
-  check(K.equip[16] == nil and status(br) == "active", "it comes off when the fight ends")
+  check(K.equip[18] == nil and status(br) == "active", "it comes off when the fight ends")
   -- but staying in combat past the grace fails
-  K.inCombat = true; K.equip[16] = 9002; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(75)
+  K.inCombat = true; K.equip[18] = 9005; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(75)
   check(status(br) == "failed", "a forbidden weapon kept on for a minute fails, even in combat")
-  K.inCombat = false; K.equip[16] = nil
+  K.inCombat = false; K.equip[18] = nil
   clear()
 
-  -- level edges: Hammerer isn't enforced at 9
+  -- level edges: Hammerer isn't enforced at 9; at 10 it starts reminding
   K.class, K.level = "ROGUE", 9
   K.equip[16] = 9002
+  local before = #K.chat
   local hm = CK.Start("hammerer"); H.run(12)
-  check(K.equip[16] == 9002 and status(hm) == "active", "Hammerer leaves your sword alone below level 10")
+  local early = false
+  for i = before + 1, #K.chat do if K.chat[i]:find("doesn't count against you", 1, true) then early = true end end
+  check(not early and status(hm) == "active", "Hammerer says nothing about your sword below level 10")
   K.level = 10; H.fire(K, "PLAYER_LEVEL_UP", 10); H.run(3)
-  check(K.equip[16] == nil, "Hammerer takes the sword off on reaching level 10")
+  local late = false
+  for i = before + 1, #K.chat do if K.chat[i]:find("Hammerer:|r that's a weapon that isn't a mace", 1, true) then late = true end end
+  check(late and K.equip[16] == 9002, "Hammerer reminds you about the sword on reaching level 10")
+  K.equip[16] = nil
   clear()
 
   -- spells before the start level, and other people's spells, don't count
@@ -1321,15 +1350,17 @@ do
   local savedPick, savedInv = K.env.C_Container.PickupContainerItem, K.env.PickupInventoryItem
   K.env.C_Container.PickupContainerItem = function() end -- the game puts it back where it was
   K.env.PickupInventoryItem = function() end
-  local br = CK.Start("brawler"); H.run(1)
-  K.equip[16] = 9002; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(8)
+  K.class = "HUNTER"
+  local br = CK.Start("beastmaster"); H.run(1)
+  K.equip[18] = 9005; H.fire(K, "PLAYER_EQUIPMENT_CHANGED"); H.run(8)
   local stuckWarn = false
-  for _, m in ipairs(K.chat) do if m:find("take off your weapon other than a fist weapon within a minute", 1, true) then stuckWarn = true end end
-  K.equip[16] = K.equip[16] or 9002
+  for _, m in ipairs(K.chat) do if m:find("take off your ranged weapon within a minute", 1, true) then stuckWarn = true end end
+  K.equip[18] = K.equip[18] or 9005
   check(stuckWarn and status(br) == "active", "a weapon that won't come off is warned about, not counted as removed")
   H.run(65)
   check(status(br) == "failed", "and fails once the minute is up")
-  K.env.C_Container.PickupContainerItem = savedPick; K.env.PickupInventoryItem = savedInv; K.equip[16] = nil
+  K.env.C_Container.PickupContainerItem = savedPick; K.env.PickupInventoryItem = savedInv; K.equip[18] = nil
+  K.class = "WARRIOR"
   clear()
 
   -- Doomseeker can't be started by a warrior who already knows Defensive Stance
@@ -1569,7 +1600,7 @@ do
 end
 do
   -- messages from another protocol version are ignored
-  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.0", "version 2.18.0 on protocol 12")
+  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.1", "version 2.18.1 on protocol 12")
   local before = A.ns.Data.Get("profiles", "Kurdran")
   local ok = A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", p = 11,
     r = { d = { backstory = "from an old version" }, t = A.ns.Stamp() + 5000, b = "Kurdran" } })

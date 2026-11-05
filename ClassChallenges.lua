@@ -65,19 +65,19 @@ P.doomseeker = { name = "Doomseeker", classes = set({ WARRIOR }), fromLevel = 5,
     return true
   end,
   rules = "Warriors. From level 5, never use a shield and never learn Defensive Stance. Skip the Defensive Stance quests: learning the stance fails the challenge." }
-P.brawler = { name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN, SHAMAN }), weapons = set({ 13 }),
+P.brawler = { name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN, SHAMAN }), weapons = set({ 13 }), warnOnly = true,
   weaponWhat = { what = "weapon other than a fist weapon", fail = "a weapon other than a fist weapon" },
-  rules = "Warriors, Hunters, Rogues, Paladins and Shamans. Fight with fist weapons or bare hands only. No other weapons, ranged included." }
-P.hammerer = { name = "Hammerer", classes = set({ WARRIOR, PALADIN, ROGUE, SHAMAN }), fromLevel = 10, weapons = set({ 4, 5 }),
+  rules = "Warriors, Hunters, Rogues, Paladins and Shamans. Fight with fist weapons or bare hands only. No other weapons, ranged included. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
+P.hammerer = { name = "Hammerer", classes = set({ WARRIOR, PALADIN, ROGUE, SHAMAN }), fromLevel = 10, weapons = set({ 4, 5 }), warnOnly = true,
   weaponWhat = { what = "weapon that isn't a mace", fail = "a weapon that wasn't a mace" },
-  rules = "Warriors, Paladins, Rogues and Shamans. From level 10, maces are your only weapons. No other weapons, ranged included." }
-P.cleaver = { name = "Cleaver", classes = set({ WARRIOR, PALADIN, HUNTER, SHAMAN }), fromLevel = 10, weapons = set({ 0, 1 }),
+  rules = "Warriors, Paladins, Rogues and Shamans. From level 10, maces are your only weapons. No other weapons, ranged included. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
+P.cleaver = { name = "Cleaver", classes = set({ WARRIOR, PALADIN, HUNTER, SHAMAN }), fromLevel = 10, weapons = set({ 0, 1 }), warnOnly = true,
   weaponWhat = { what = "weapon that isn't an axe", fail = "a weapon that wasn't an axe" },
-  rules = "Warriors, Paladins, Hunters and Shamans. From level 10, axes are your only weapons. No other weapons, ranged included." }
-P.earthbreaker = { name = "Earthbreaker", classes = set({ SHAMAN }), fromLevel = 10, weapons = set({ 1, 5 }), noShield = true,
+  rules = "Warriors, Paladins, Hunters and Shamans. From level 10, axes are your only weapons. No other weapons, ranged included. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
+P.earthbreaker = { name = "Earthbreaker", classes = set({ SHAMAN }), fromLevel = 10, weapons = set({ 1, 5 }), noShield = true, warnOnly = true,
   weaponWhat = { what = "weapon that isn't a two-handed axe or mace", fail = "a weapon that wasn't a two-handed axe or mace" },
   spellRule = function(n) if SHAMAN_HEALS[n] then return "a healing spell" end end,
-  rules = "Shamans. From level 10, fight only with a two-handed axe or mace (no shield, no one-handers), and cast no healing spells." }
+  rules = "Shamans. From level 10, fight only with a two-handed axe or mace (no shield, no one-handers), and cast no healing spells. Equip the wrong weapon or a shield and the addon reminds you; a healing spell fails the challenge." }
 P.beastmaster = { name = "Beastmaster", classes = set({ HUNTER }), fromLevel = 10, noRanged = true,
   rules = "Hunters. From level 10, no ranged weapon. You and your pet fight up close." }
 P.rifleman = { name = "Rifleman", classes = set({ HUNTER }), noPet = true,
@@ -112,24 +112,41 @@ local SHIELD = { what = "shield", fail = "a shield" }
 local RANGED_W = { what = "ranged weapon", fail = "a ranged weapon" }
 local WAND = { what = "wand", fail = "a wand" }
 
--- Item class and subclass of what's in a slot (weapon = 2, armor = 4; shield = armor subclass 6).
+-- Item class and subclass of what's in a slot (weapon = 2, armor = 4; shield = armor subclass 6),
+-- plus its subclass name and item ID.
 local function itemType(slot)
   local id = GetInventoryItemID and GetInventoryItemID("player", slot)
   if not id or isSecret(id) then return nil end
   local fn = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
   if not fn then return nil end
-  local ok, _, _, _, _, _, cls, sub = pcall(fn, id)
+  local ok, _, _, subName, equipLoc, _, cls, sub = pcall(fn, id)
   if not ok then return nil end
-  return cls, sub
+  return cls, sub, subName, id, equipLoc
 end
+
+-- Holding a fishing pole (weapon subclass 20, or anything the game calls a fishing pole or a
+-- profession tool). While fishing, weapon and shield rules rest.
+local function fishing()
+  local cls, sub, subName, id, equipLoc = itemType(16)
+  if not cls then return false end
+  if cls == 2 and sub == 20 then return true end
+  if equipLoc == "INVTYPE_PROFESSION_TOOL" then return true end
+  if type(subName) == "string" and subName:lower():find("fishing", 1, true) then return true end
+  local name = id and C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
+  return type(name) == "string" and name:lower():find("fishing pole", 1, true) ~= nil
+end
+C.Fishing = fishing
 
 local function hasShield()
   local cls, sub = itemType(17)
   return cls == 4 and sub == 6
 end
 
-function C.GearRules(p)
+-- What a rule set objects to right now: { [slot] = { what =, fail = } }. Weapon challenges
+-- (warnOnly) only ever remind you; the others take the item off and fail after a minute.
+local function gearProblems(p)
   local out = {}
+  if fishing() then return out end
   for _, slot in ipairs({ 16, 17, 18 }) do
     local cls, sub = itemType(slot)
     if cls == 4 and sub == 6 and p.noShield then
@@ -143,6 +160,29 @@ function C.GearRules(p)
   return out
 end
 
+function C.GearRules(p)
+  if p.warnOnly then return {} end
+  return gearProblems(p)
+end
+
+-- Weapon challenges: a reminder each time a weapon that doesn't fit goes on. Never a failure.
+local reminded = {} -- slot -> item ID already reminded about
+table.insert(C.ENFORCERS, function(c)
+  local p = c.preset
+  if not p.warnOnly then return end
+  local probs = gearProblems(p)
+  for _, slot in ipairs({ 16, 17, 18 }) do
+    local w = probs[slot]
+    local id = GetInventoryItemID and GetInventoryItemID("player", slot)
+    if w and id and reminded[slot] ~= id then
+      reminded[slot] = id
+      ns.Print("|cffffd040" .. p.name .. ":|r that's a " .. w.what .. ". Swap it out when you can; it doesn't count against you.")
+    elseif not w then
+      reminded[slot] = nil
+    end
+  end
+end)
+
 -- Ironbreaker: a shield, always.
 -- The minute is kept in saved variables (server time), so a /reload doesn't restart it.
 local shieldWarned
@@ -155,7 +195,7 @@ local function shieldClock(v)
 end
 table.insert(C.ENFORCERS, function(c)
   if not c.preset.needShield then return end
-  if hasShield() then shieldClock(false); shieldWarned = nil; return end
+  if hasShield() or fishing() then shieldClock(false); shieldWarned = nil; return end -- fishing: the pole takes both hands
   -- dead: a fresh minute once you're back on your feet
   if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then shieldClock(false); shieldWarned = nil; return end
   local since = shieldClock() or shieldClock(ns.Now())
