@@ -268,6 +268,7 @@ local function makeClient(shortName, race, fullName)
     if client.cursor then client.bags[slot] = { id = client.cursor, count = 1, name = "Gear" }; client.cursor = nil end
   end
   env.UnitIsPVP = function(u) return client.pvp end
+  env.IsInInstance = function() return client.instanceType ~= nil and client.instanceType ~= "none", client.instanceType or "none" end
   env.GetPVPDesired = function() return client.pvp end
   env.SetPVP = function(v) client.pvp = v == 1 or v == true end
   env.TogglePVP = function() client.pvp = not client.pvp end

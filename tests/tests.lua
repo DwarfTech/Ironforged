@@ -867,6 +867,23 @@ H.run(40)
 local s2 = K.ns.Data.Get("challenges", slayer2)
 check(s2.status == "failed" and s2.reason:find("PvP", 1, true), "Slayer fails if not flagged within a minute")
 check(pvpCalls == 0, "still no protected calls")
+-- dungeons drop the flag: Slayer rests inside and gives a minute after leaving
+CK.Remove(slayer2); H.run(1)
+K.pvp = true
+local slayer3 = CK.Start("slayer"); H.run(3)
+K.instanceType = "party"; K.pvp = false; H.fire(K, "PLAYER_ENTERING_WORLD"); H.fire(K, "PLAYER_FLAGS_CHANGED", "player"); H.run(600)
+check(K.ns.Data.Get("challenges", slayer3).status == "active", "Slayer: ten minutes unflagged inside a dungeon is fine")
+K.instanceType = "raid"; H.run(300)
+check(K.ns.Data.Get("challenges", slayer3).status == "active", "Slayer: inside a raid is fine too")
+K.instanceType = nil; H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(12)
+local told = false
+for _, m in ipairs(K.chat) do if m:find("the dungeon took your PvP flag", 1, true) then told = true end end
+check(told and K.ns.Data.Get("challenges", slayer3).status == "active", "Slayer: leaving the dungeon unflagged gives a minute, with the reason")
+K.pvp = true; H.fire(K, "PLAYER_FLAGS_CHANGED", "player"); H.run(90)
+check(K.ns.Data.Get("challenges", slayer3).status == "active", "Slayer: flagging after the dungeon keeps it going")
+K.instanceType = "party"; K.pvp = false; H.run(60)
+K.instanceType = nil; H.run(75)
+check(K.ns.Data.Get("challenges", slayer3).status == "failed", "Slayer: not flagging within a minute of leaving still fails")
 K.env.SlashCmdList.IRONFORGED("pvp")
 check(pvpCalls == 0, "/hold pvp only reports")
 K.env.SetPVP, K.env.TogglePVP = realSet, realToggle

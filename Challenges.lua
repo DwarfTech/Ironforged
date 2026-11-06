@@ -337,8 +337,26 @@ local function pvpOn()
 end
 C.PvPOn = pvpOn
 
+-- Inside a dungeon, raid or battleground the game drops your PvP flag and won't let you set it,
+-- so Slayer rests there. Leaving one, you get the usual minute to flag again.
+local function inInstance()
+  if not IsInInstance then return false end
+  local ok, inside, kind = pcall(IsInInstance)
+  if not ok or not inside or (issecretvalue and issecretvalue(kind)) then return false end
+  return kind == "party" or kind == "raid" or kind == "scenario" or kind == "pvp" or kind == "arena"
+end
+C.InInstance = inInstance
+local cameOutOfInstance = false
+
 function C.KeepFlagged(name, key)
+  if inInstance() then
+    if unflaggedSince and ns.UI and ns.UI.HideNotice then ns.UI.HideNotice("pvp") end
+    unflaggedSince = nil
+    cameOutOfInstance = true
+    return
+  end
   if pvpOn() then
+    cameOutOfInstance = false
     if unflaggedSince then ns.Print("|cffd4a017" .. name .. ":|r flagged for PvP. Keep it that way.") end
     unflaggedSince = nil
     if ns.UI and ns.UI.HideNotice then ns.UI.HideNotice("pvp") end
@@ -354,7 +372,9 @@ function C.KeepFlagged(name, key)
     return
   end
   unflaggedSince = now
-  ns.Print("|cffff4040" .. name .. ":|r you're not flagged for PvP. Type |cffffd040/pvp|r within " .. C.PVP_GRACE ..
+  local why = cameOutOfInstance and "the dungeon took your PvP flag" or "you're not flagged for PvP"
+  cameOutOfInstance = false
+  ns.Print("|cffff4040" .. name .. ":|r " .. why .. ". Type |cffffd040/pvp|r within " .. C.PVP_GRACE ..
     " seconds or the challenge fails.")
   if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
   if ns.UI and ns.UI.Notice then
