@@ -1755,7 +1755,7 @@ do
 end
 do
   -- messages from another protocol version are ignored
-  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.3", "version 2.18.3 on protocol 12")
+  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.4", "version 2.18.4 on protocol 12")
   local before = A.ns.Data.Get("profiles", "Kurdran")
   local ok = A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", p = 11,
     r = { d = { backstory = "from an old version" }, t = A.ns.Stamp() + 5000, b = "Kurdran" } })
