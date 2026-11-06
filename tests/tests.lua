@@ -1634,6 +1634,57 @@ do
   K.class, K.level = savedClass, savedLevel
 end
 
+-- Elves in Warsong Gulch: the battleground's raid group isn't your raid, and the scoreboard
+-- tells the addon who's an elf
+do
+  local B = K.ns.Blood
+  local me = K.ns.PlayerName()
+  local function elves() return (K.ns.db.pvp[me] and K.ns.db.pvp[me].elves) or 0 end
+  local function kill(name) H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", name .. " dies, honorable kill Rank: Scout (Estimated Honor Points: 12)"); H.run(4) end
+  K.inBG, K.instanceGroup, K.instanceRaid = true, true, true
+  K.inGroup, K.inRaid = false, false
+  K.scores = {
+    { name = "Lyriel Dawnshard", faction = 0, raceName = "Windshaper Skyborne" },
+    { name = "Thalor Sunstrider", faction = 0, raceName = "Blood Elf" },
+    { name = "Grukk Bonecrusher", faction = 0, raceName = "Orc" },
+    { name = "Aeris Highwind", faction = 1, raceName = "Skyborne" },
+    { name = "Vaelin Starfall", faction = 0, raceName = "Windshaper Skyborne" },
+  }
+  H.fire(K, "UPDATE_BATTLEFIELD_SCORE"); H.run(1)
+  local before = elves()
+  kill("Lyriel Dawnshard")
+  check(elves() == before + 1, "WSG solo-queued: a Windshaper Skyborne you never targeted counts (from the scoreboard)")
+  check(B.IsElf(nil, "Windshaper Skyborne") and B.IsElf(nil, "Blood Elf") and not B.IsElf(nil, "Orc"), "the elf check reads the display name when the internal one is missing")
+  kill("Thalor Sunstrider")
+  check(elves() == before + 2, "WSG: a Blood Elf counts")
+  kill("Grukk Bonecrusher")
+  check(elves() == before + 2, "WSG: an orc doesn't count")
+  kill("Aeris Highwind")
+  check(elves() == before + 2, "WSG: an Alliance Skyborne never counts")
+  kill("Lyriel Dawnshard")
+  check(elves() == before + 2, "WSG: the same elf only once an hour")
+  -- a premade party inside WSG: the elf must have been your target
+  K.inGroup = true
+  kill("Vaelin Starfall")
+  check(elves() == before + 2, "WSG premade party: an elf you weren't targeting doesn't count")
+  H.clock = H.clock + 3700
+  K.units.target = { name = "Vaelin Starfall", race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+  H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(1)
+  kill("Vaelin Starfall")
+  check(elves() == before + 3, "WSG premade party: your target counts")
+  K.units.target = nil
+  -- the scoreboard is asked for while in a battleground
+  local asked = K.scoreRequests or 0
+  H.run(25)
+  check((K.scoreRequests or 0) > asked, "the addon asks for the scoreboard while in a battleground")
+  -- an open-world raid still doesn't count
+  K.inBG, K.instanceGroup, K.instanceRaid, K.inGroup, K.inRaid = false, false, false, false, true
+  H.clock = H.clock + 3700
+  kill("Thalor Sunstrider")
+  check(elves() == before + 3, "a raid you formed still doesn't count")
+  K.inRaid, K.scores = false, nil
+end
+
 -- The greeting bar can be dragged by its grip, and right-click puts it back
 do
   local bar, grip = K.env.IronforgedGreetBar, K.env.IronforgedGreetGrip

@@ -1,8 +1,10 @@
 -- Ironforged: the Blood Tally and the hunt for grudged foes.
 --   * Horde slain: your lifetime honorable kills, from the game's own PvP stats.
 --   * Elves slain: honorable kills on Horde elves. The victim's race comes from what the addon
---     saw on their nameplate, target or tooltip. Solo kills count; in a party the elf must have
---     been your target; in a raid they don't count. The same elf counts at most once an hour.
+--     saw on their nameplate, target or tooltip, or in a battleground from the scoreboard. Solo
+--     kills count; in a party the elf must have been your target; in a raid they don't count. Only
+--     the group you formed counts here: a battleground's own group is ignored, so solo-queued
+--     kills in Warsong Gulch count like solo ones. The same elf counts at most once an hour.
 --   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
 --     foe. Alliance grudges are avenged by an officer.
 --   * Grudged foes get a red warning on their tooltip. The first time a grudged foe is spotted,
@@ -35,7 +37,8 @@ end
 -- Both the race's internal name and its display name are checked.
 local ELF_WORDS = { "elf", "elves", "skyborne", "windshaper", "shen'dorei", "shendorei", "sin'dorei", "sindorei" }
 function Blood.IsElf(raceFile, raceName)
-  for _, r in ipairs({ raceFile, raceName }) do
+  -- each one on its own: either may be missing (a scoreboard gives only the display name)
+  for _, r in pairs({ raceFile or false, raceName or false }) do
     if type(r) == "string" and not isSecret(r) then
       r = r:lower()
       for _, w in ipairs(ELF_WORDS) do if r:find(w, 1, true) then return true end end
@@ -222,22 +225,25 @@ end
 --   solo: every elf kill counts; in a party: only if the elf was your target;
 --   in a raid: elf kills don't count.
 Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves.\n" ..
-  "- Solo: every elf kill counts.\n- In a party: only if the elf was your target when they died.\n" ..
-  "- In a raid: elf kills don't count.\n- The same elf counts at most once an hour."
+  "- Solo (including solo-queued battlegrounds): every elf kill counts.\n- In a party: only if the elf was your target when they died.\n" ..
+  "- In a raid you formed: elf kills don't count.\n- The same elf counts at most once an hour."
 
 Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
   "You avenge one by getting an honorable kill on a Horde player with an open grudge against them.\n" ..
   "Each open grudge counts once. Alliance grudges are marked avenged by an officer and don't add to this count."
 
+local HOME = LE_PARTY_CATEGORY_HOME or 1
+
 function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)
   -- every honorable kill an Alliance dwarf gets is on the Horde, so only Horde elves can turn up here
   if not foe or foe.faction == "Alliance" or not Blood.IsElf(foe.race, foe.raceName) then return false end
-  if IsInRaid and IsInRaid() then
+  -- only the group you formed yourself; a battleground's own raid group doesn't count as a raid
+  if IsInRaid and IsInRaid(HOME) then
     ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but elf kills don't count toward Elfbane in a raid.|r")
     return false
   end
-  if IsInGroup and IsInGroup() and not wasMyTarget(victim, key) then
+  if IsInGroup and IsInGroup(HOME) and not wasMyTarget(victim, key) then
     ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but in a party an elf only counts if they were your target.|r")
     return false
   end
@@ -288,6 +294,63 @@ ns.RegisterEvent("CHAT_MSG_COMBAT_HONOR_GAIN", function(text)
 end)
 
 ns.RegisterEvent("PLAYER_PVP_KILLS_CHANGED", function() schedulePublish(10) end)
+
+----------------------------------------------------------------------
+-- Battlegrounds: the scoreboard lists every player's race and faction, so foes count as elves
+-- even when the addon never saw their nameplate.
+----------------------------------------------------------------------
+local function learnScore(name, factionIndex, raceName)
+  if type(name) ~= "string" or isSecret(name) or name == "" then return end
+  if isSecret(raceName) then raceName = nil end
+  local faction = (factionIndex == 0 and "Horde") or (factionIndex == 1 and "Alliance") or nil
+  local n = ns.Name(name)
+  if not n or ns.IsGuildmateName(n) then return end
+  local key = Data.FoeKey(n)
+  local c = foeCache()
+  local old = c[key]
+  c[key] = { name = n, race = old and old.race, raceName = raceName or (old and old.raceName),
+    faction = faction or (old and old.faction), seen = time() }
+end
+
+function Blood.ReadScoreboard()
+  if not GetNumBattlefieldScores then return 0 end
+  local ok, n = pcall(GetNumBattlefieldScores)
+  if not ok or type(n) ~= "number" or isSecret(n) then return 0 end
+  local learned = 0
+  for i = 1, n do
+    if C_PvP and C_PvP.GetScoreInfo then
+      local okI, s = pcall(C_PvP.GetScoreInfo, i)
+      if okI and type(s) == "table" then learnScore(s.name, s.faction, s.raceName); learned = learned + 1 end
+    elseif GetBattlefieldScore then
+      -- older clients: name, killingBlows, honorableKills, deaths, honorGained, faction, rank, race, ...
+      -- (no rank on newer ones, so race may be the 7th value)
+      local okS, name, _, _, _, _, faction, a7, a8 = pcall(GetBattlefieldScore, i)
+      if okS then
+        local race = (type(a7) == "string" and a7) or (type(a8) == "string" and a8) or nil
+        learnScore(name, faction, race); learned = learned + 1
+      end
+    end
+  end
+  return learned
+end
+
+ns.RegisterEvent("UPDATE_BATTLEFIELD_SCORE", function() pcall(Blood.ReadScoreboard) end)
+-- while in a battleground, ask for the scoreboard now and then (a request to the game, nothing sent)
+local function inBattleground()
+  if UnitInBattleground and UnitInBattleground("player") then return true end
+  local okI, _, kind = pcall(IsInInstance or function() end)
+  return okI and kind == "pvp"
+end
+if C_Timer and C_Timer.NewTicker then
+  C_Timer.NewTicker(20, function()
+    if inBattleground() and RequestBattlefieldScoreData then pcall(RequestBattlefieldScoreData) end
+  end)
+end
+ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
+  if C_Timer then C_Timer.After(5, function()
+    if inBattleground() and RequestBattlefieldScoreData then pcall(RequestBattlefieldScoreData) end
+  end) end
+end)
 
 
 ----------------------------------------------------------------------

@@ -278,11 +278,22 @@ local function makeClient(shortName, race, fullName)
   client.inGroup, client.left, client.declined = false, false, false
   client.inRaid = false
   env.LE_PARTY_CATEGORY_HOME, env.LE_PARTY_CATEGORY_INSTANCE = 1, 2
+  -- as in the game: HOME is the group you formed, INSTANCE the one a battleground put you in
+  -- (client.instanceRaid: that group is a raid), no category means either
   env.IsInGroup = function(category)
     if category == env.LE_PARTY_CATEGORY_INSTANCE then return client.instanceGroup and true or false end
+    if category == env.LE_PARTY_CATEGORY_HOME then return (client.inGroup or client.inRaid) and true or false end
     return client.inGroup or client.inRaid or client.instanceGroup
   end
-  env.IsInRaid = function() return client.inRaid end
+  env.IsInRaid = function(category)
+    if category == env.LE_PARTY_CATEGORY_INSTANCE then return client.instanceRaid and true or false end
+    if category == env.LE_PARTY_CATEGORY_HOME then return client.inRaid and true or false end
+    return (client.inRaid or client.instanceRaid) and true or false
+  end
+  env.GetNumBattlefieldScores = function() return client.scores and #client.scores or 0 end
+  env.RequestBattlefieldScoreData = function() client.scoreRequests = (client.scoreRequests or 0) + 1 end
+  env.C_PvP = { GetScoreInfo = function(i) return client.scores and client.scores[i] end }
+  env.UnitInBattleground = function(u) return client.inBG and 1 or nil end
   env.UnitIsGroupLeader = function(u) return client.leader and true or false end
   -- UnitInRaid by character name: in my raid if we're both in the (single) test raid
   env.UnitInRaid = function(n)
