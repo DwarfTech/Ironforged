@@ -1,10 +1,9 @@
 -- Ironforged: the Blood Tally and the hunt for grudged foes.
 --   * Horde slain: your lifetime honorable kills, from the game's own PvP stats.
 --   * Elves slain: honorable kills on Horde elves. The victim's race comes from what the addon
---     saw on their nameplate, target or tooltip, or in a battleground from the scoreboard. Solo
---     kills count; in a party the elf must have been your target; in a raid they don't count. Only
---     the group you formed counts here: a battleground's own group is ignored, so solo-queued
---     kills in Warsong Gulch count like solo ones. The same elf counts at most once an hour.
+--     saw on their nameplate, target or tooltip, or in a battleground from the scoreboard. Every
+--     honorable kill on a Horde elf counts, solo, in a group or in a battleground; the same elf
+--     counts at most once an hour.
 --   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
 --     foe. Alliance grudges are avenged by an officer.
 --   * Grudged foes get a red warning on their tooltip. The first time a grudged foe is spotted,
@@ -221,32 +220,18 @@ local function wasMyTarget(victim, key)
   return t ~= nil and GetTime() - t < 15
 end
 
--- Elfbane rules, to keep raid zergs from farming the count:
---   solo: every elf kill counts; in a party: only if the elf was your target;
---   in a raid: elf kills don't count.
+-- Elfbane rules: every honorable kill on a Horde elf counts, solo, grouped or in a battleground.
 Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves.\n" ..
-  "- Solo (including solo-queued battlegrounds): every elf kill counts.\n- In a party: only if the elf was your target when they died.\n" ..
-  "- In a raid you formed: elf kills don't count.\n- The same elf counts at most once an hour."
+  "- Solo, in a group or in a battleground, every elf kill counts.\n- The same elf counts at most once an hour."
 
 Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
   "You avenge one by getting an honorable kill on a Horde player with an open grudge against them.\n" ..
   "Each open grudge counts once. Alliance grudges are marked avenged by an officer and don't add to this count."
 
-local HOME = LE_PARTY_CATEGORY_HOME or 1
-
 function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)
   -- every honorable kill an Alliance dwarf gets is on the Horde, so only Horde elves can turn up here
   if not foe or foe.faction == "Alliance" or not Blood.IsElf(foe.race, foe.raceName) then return false end
-  -- only the group you formed yourself; a battleground's own raid group doesn't count as a raid
-  if IsInRaid and IsInRaid(HOME) then
-    ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but elf kills don't count toward Elfbane in a raid.|r")
-    return false
-  end
-  if IsInGroup and IsInGroup(HOME) and not wasMyTarget(victim, key) then
-    ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but in a party an elf only counts if they were your target.|r")
-    return false
-  end
   ns.db.elfCounted = ns.db.elfCounted or {}
   local last = ns.db.elfCounted[key]
   local now = ns.Now()

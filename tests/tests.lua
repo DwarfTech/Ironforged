@@ -412,7 +412,7 @@ H.fire(K, "CHAT_MSG_SYSTEM", "Kurdran has defeated Aelindra in a duel")
 H.run(12)
 check(select(2, A.ns.Blood.Tally("Kurdran")) == 2, "duels don't count")
 K.target = nil
--- Elfbane rules: in a party the elf must be your target; in a raid elf kills don't count
+-- Elfbane rules: elf kills count in a party and in a raid, target or not
 K.units.nameplate3 = { name = "Vaelith", race = "BloodElf", faction = "Horde" }
 H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate3")
 K.units.nameplate4 = { name = "Seryn", race = "BloodElf", faction = "Horde" }
@@ -420,17 +420,17 @@ H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate4")
 K.inGroup = true
 H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Vaelith dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
 H.run(12)
-check(select(2, A.ns.Blood.Tally("Kurdran")) == 2, "party kill on an elf you didn't target doesn't count")
+check(select(2, A.ns.Blood.Tally("Kurdran")) == 3, "party kill on an elf you didn't target counts")
 K.target = { name = "Seryn", race = "BloodElf" }
 H.fire(K, "PLAYER_TARGET_CHANGED")
 H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Seryn dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
 H.run(12)
-check(select(2, A.ns.Blood.Tally("Kurdran")) == 3, "party kill on your target counts")
+check(select(2, A.ns.Blood.Tally("Kurdran")) == 4, "party kill on your target counts")
 K.inGroup, K.inRaid = false, true
 H.clock = H.clock + 3700; H.server = H.server + 3700
 H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Seryn dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")
 H.run(12)
-check(select(2, A.ns.Blood.Tally("Kurdran")) == 3, "elf kills in a raid don't count")
+check(select(2, A.ns.Blood.Tally("Kurdran")) == 5, "elf kills in a raid count")
 K.inRaid = false
 K.target = nil
 -- Forever's Horde Sky Elves: counted whatever the game calls the race internally
@@ -443,7 +443,7 @@ check(select(2, A.ns.Blood.Tally("Kurdran")) == beforeElves + 1, "a Windshaper S
 check(K.ns.db.lastKills[1].name == "Lyriel" and K.ns.db.lastKills[1].raceName == "Windshaper Skyborne", "last kills remember the race seen")
 K.env.SlashCmdList.IRONFORGED("kills")
 
-check(K.ns.Blood.ELF_RULES:find("raid", 1, true), "Elfbane rules written for the tooltip")
+check(K.ns.Blood.ELF_RULES:find("battleground", 1, true) and K.ns.Blood.ELF_RULES:find("once an hour", 1, true), "Elfbane rules written for the tooltip")
 check(K.ns.Blood.AVENGED_RULES:find("open grudge", 1, true), "Avenged rules written for the tooltip")
 -- seeing a grudged foe dead does not avenge the grudge
 check(Hh.ns.Data.Put("grudges", "zug", { against = "Zug", faction = "Horde", deed = "Ganked lowbies", ts = 4 }), "second Horde grudge")
@@ -1663,25 +1663,19 @@ do
   check(elves() == before + 2, "WSG: an Alliance Skyborne never counts")
   kill("Lyriel Dawnshard")
   check(elves() == before + 2, "WSG: the same elf only once an hour")
-  -- a premade party inside WSG: the elf must have been your target
+  -- a premade party inside WSG: counts, target or not
   K.inGroup = true
   kill("Vaelin Starfall")
-  check(elves() == before + 2, "WSG premade party: an elf you weren't targeting doesn't count")
-  H.clock = H.clock + 3700
-  K.units.target = { name = "Vaelin Starfall", race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
-  H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(1)
-  kill("Vaelin Starfall")
-  check(elves() == before + 3, "WSG premade party: your target counts")
-  K.units.target = nil
+  check(elves() == before + 3, "WSG premade party: an elf counts, target or not")
   -- the scoreboard is asked for while in a battleground
   local asked = K.scoreRequests or 0
   H.run(25)
   check((K.scoreRequests or 0) > asked, "the addon asks for the scoreboard while in a battleground")
-  -- an open-world raid still doesn't count
+  -- an open-world raid counts too
   K.inBG, K.instanceGroup, K.instanceRaid, K.inGroup, K.inRaid = false, false, false, false, true
   H.clock = H.clock + 3700
   kill("Thalor Sunstrider")
-  check(elves() == before + 3, "a raid you formed still doesn't count")
+  check(elves() == before + 4, "an elf killed in a raid counts")
   K.inRaid, K.scores = false, nil
 end
 
