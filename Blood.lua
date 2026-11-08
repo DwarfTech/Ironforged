@@ -5,8 +5,8 @@
 --     count, solo or grouped; battleground kills don't. The same elf counts at most once an hour.
 --   * World kills (Warbringer): honorable kills made outside battlegrounds, counted by this addon
 --     from the moment it's installed.
---   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
---     foe. Alliance grudges are avenged by an officer.
+--   * Horde grudges are avenged automatically when a guildmate kills the foe (an honorable kill,
+--     or a no-honor kill on a foe they were fighting). Alliance grudges are avenged by an officer.
 --   * Grudged foes get a red warning on their tooltip. The first time a grudged foe is spotted,
 --     an alert goes to you and the guild; each grudge alerts only once.
 local ADDON, ns = ...
@@ -248,7 +248,8 @@ Blood.WORLD_RULES = "World kills counts your honorable kills outside battlegroun
   "The most world kills holds the title Warbringer."
 
 Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
-  "You avenge one by getting an honorable kill on a Horde player with an open grudge against them.\n" ..
+  "You avenge one by killing a Horde player with an open grudge against them: an honorable kill,\n" ..
+  "or a kill that gives no honor on a foe you were fighting.\n" ..
   "Each open grudge counts once. Alliance grudges are marked avenged by an officer and don't add to this count."
 
 function Blood.CountElf(victim, how)
@@ -331,21 +332,24 @@ local function noteDeath(unit)
   local f = foeCache()[Data.FoeKey(name)]
   if f and f.faction == "Alliance" then return end
   local key = Data.FoeKey(name)
-  -- my own target died: an elf counts even without honor
-  if unit == "target" then pcall(Blood.ElfDied, name, false) end
+  -- my own target died: an elf counts and a grudge is avenged, even without honor
+  if unit == "target" then pcall(Blood.FoeDied, name, false) end
   for _, r in ipairs(recentDeaths) do if r.key == key and GetTime() - r.t < 10 then return end end
   table.insert(recentDeaths, 1, { name = name, key = key, t = GetTime() })
   while #recentDeaths > 20 do table.remove(recentDeaths) end
 end
 Blood.NoteDeath = noteDeath
 
--- An elf died without (or before) an honorable kill. It counts when I slew them, or when they were
--- the Horde player I was fighting (my target within the last 15 seconds). Never avenges grudges:
--- that still takes an honorable kill.
-function Blood.ElfDied(name, mine)
-  if not name or name == "" then return false end
+-- A Horde player died without (or before) an honorable kill. It counts when I slew them, or when
+-- they were the Horde player I was fighting (my target within the last 15 seconds): an elf counts
+-- toward Elves slain, and open Horde grudges against them are avenged.
+function Blood.FoeDied(name, mine)
+  if not name or name == "" or isSecret(name) or ns.IsGuildmateName(name) then return false end
   local key, foe = findFoe(name)
-  if not foe or foe.faction == "Alliance" or not Blood.IsElf(foe.race, foe.raceName) then return false end
+  if foe and foe.faction == "Alliance" then return false end
+  local elf = foe ~= nil and Blood.IsElf(foe.race, foe.raceName)
+  local grudged = #Data.GrudgesAgainst(name) > 0
+  if not elf and not grudged then return false end
   local fighting = mine
   if not fighting then
     local first = key:match("^(%S+)")
@@ -355,17 +359,21 @@ function Blood.ElfDied(name, mine)
     if cur and Data.FoeKey(cur):match("^(%S+)") == first then fighting = true end
   end
   if not fighting then return false end
-  -- its own record of handled deaths, so a later honorable kill still avenges grudges
-  -- (the elf itself counts once either way: CountElf allows one per elf an hour)
+  -- its own record of handled deaths, separate from honorable kills; the elf itself counts once
+  -- either way (one per elf an hour), and a grudge is avenged only once (only open ones are taken)
   Blood.elfDeathAt = Blood.elfDeathAt or {}
   local t = GetTime()
   if Blood.elfDeathAt[key] and t - Blood.elfDeathAt[key] < 10 then return false end
   Blood.elfDeathAt[key] = t
   ns.db.lastKills = ns.db.lastKills or {}
-  table.insert(ns.db.lastKills, 1, { name = name, race = foe.race, raceName = foe.raceName, faction = foe.faction, ts = ns.Now() })
+  table.insert(ns.db.lastKills, 1, { name = name, race = foe and foe.race, raceName = foe and foe.raceName,
+    faction = foe and foe.faction, ts = ns.Now() })
   while #ns.db.lastKills > 10 do table.remove(ns.db.lastKills) end
-  return Blood.CountElf(name, "slain")
+  local counted = elf and Blood.CountElf(name, "slain") or false
+  local avenged = grudged and avenge(name, "slain") or 0
+  return counted or avenged > 0
 end
+Blood.ElfDied = Blood.FoeDied
 
 -- The combat log, where the game still writes it to chat: "You have slain X!" and "X dies."
 local slainPatterns, diesPatterns
@@ -388,7 +396,7 @@ local function onDeathMessage(text)
   d.deathMsgs = (d.deathMsgs or 0) + 1
   if type(text) ~= "string" or isSecret(text) then return end
   local victim, mine = deathFromText(text)
-  if victim then pcall(Blood.ElfDied, victim, mine) end
+  if victim then pcall(Blood.FoeDied, victim, mine) end
 end
 ns.RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH", onDeathMessage)
 

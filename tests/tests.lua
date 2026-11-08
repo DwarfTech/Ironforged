@@ -1886,6 +1886,88 @@ do
   K.target = nil
 end
 
+-- Grudge targets are avenged through every way a kill is noticed, elf or not
+do
+  local me = K.ns.PlayerName()
+  local function avengedCount() return (K.ns.db.pvp[me] and K.ns.db.pvp[me].avenged) or 0 end
+  local function elves() return (K.ns.db.pvp[me] and K.ns.db.pvp[me].elves) or 0 end
+  K.inBG, K.instanceType = false, nil
+  local function grudge(name, faction)
+    A.ns.Data.Put("grudges", A.ns.Data.KeyOf(name), { against = name, faction = faction or "Horde", deed = "camped the flight master", ts = A.ns.Now() })
+    H.run(4)
+    return A.ns.Data.KeyOf(name)
+  end
+  local function avenged(key) return K.ns.Data.Avenged(key) ~= nil end
+  local function fight(name, race)
+    H.clock = H.clock + 3700
+    K.target = { name = name, race = race or "Orc", raceName = race or "Orc", faction = "Horde" }
+    H.fire(K, "PLAYER_TARGET_CHANGED"); H.fire(K, "UNIT_HEALTH", "target"); H.run(1)
+  end
+  local function rise() K.sessionHK = (K.sessionHK or 0) + 1; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6) end
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(1)
+  local a0 = avengedCount()
+
+  -- the kill message names them
+  local k1 = grudge("Grashnak One")
+  fight("Grashnak One")
+  H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Grashnak One dies, honorable kill Rank: Scout (Estimated Honor Points: 12)"); H.run(4)
+  check(avenged(k1), "a grudge target named in the kill message is avenged")
+  -- no message, death not seen: the kill count goes to the Horde player you were fighting
+  local k2 = grudge("Grashnak Two")
+  fight("Grashnak Two")
+  K.target = nil; H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(2)
+  rise()
+  check(avenged(k2), "no message, death not seen: the grudge target you were fighting is avenged")
+  -- a kill with no honor: you slew them
+  local k3 = grudge("Grashnak Three")
+  fight("Grashnak Three")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "You have slain Grashnak Three!"); H.run(2)
+  check(avenged(k3), "\"You have slain\" with no honor avenges the grudge")
+  -- no honor, your target seen dead
+  local k4 = grudge("Grashnak Four")
+  fight("Grashnak Four")
+  K.target.dead = true; H.fire(K, "UNIT_HEALTH", "target"); H.run(2)
+  check(avenged(k4), "your grudge target seen dead with no honor is avenged")
+  -- "X dies." while you're fighting them
+  local k5 = grudge("Grashnak Five")
+  fight("Grashnak Five")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "Grashnak Five dies."); H.run(2)
+  check(avenged(k5), "\"X dies.\" for the grudge target you were fighting avenges it")
+  -- "X dies." for someone you weren't fighting: not yours
+  K.target = nil; H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(20)
+  local k6 = grudge("Grashnak Six")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "Grashnak Six dies."); H.run(2)
+  check(not avenged(k6), "a grudge target dying to someone else, out of your fight, isn't avenged by you")
+  -- Alliance grudges are still an officer's call
+  local k7 = grudge("Tagthief Eight", "Alliance")
+  H.clock = H.clock + 3700
+  K.target = { name = "Tagthief Eight", race = "Human", raceName = "Human", faction = "Alliance" }
+  H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(1)
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "You have slain Tagthief Eight!"); H.run(2)
+  check(not avenged(k7), "Alliance grudges aren't avenged by a kill")
+  -- each grudge counts once, however many ways the kill shows up
+  check(avengedCount() == a0 + 5, "five grudges avenged, five on the tally")
+  local k9 = grudge("Grashnak Nine")
+  fight("Grashnak Nine")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "You have slain Grashnak Nine!"); H.run(1)
+  H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Grashnak Nine dies, honorable kill Rank: Scout (Estimated Honor Points: 12)")
+  rise()
+  check(avenged(k9) and avengedCount() == a0 + 6, "no-honor line, honor message and kill count for one foe: avenged once")
+  -- an elf with a grudge: both count; in a battleground the grudge is avenged but the elf isn't counted
+  local e0 = elves()
+  local k10 = grudge("Sylwen Grudgeleaf")
+  fight("Sylwen Grudgeleaf", "BloodElf")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "You have slain Sylwen Grudgeleaf!"); H.run(2)
+  check(avenged(k10) and elves() == e0 + 1, "a grudged elf: avenged and counted")
+  K.inBG = true
+  local k11 = grudge("Lirael Grudgeleaf")
+  fight("Lirael Grudgeleaf", "BloodElf")
+  H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Lirael Grudgeleaf dies, honorable kill Rank: Scout (Estimated Honor Points: 12)"); H.run(4)
+  K.inBG = false
+  check(avenged(k11) and elves() == e0 + 1, "in a battleground the grudge is avenged, the elf isn't counted")
+  K.target = nil
+end
+
 -- Officers post the recruitment message from the Roster tab
 do
   local R = A.ns.Recruit
@@ -2124,7 +2206,7 @@ check(F.ns.PlayerName() == "Frugo Mega" and F.ns.IAmOfficer(), "matched by chara
 -- A guildmate with a Forever surname: whispers go to their real character name
 local Bc = H.makeClient("Buttercup", nil, "Buttercup Clamstone-Forever"); Bc.guidOverride = "Player-Buttercup Clamstone-Forever"
 H.boot(Bc)
-H.run(90)
+H.run(240)
 check(Bc.ns.PlayerName() == "Buttercup Clamstone", "surnamed member recognised")
 check(Bc.ns.Data.Digest("grudges") == AD.Digest("grudges"), "surnamed member syncs (whispered records arrive)")
 check(A.ns.Name("Buttercup Clamstone-Forever") == "Buttercup Clamstone" and A.ns.Name("Buttercup Clamstone") == "Buttercup Clamstone" and A.ns.Name("Thorin-Forever") == "Thorin", "character name is first name and surname without the realm")
