@@ -1070,7 +1070,10 @@ check(#D.ns.LFD.Posts() == 1 and D.ns.LFD.Posts()[1].data.what == "Stockades", "
 do -- level ranges: names and short names, posts that aren't dungeons, edges of the range
   local LD = D.ns.LFD
   check(LD.MatchDungeon("BRD jailbreak").key == "brd" and LD.MatchDungeon("need tank for sm lib").key == "smlib", "short names pick the dungeon")
-  check(LD.MatchDungeon("dm east").key == "direm" and LD.MatchDungeon("DM").key == "dm", "DM is Deadmines, DM East is Dire Maul")
+  check(LD.MatchDungeon("dm east").key == "dme" and LD.MatchDungeon("DM").key == "dm", "DM is Deadmines, DM East is Dire Maul")
+  check(LD.MatchDungeon("Hall of Thanes").key == "hot" and LD.MatchDungeon("krol'dok run").key == "kroldok"
+    and LD.MatchDungeon("Alcaz Island Prison").key == "alcaz" and LD.MatchDungeon("Barrow Deeps").key == "barrow", "Forever's new dungeons and raids are on the list")
+  check(#LD.DUNGEONS == 38, "every Forever dungeon and raid is listed")
   check(LD.MatchDungeon("quest help in Westfall") == nil, "plain posts aren't dungeons")
   local r = { min = 29, max = 38 }
   check(LD.InRange(r, 29) and LD.InRange(r, 38) and not LD.InRange(r, 28) and not LD.InRange(r, 39), "the range includes both ends")
