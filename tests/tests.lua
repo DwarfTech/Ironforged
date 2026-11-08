@@ -1912,10 +1912,11 @@ do
   local d = A.env.IronforgedDialog
   check(d:IsShown(), "the Recruit window opens for officers")
   local sendBtn
-  for _, b in ipairs(d.buttons or {}) do if b.__text == "Send" and b:IsShown() then sendBtn = b end end
+  for _, b in ipairs(d.buttons or {}) do if b.__text == "Send to General" and b:IsShown() then sendBtn = b end end
   local before = #A.publicChat
   if sendBtn then sendBtn:Click() end
-  check(sendBtn ~= nil and #A.publicChat == before + 1 and A.publicChat[#A.publicChat].text == R.Message(), "the Send button posts the message")
+  check(sendBtn ~= nil and #A.publicChat == before + 1 and A.publicChat[#A.publicChat].text == R.Message(), "the Send to General button posts the message")
+  check(A.publicChat[#A.publicChat].channel == "CHANNEL" and A.publicChat[#A.publicChat].target == 1, "and it goes to General")
   check(R.SaveMessage("Ironforged wants YOU. Whisper me!"), "officers save the message")
   H.run(6)
   check(B.ns.Recruit.Message() == "Ironforged wants YOU. Whisper me!", "the saved message reaches other officers")

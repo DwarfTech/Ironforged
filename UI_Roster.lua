@@ -221,29 +221,26 @@ local function build(f, w, h)
   f.list:SetPoint("BOTTOMRIGHT", 0, 2)
 end
 
--- The recruitment message window: pick where to post, change the words if you like, send.
+-- The recruitment message window: change the words if you like, then send it to your zone's General chat.
 function UI.OpenRecruit()
   local R = ns.Recruit
   if not ns.IAmOfficer() then ns.Print("Only officers can send the recruitment message."); return end
-  local options = {}
-  for _, c in ipairs(R.CHANNELS) do options[#options + 1] = { text = c.text, value = c.key } end
   UI.OpenForm({
     title = "Send the recruitment message",
     width = 520,
     fields = {
-      { key = "where", label = "Post to", type = "choice", value = ns.settings.recruitChannel or "General", options = options },
       { key = "text", label = "Message", type = "multiline", value = R.Message(), height = 90, maxLen = 255 },
-      { type = "info", font = "GameFontHighlightSmall", value = "Changes to the message are saved for every officer. " ..
-        "Up to 255 letters. One post a minute." },
+      { type = "info", font = "GameFontHighlightSmall", value = "Goes to the General chat of the zone you're in. " ..
+        "Changes to the message are saved for every officer. Up to 255 letters. One post a minute." },
     },
-    saveText = "Send",
+    saveText = "Send to General",
     onSave = function(v)
       local text = ns.Trim((v.text or ""):gsub("[\r\n]+", " "))
       if text == "" then text = R.DefaultMessage() end
-      local ok, why = R.Send(text, v.where)
+      local ok, why = R.Send(text, "General")
       if not ok then ns.Print(why); return false end
       R.SaveMessage(text)
-      ns.Print("Recruitment message sent.")
+      ns.Print("Recruitment message sent to General.")
     end,
   })
 end

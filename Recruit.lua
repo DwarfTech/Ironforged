@@ -1,5 +1,5 @@
--- Ironforged: recruitment message. Officers post the guild's recruiting message to a public channel
--- (General, Trade, LookingForGroup) or say/yell it, from a button on the Roster tab. The message is
+-- Ironforged: recruitment message. Officers post the guild's recruiting message to the General chat
+-- of the zone they're in, from a button on the Roster tab. The message is
 -- kept in the guild settings, so every officer posts the same one and any of them can change it.
 local ADDON, ns = ...
 
@@ -55,6 +55,11 @@ function R.ChannelNumber(base)
   if GetChannelName then
     local ok, id = pcall(GetChannelName, base)
     if ok and type(id) == "number" and id > 0 then return id end
+    -- General is channel 1 unless you've rearranged your channels
+    if lower == "general" then
+      local ok1, id1 = pcall(GetChannelName, 1)
+      if ok1 and id1 == 1 then return 1 end
+    end
   end
 end
 
