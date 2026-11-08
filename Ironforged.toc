@@ -22,6 +22,7 @@ Titles.lua
 Professions.lua
 LookingForDwarf.lua
 AutoInvite.lua
+Recruit.lua
 Challenges.lua
 ClassChallenges.lua
 IronChef.lua

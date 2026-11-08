@@ -213,11 +213,19 @@ local function makeClient(shortName, race, fullName)
         table.insert(H.whisperBus, { from = H.charName(client.full), to = target, text = text })
         return
       end
+      if channel == "CHANNEL" or channel == "SAY" or channel == "YELL" then
+        client.publicChat = client.publicChat or {}
+        table.insert(client.publicChat, { text = text, channel = channel, target = target })
+        return
+      end
       table.insert(client.guildChat, text)
       if channel == "GUILD" then H.guildBus = H.guildBus or {}; table.insert(H.guildBus, { from = client.full, text = text }) end
       if channel == "RAID" and client.inRaid then H.raidBus = H.raidBus or {}; table.insert(H.raidBus, { from = client.full, text = text }) end
     end,
   }
+  -- joined chat channels: id, name, disabled triples
+  client.channels = { 1, "General", false, 2, "Trade", false }
+  env.GetChannelList = function() return unpack(client.channels) end
   env.GetPlayerInfoByGUID = function(guid)
     local race = GUID_RACE[guid]
     if not race then return nil end

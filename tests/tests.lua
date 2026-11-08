@@ -1886,6 +1886,46 @@ do
   K.target = nil
 end
 
+-- Officers post the recruitment message from the Roster tab
+do
+  local R = A.ns.Recruit
+  R.ResetCooldown()
+  A.publicChat = {}
+  check(R.Message():find("is recruiting dwarves", 1, true) ~= nil, "a default recruitment message is ready")
+  local ok = R.Send("Join us, lads!", "General")
+  check(ok and A.publicChat[1] and A.publicChat[1].channel == "CHANNEL" and A.publicChat[1].target == 1, "officer posts to General")
+  local ok2, why2 = R.Send("Again!", "General")
+  check(not ok2 and why2:find("minute", 1, true), "one post a minute")
+  R.ResetCooldown()
+  A.channels = { 1, "General - Dun Morogh", false }
+  local ok3, why3 = R.Send("Trade?", "Trade")
+  check(not ok3 and why3:find("capital cities", 1, true), "Trade outside a city explains why")
+  check(R.Send("Zone general", "General") and A.publicChat[#A.publicChat].target == 1, "a zone's General is found by name")
+  R.ResetCooldown()
+  check(R.Send("Hear me!", "YELL") and A.publicChat[#A.publicChat].channel == "YELL", "yell works too")
+  A.channels = { 1, "General", false, 2, "Trade", false }
+  local okE, whyE = E.ns.Recruit.Send("I'm no officer", "General")
+  check(not okE and whyE:find("Only officers", 1, true), "non-officers can't send it")
+  -- the window: send with a changed message, and it's saved for every officer
+  R.ResetCooldown()
+  A.ns.UI.OpenRecruit()
+  local d = A.env.IronforgedDialog
+  check(d:IsShown(), "the Recruit window opens for officers")
+  local sendBtn
+  for _, b in ipairs(d.buttons or {}) do if b.__text == "Send" and b:IsShown() then sendBtn = b end end
+  local before = #A.publicChat
+  if sendBtn then sendBtn:Click() end
+  check(sendBtn ~= nil and #A.publicChat == before + 1 and A.publicChat[#A.publicChat].text == R.Message(), "the Send button posts the message")
+  check(R.SaveMessage("Ironforged wants YOU. Whisper me!"), "officers save the message")
+  H.run(6)
+  check(B.ns.Recruit.Message() == "Ironforged wants YOU. Whisper me!", "the saved message reaches other officers")
+  check(not E.ns.Recruit.SaveMessage("hacked"), "non-officers can't change it")
+  d:Hide()
+  A.ns.ToggleMain()
+  local okR = pcall(A.ns.UI.Refresh or function() end)
+  check(okR, "the roster draws with the Recruit button")
+end
+
 -- The greeting bar can be dragged by its grip, and right-click puts it back
 do
   local bar, grip = K.env.IronforgedGreetBar, K.env.IronforgedGreetGrip

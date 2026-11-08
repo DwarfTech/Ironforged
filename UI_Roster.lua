@@ -204,8 +204,11 @@ local function build(f, w, h)
   f.scan = UI.Button(f, "Scan races", 90, 22, function() ns.Gear.ScanGuild() end)
   scanButton = f.scan
   f.scan:SetPoint("TOPRIGHT", -2, -2)
+  -- officers: post the guild's recruitment message
+  f.recruit = UI.Button(f, "Recruit", 70, 22, function() UI.OpenRecruit() end)
+  f.recruit:SetPoint("RIGHT", f.scan, "LEFT", -4, 0)
   f.count = UI.Label(f, "", "GameFontHighlightSmall")
-  f.count:SetPoint("RIGHT", f.scan, "LEFT", -8, 0)
+  f.count:SetPoint("RIGHT", f.recruit, "LEFT", -8, 0)
 
   f.list = UI.List(f, w, h - 30, {
     { title = "Name", width = 150 }, { title = "Rank", width = 78 }, { title = "Lvl", width = 26 },
@@ -216,6 +219,33 @@ local function build(f, w, h)
   end)
   f.list:SetPoint("TOPLEFT", 0, -28)
   f.list:SetPoint("BOTTOMRIGHT", 0, 2)
+end
+
+-- The recruitment message window: pick where to post, change the words if you like, send.
+function UI.OpenRecruit()
+  local R = ns.Recruit
+  if not ns.IAmOfficer() then ns.Print("Only officers can send the recruitment message."); return end
+  local options = {}
+  for _, c in ipairs(R.CHANNELS) do options[#options + 1] = { text = c.text, value = c.key } end
+  UI.OpenForm({
+    title = "Send the recruitment message",
+    width = 520,
+    fields = {
+      { key = "where", label = "Post to", type = "choice", value = ns.settings.recruitChannel or "General", options = options },
+      { key = "text", label = "Message", type = "multiline", value = R.Message(), height = 90, maxLen = 255 },
+      { type = "info", font = "GameFontHighlightSmall", value = "Changes to the message are saved for every officer. " ..
+        "Up to 255 letters. One post a minute." },
+    },
+    saveText = "Send",
+    onSave = function(v)
+      local text = ns.Trim((v.text or ""):gsub("[\r\n]+", " "))
+      if text == "" then text = R.DefaultMessage() end
+      local ok, why = R.Send(text, v.where)
+      if not ok then ns.Print(why); return false end
+      R.SaveMessage(text)
+      ns.Print("Recruitment message sent.")
+    end,
+  })
 end
 
 -- Roster cell: the member's challenges under way (completed ones in green).
@@ -229,6 +259,10 @@ local function challengeCell(name)
 end
 
 local function refresh(f)
+  local officer = ns.IAmOfficer()
+  f.recruit:SetShown(officer)
+  f.count:ClearAllPoints()
+  f.count:SetPoint("RIGHT", officer and f.recruit or f.scan, "LEFT", -8, 0)
   local items, shown, online = {}, 0, 0
   for _, name in ipairs(ns.rosterList) do
     local info = ns.roster[name]
