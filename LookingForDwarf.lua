@@ -368,15 +368,68 @@ ns.On("DATA_CHANGED", function(coll, key)
     if ns.settings.lfdPopup == false or L.IsFull(key, d) then return end
     -- a dungeon post pops up only for guildmates inside its level range (it's still in the tab for all)
     if not L.InRange(d, myLevel()) then return end
-    postPopup(key, d)
+    L.ShowWhenFree(key, false)
   elseif coll == "lfdjoin" then
     local d = Data.Get("lfdjoin", key)
     local post, member = Data.SplitKey(key)
     if not d or not post or member == me or L.Leader(post) ~= me or told[key] then return end
     told[key] = true
-    joinPopup(key, d)
+    L.ShowWhenFree(key, true)
   end
 end)
+
+----------------------------------------------------------------------
+-- Popups wait until you're out of combat, and, if you've turned them off for instances, until
+-- you're out of the dungeon or battleground. Then the ones still worth answering come up.
+----------------------------------------------------------------------
+local waiting = {} -- key -> true for a sign-up to me (lfdjoin), false for a group post (lfd)
+
+local function inCombat()
+  if InCombatLockdown and InCombatLockdown() then return true end
+  local ok, c = pcall(UnitAffectingCombat, "player")
+  return ok and c == true
+end
+
+local function inInstance()
+  if not IsInInstance then return false end
+  local ok, inside, kind = pcall(IsInInstance)
+  return ok and (inside == true or (type(kind) == "string" and kind ~= "none"))
+end
+L.InInstance = inInstance
+
+-- Can this popup show right now?
+local function free(isJoin)
+  if inCombat() then return false end
+  if not isJoin and ns.settings.lfdPopupInstance == false and inInstance() then return false end
+  return true
+end
+
+local function showNow(key, isJoin)
+  if isJoin then
+    local d = Data.Get("lfdjoin", key)
+    local post = Data.SplitKey(key)
+    if d and post and L.IsOpen(post) then joinPopup(key, d) end
+  else
+    local d = Data.Get("lfd", key)
+    if d and L.IsOpen(key, d) and not L.IsFull(key, d) and not L.MyJoin(key)
+      and ns.settings.lfdPopup ~= false and L.InRange(d, myLevel()) then
+      postPopup(key, d)
+    end
+  end
+end
+
+function L.ShowWhenFree(key, isJoin)
+  if free(isJoin) then showNow(key, isJoin) else waiting[key] = isJoin end
+end
+
+local function flush()
+  for key, isJoin in pairs(waiting) do
+    if free(isJoin) then waiting[key] = nil; showNow(key, isJoin) end
+  end
+end
+L.FlushWaiting = flush
+ns.RegisterEvent("PLAYER_REGEN_ENABLED", function() if C_Timer then C_Timer.After(1, flush) else flush() end end)
+ns.RegisterEvent("PLAYER_ENTERING_WORLD", function() if C_Timer then C_Timer.After(3, flush) else flush() end end)
 
 -- Tidy up my own old posts and sign-ups.
 local function sweep()

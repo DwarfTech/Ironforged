@@ -1094,6 +1094,48 @@ do -- level ranges: names and short names, posts that aren't dungeons, edges of 
   end
   M.level, D.level = 1, 1
 end
+do -- popups wait out combat, and instances if you've turned them off there
+  local notice = M.env.IronforgedNotice
+  notice:Hide()
+  M.inCombat = true
+  local ck = LK.Post("Help with the Defias Traitor", 2); H.run(3)
+  check(not notice:IsShown(), "no group popup in combat")
+  M.inCombat = false
+  H.fire(M, "PLAYER_REGEN_ENABLED"); H.run(2)
+  check(notice:IsShown() and notice.id == "lfd", "it comes up when the fight ends")
+  notice:Hide()
+  -- inside a dungeon: shows by default, waits when turned off
+  M.instanceType = "party"
+  local ik = LK.Post("Bring ale, any dwarf", 2); H.run(3)
+  check(notice:IsShown() and notice.id == "lfd", "by default it shows inside a dungeon")
+  notice:Hide()
+  M.ns.settings.lfdPopupInstance = false
+  local ik2 = LK.Post("Hogger again, lads", 2); H.run(3)
+  check(not notice:IsShown(), "with the option off, nothing pops up inside a dungeon")
+  M.instanceType = nil
+  H.fire(M, "PLAYER_ENTERING_WORLD"); H.run(4)
+  check(notice:IsShown() and notice.id == "lfd", "it comes up after leaving, if the post is still open")
+  notice:Hide()
+  M.ns.settings.lfdPopupInstance = true
+  -- a post that closed while you waited doesn't come up
+  M.inCombat = true
+  local gone = LK.Post("Quick Wetlands run", 2); H.run(3)
+  LK.Close(gone); H.run(3)
+  M.inCombat = false
+  H.fire(M, "PLAYER_REGEN_ENABLED"); H.run(2)
+  check(not notice:IsShown(), "a post closed during the fight doesn't pop up after")
+  -- the leader's "who answered" popup waits out combat too
+  local lk2 = LK.Post("Stockade, two more", 2); H.run(3)
+  K.inCombat = true
+  K.env.IronforgedNotice:Hide()
+  M.ns.LFD.Join(lk2, "tank"); H.run(3)
+  check(not K.env.IronforgedNotice:IsShown(), "the leader isn't interrupted mid-fight")
+  K.inCombat = false
+  H.fire(K, "PLAYER_REGEN_ENABLED"); H.run(2)
+  check(K.env.IronforgedNotice:IsShown() and K.env.IronforgedNotice.id == "lfdjoin", "and hears who answered once it's over")
+  K.env.IronforgedNotice:Hide()
+  LK.Close(lk2); H.run(3)
+end
 
 -- Call for aid: one line in chat, no popup, up to a raid of 40
 LK.Close(p3, true); H.run(2)

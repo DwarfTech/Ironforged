@@ -232,6 +232,7 @@ local SETTINGS_DEFAULTS = {
   doomPopup = true,
   greetBar = true,
   lfdPopup = true,
+  lfdPopupInstance = true, -- also inside dungeons, raids and battlegrounds
   autoInvite = true,
   inviteAnyone = false,
   inviteKeyword = "inv",

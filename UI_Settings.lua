@@ -95,6 +95,11 @@ local function build(f, w, h)
   end)
   lp:SetPoint("TOPLEFT", 330, -274)
   lp:SetChecked(ns.settings.lfdPopup ~= false)
+  local li = UI.Check(f, "...also inside dungeons and battlegrounds", function(self)
+    ns.settings.lfdPopupInstance = self:GetChecked() and true or false
+  end)
+  li:SetPoint("TOPLEFT", 346, -296)
+  li:SetChecked(ns.settings.lfdPopupInstance ~= false)
 
   local syncTitle = UI.Label(f, "Sync", "GameFontNormal")
   syncTitle:SetPoint("TOPLEFT", 4, -304)
