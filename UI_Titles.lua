@@ -29,7 +29,7 @@ local function refresh(f)
   local items = {}
   local holders = T.AutoHolders()
   local units = { Elfbane = "elves slain", ["The Hordebreaker"] = "Horde slain", ["The Grudgebearer"] = "grudges avenged",
-    ["The Goldbringer"] = "gold won" }
+    ["The Goldbringer"] = "gold won", Warbringer = "world kills" }
   for i, a in ipairs(T.AUTO) do
     local b = holders[a.title]
     local names = {}

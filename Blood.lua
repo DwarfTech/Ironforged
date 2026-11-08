@@ -4,6 +4,8 @@
 --     saw on their nameplate, target or tooltip, or in a battleground from the scoreboard. Every
 --     honorable kill on a Horde elf counts, solo, in a group or in a battleground; the same elf
 --     counts at most once an hour.
+--   * World kills (Warbringer): honorable kills made outside battlegrounds, counted by this addon
+--     from the moment it's installed.
 --   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
 --     foe. Alliance grudges are avenged by an officer.
 --   * Grudged foes get a red warning on their tooltip. The first time a grudged foe is spotted,
@@ -17,10 +19,17 @@ local Data = ns.Data
 
 local function isSecret(v) return issecretvalue and issecretvalue(v) end
 
+local function inBattleground()
+  if UnitInBattleground and UnitInBattleground("player") then return true end
+  local okI, _, kind = pcall(IsInInstance or function() end)
+  return okI and kind == "pvp"
+end
+Blood.InBattleground = inBattleground
+
 local function personal()
   ns.db.pvp = ns.db.pvp or {}
   local me = ns.PlayerName() or "?"
-  ns.db.pvp[me] = ns.db.pvp[me] or { elves = 0, avenged = 0 }
+  ns.db.pvp[me] = ns.db.pvp[me] or { elves = 0, avenged = 0, world = 0 }
   return ns.db.pvp[me]
 end
 
@@ -87,8 +96,8 @@ function Blood.Publish()
   local hk = lifetimeHKs() or p.hk or 0
   p.hk = hk
   local old = Data.Get("pvp", me)
-  if old and old.hk == hk and old.elves == p.elves and old.avenged == p.avenged then return end
-  Data.Put("pvp", me, { hk = hk, elves = p.elves or 0, avenged = p.avenged or 0, ts = ns.Now() }, true)
+  if old and old.hk == hk and old.elves == p.elves and old.avenged == p.avenged and old.world == (p.world or 0) then return end
+  Data.Put("pvp", me, { hk = hk, elves = p.elves or 0, avenged = p.avenged or 0, world = p.world or 0, ts = ns.Now() }, true)
 end
 
 local publishPending = false
@@ -102,7 +111,7 @@ end
 function Blood.Tally(name)
   local t = Data.Get("pvp", name)
   if not t then return nil end
-  return t.hk or 0, t.elves or 0, t.avenged or 0
+  return t.hk or 0, t.elves or 0, t.avenged or 0, t.world or 0
 end
 
 ----------------------------------------------------------------------
@@ -224,6 +233,10 @@ end
 Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves.\n" ..
   "- Solo, in a group or in a battleground, every elf kill counts.\n- The same elf counts at most once an hour."
 
+Blood.WORLD_RULES = "World kills counts your honorable kills outside battlegrounds:\n" ..
+  "the open world, solo or grouped. It starts counting from when you install this version.\n" ..
+  "The most world kills holds the title Warbringer."
+
 Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
   "You avenge one by getting an honorable kill on a Horde player with an open grudge against them.\n" ..
   "Each open grudge counts once. Alliance grudges are marked avenged by an officer and don't add to this count."
@@ -252,7 +265,7 @@ function Blood.OnHonorableKill(victim)
   if not victim or victim == "" then return end
   local key = Data.FoeKey(victim)
   local t = GetTime()
-  if recentKills[key] and t - recentKills[key] < 3 then return end
+  if recentKills[key] and t - recentKills[key] < 10 then return end -- both ways of noticing the same kill
   recentKills[key] = t
   -- remember the last few kills and the race seen for each, for /hold kills
   local _, foe = findFoe(victim)
@@ -272,13 +285,87 @@ function Blood.Ordinal(n)
   return "th"
 end
 
+local function diag()
+  ns.db.killDiag = ns.db.killDiag or { msgs = 0, named = 0, counts = 0, matched = 0 }
+  return ns.db.killDiag
+end
+Blood.Diag = diag
+
 ns.RegisterEvent("CHAT_MSG_COMBAT_HONOR_GAIN", function(text)
+  local d = diag()
+  d.msgs = d.msgs + 1
   if type(text) ~= "string" or isSecret(text) then return end
   local victim = victimFromHonorText(text)
-  if victim then Blood.OnHonorableKill(victim) end
+  if victim then d.named = d.named + 1; Blood.OnHonorableKill(victim) end
 end)
 
-ns.RegisterEvent("PLAYER_PVP_KILLS_CHANGED", function() schedulePublish(10) end)
+----------------------------------------------------------------------
+-- The second way to notice a kill: the game's honorable-kill count goes up. Each new kill is
+-- matched to a Horde player the addon just saw die (target, nameplate or mouseover). This works
+-- even when the game doesn't name the victim in chat. The same count drives world kills.
+----------------------------------------------------------------------
+local recentDeaths = {} -- { name, t }
+local function noteDeath(unit)
+  if not unit or not UnitExists or not UnitExists(unit) then return end
+  local okP, isPlayer = pcall(UnitIsPlayer, unit)
+  if not okP or isSecret(isPlayer) or not isPlayer then return end
+  local okD, dead = pcall(UnitIsDeadOrGhost, unit)
+  if not okD or isSecret(dead) or not dead then return end
+  local name = learn(unit)
+  if not name or ns.IsGuildmateName(name) then return end
+  local f = foeCache()[Data.FoeKey(name)]
+  if f and f.faction == "Alliance" then return end
+  local key = Data.FoeKey(name)
+  for _, r in ipairs(recentDeaths) do if r.key == key and GetTime() - r.t < 10 then return end end
+  table.insert(recentDeaths, 1, { name = name, key = key, t = GetTime() })
+  while #recentDeaths > 20 do table.remove(recentDeaths) end
+end
+Blood.NoteDeath = noteDeath
+
+-- Honorable kills so far: today's count where the game keeps one (it moves at once), else lifetime.
+local function killCount()
+  if GetPVPSessionStats then
+    local ok, hk = pcall(GetPVPSessionStats)
+    if ok and type(hk) == "number" and not isSecret(hk) then return hk, "session" end
+  end
+  local hk = lifetimeHKs()
+  if hk then return hk, "lifetime" end
+end
+
+local lastCount, lastKind
+function Blood.OnKillCountChanged()
+  local n, kind = killCount()
+  if not n then return end
+  if lastCount == nil or kind ~= lastKind or n < lastCount then lastCount, lastKind = n, kind; return end -- a new day resets it
+  local gained = n - lastCount
+  lastCount = n
+  if gained <= 0 then return end
+  local d = diag()
+  d.counts = d.counts + gained
+  local p = personal()
+  if not inBattleground() then
+    p.world = (p.world or 0) + gained
+  end
+  -- match the new kills to players just seen dying
+  local now = GetTime()
+  for i = #recentDeaths, 1, -1 do if now - recentDeaths[i].t > 10 then table.remove(recentDeaths, i) end end
+  for _ = 1, gained do
+    local r = table.remove(recentDeaths, 1)
+    if not r then break end
+    d.matched = d.matched + 1
+    Blood.OnHonorableKill(r.name)
+  end
+  schedulePublish(3)
+end
+
+ns.RegisterEvent("PLAYER_PVP_KILLS_CHANGED", function()
+  pcall(Blood.OnKillCountChanged)
+  schedulePublish(10)
+end)
+ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
+  local n, kind = killCount()
+  if n then lastCount, lastKind = n, kind end
+end)
 
 ----------------------------------------------------------------------
 -- Battlegrounds: the scoreboard lists every player's race and faction, so foes count as elves
@@ -321,11 +408,6 @@ end
 
 ns.RegisterEvent("UPDATE_BATTLEFIELD_SCORE", function() pcall(Blood.ReadScoreboard) end)
 -- while in a battleground, ask for the scoreboard now and then (a request to the game, nothing sent)
-local function inBattleground()
-  if UnitInBattleground and UnitInBattleground("player") then return true end
-  local okI, _, kind = pcall(IsInInstance or function() end)
-  return okI and kind == "pvp"
-end
 if C_Timer and C_Timer.NewTicker then
   C_Timer.NewTicker(20, function()
     if inBattleground() and RequestBattlefieldScoreData then pcall(RequestBattlefieldScoreData) end
@@ -424,7 +506,13 @@ ns.RegisterEvent("NAME_PLATE_UNIT_ADDED", function(unit) pcall(checkUnit, unit, 
 ns.RegisterEvent("PLAYER_TARGET_CHANGED", function() pcall(checkUnit, "target") end)
 ns.RegisterEvent("UPDATE_MOUSEOVER_UNIT", function() pcall(checkUnit, "mouseover") end)
 ns.RegisterEvent("UNIT_HEALTH", function(unit)
-  if unit == "target" or (type(unit) == "string" and unit:find("^nameplate")) then pcall(checkUnit, unit) end
+  if unit == "target" or unit == "mouseover" or (type(unit) == "string" and unit:find("^nameplate")) then
+    pcall(checkUnit, unit)
+    pcall(noteDeath, unit)
+  end
+end)
+ns.RegisterEvent("UNIT_FLAGS", function(unit)
+  if unit == "target" or (type(unit) == "string" and unit:find("^nameplate")) then pcall(noteDeath, unit) end
 end)
 
 ----------------------------------------------------------------------

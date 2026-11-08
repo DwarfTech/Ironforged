@@ -1,4 +1,4 @@
--- Ironforged: War Hall tab, a leaderboard of Horde slain, elves slain and grudges avenged.
+-- Ironforged: War Hall tab, a leaderboard of Horde slain, world kills, elves slain and grudges avenged.
 local ADDON, ns = ...
 local UI = ns.UI
 local Data = ns.Data
@@ -10,8 +10,9 @@ local function build(f, w, h)
   f.mine:SetPoint("TOPRIGHT", -6, -7)
   f.mine:SetWordWrap(false)
   f.list = UI.List(f, w, h - 52, {
-    { title = "#", width = 30 }, { title = "Dwarf", width = 250 },
-    { title = "Horde slain", width = 110 }, { title = "Elves slain", width = 110 }, { title = "Avenged", width = 100 },
+    { title = "#", width = 30 }, { title = "Dwarf", width = 190 },
+    { title = "Horde slain", width = 100 }, { title = "Elves slain", width = 100 }, { title = "Avenged", width = 90 },
+    { title = "World kills", width = 100 },
   }, function(name) UI.ShowMember(name, { noManage = true }) end)
   f.list:SetPoint("TOPLEFT", 0, -28)
   f.list:SetPoint("BOTTOMRIGHT", 0, 24)
@@ -30,6 +31,7 @@ local function build(f, w, h)
   explain(3, "Horde slain", 1, 0.38, 0.25, "Your lifetime honorable kills, straight from the game's own PvP stats.")
   explain(4, "Elves slain", 0.5, 1, 0.37, ns.Blood.ELF_RULES)
   explain(5, "Avenged", 1, 0.82, 0.25, ns.Blood.AVENGED_RULES)
+  explain(6, "World kills", 1, 0.5, 0.3, ns.Blood.WORLD_RULES)
   f.note = UI.Label(f, "Hover a column title to see how it's counted.", "GameFontDisableSmall")
   f.note:SetPoint("BOTTOMLEFT", 4, 4)
   f.note:SetPoint("BOTTOMRIGHT", -4, 4)
@@ -39,7 +41,7 @@ local function refresh(f)
   local rows = {}
   for name, t in Data.Each("pvp") do
     if ns.roster[name] then
-      rows[#rows + 1] = { name = name, hk = t.hk or 0, elves = t.elves or 0, avenged = t.avenged or 0 }
+      rows[#rows + 1] = { name = name, hk = t.hk or 0, elves = t.elves or 0, avenged = t.avenged or 0, world = t.world or 0 }
     end
   end
   table.sort(rows, function(a, b)
@@ -57,17 +59,17 @@ local function refresh(f)
     local medal = (i == 1 and "|cffffd700") or (i == 2 and "|cffc0c0c0") or (i == 3 and "|cffcd7f32") or "|cffffffff"
     items[#items + 1] = {
       data = r.name,
-      keys = { [2] = ns.NameKey(r.name), [3] = r.hk, [4] = r.elves, [5] = r.avenged },
+      keys = { [2] = ns.NameKey(r.name), [3] = r.hk, [4] = r.elves, [5] = r.avenged, [6] = r.world },
       cols = { medal .. i .. "|r", ns.ColorName(r.name) .. (r.name == me and " |cff999999(you)|r" or ""),
         r.hk,
-        (topElves > 0 and r.elves == topElves) and ("|cff7fff5f" .. r.elves .. "|r") or r.elves, r.avenged },
+        (topElves > 0 and r.elves == topElves) and ("|cff7fff5f" .. r.elves .. "|r") or r.elves, r.avenged, r.world },
     }
   end
   f.list:SetItems(items, "No tallies yet. Spill some Horde blood.")
-  local hk, elves, avenged = ns.Blood.Tally(me)
+  local hk, elves, avenged, world = ns.Blood.Tally(me)
   if hk then
-    f.mine:SetText(string.format("|cffd4a017Your tally:|r  %d Horde slain   |   %d elves slain   |   %d grudges avenged%s",
-      hk, elves, avenged, myPlace and ("   |   ranked |cffd4a017#" .. myPlace .. "|r") or ""))
+    f.mine:SetText(string.format("|cffd4a017Your tally:|r  %d Horde slain   |   %d world kills   |   %d elves slain   |   %d avenged%s",
+      hk, world or 0, elves, avenged, myPlace and ("   |   ranked |cffd4a017#" .. myPlace .. "|r") or ""))
   else
     f.mine:SetText("")
   end

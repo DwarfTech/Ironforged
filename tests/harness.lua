@@ -155,6 +155,7 @@ local function makeClient(shortName, race, fullName)
   end
   client.hk = 0
   env.GetPVPLifetimeStats = function() return client.hk, 0, 0 end
+  env.GetPVPSessionStats = function() return client.sessionHK or 0, 0 end
   env.GetZoneText = function() return "Arathi Highlands" end
   env.COMBATLOG_HONORGAIN = "%s dies, honorable kill Rank: %s (Estimated Honor Points: %d)"
   env.UnitIsPlayer = function() return true end

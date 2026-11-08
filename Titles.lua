@@ -5,6 +5,7 @@
 --   The Hordebreaker   most Horde slain
 --   The Grudgebearer   most grudges avenged
 --   The Goldbringer    most gold won at Cross Gambling
+--   Warbringer         most Horde slain outside battlegrounds
 local ADDON, ns = ...
 local Data = ns.Data
 
@@ -16,6 +17,7 @@ T.AUTO = {
   { title = "The Hordebreaker", what = "most Horde slain" },
   { title = "The Grudgebearer", what = "most grudges avenged" },
   { title = "The Goldbringer", what = "most gold won at Cross Gambling" },
+  { title = "Warbringer", what = "most Horde slain outside battlegrounds" },
 }
 
 -- Holders of each automatic title: { [title] = { names = {..}, value = n } }. Ties share the title.
@@ -36,6 +38,7 @@ function T.AutoHolders()
       consider("Elfbane", name, t.elves)
       consider("The Hordebreaker", name, t.hk)
       consider("The Grudgebearer", name, t.avenged)
+      consider("Warbringer", name, t.world)
     end
   end
   if ns.Gamble and ns.Gamble.Standings then

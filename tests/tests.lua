@@ -1702,6 +1702,58 @@ do
   K.inRaid, K.scores = false, nil
 end
 
+-- Kills noticed from the kill count (when the game names no victim), and world kills (Warbringer)
+do
+  local B = K.ns.Blood
+  local me = K.ns.PlayerName()
+  local function p() return K.ns.db.pvp[me] end
+  K.inBG, K.instanceGroup, K.instanceRaid, K.inGroup, K.inRaid, K.instanceType = false, false, false, false, false, nil
+  K.sessionHK = 10
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(1)
+  local elves0, world0 = p().elves or 0, p().world or 0
+  H.clock = H.clock + 3700
+  -- an elf on my target dies; the game raises the kill count but prints no "dies, honorable kill" line
+  K.target = { name = "Sylaria Dawnwhisper", race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+  H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(1)
+  K.target.dead = true
+  H.fire(K, "UNIT_HEALTH", "target"); H.run(1)
+  K.sessionHK = 11
+  H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6)
+  check((p().elves or 0) == elves0 + 1, "an elf kill counts even when the game names no victim")
+  check((p().world or 0) == world0 + 1, "a kill outside a battleground is a world kill")
+  -- the same kill noticed both ways counts once
+  K.target = { name = "Ilyren Dawnwhisper", race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+  H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(1)
+  K.target.dead = true; H.fire(K, "UNIT_HEALTH", "target"); H.run(1)
+  H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Ilyren Dawnwhisper dies, honorable kill Rank: Scout (Estimated Honor Points: 12)")
+  K.sessionHK = 12; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6)
+  check((p().elves or 0) == elves0 + 2, "a kill seen both ways counts once")
+  check((p().world or 0) == world0 + 2, "and is one world kill")
+  -- an orc kill is a world kill but not an elf
+  K.target = { name = "Brakk Ironjaw", race = "Orc", raceName = "Orc", faction = "Horde", dead = true }
+  H.fire(K, "PLAYER_TARGET_CHANGED"); H.fire(K, "UNIT_HEALTH", "target"); H.run(1)
+  K.sessionHK = 13; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6)
+  check((p().elves or 0) == elves0 + 2 and (p().world or 0) == world0 + 3, "an orc counts as a world kill only")
+  -- in a battleground: not a world kill
+  K.inBG, K.instanceType = true, "pvp"
+  K.sessionHK = 15; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6)
+  check((p().world or 0) == world0 + 3, "battleground kills aren't world kills")
+  K.inBG, K.instanceType = false, nil
+  -- a new day resets the game's daily count without losing anything
+  K.sessionHK = 0; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(2)
+  K.sessionHK = 1; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6)
+  check((p().world or 0) == world0 + 4, "world kills keep counting after the daily reset")
+  -- published, shown, and the leader holds Warbringer
+  H.run(15)
+  check(select(4, A.ns.Blood.Tally("Kurdran")) == world0 + 4, "world kills reach the guild")
+  check(A.ns.Titles.Holds("Kurdran", "Warbringer"), "the most world kills holds Warbringer")
+  K.env.SlashCmdList.IRONFORGED("kills")
+  local diagShown = false
+  for _, m in ipairs(K.chat) do if m:find("Kill-count rises:", 1, true) then diagShown = true end end
+  check(diagShown, "/hold kills reports which kill signals the game sends")
+  K.target = nil
+end
+
 -- The greeting bar can be dragged by its grip, and right-click puts it back
 do
   local bar, grip = K.env.IronforgedGreetBar, K.env.IronforgedGreetGrip
