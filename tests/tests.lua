@@ -1995,8 +1995,12 @@ do
   R.ResetCooldown()
   check(R.Send("Hear me!", "YELL") and A.publicChat[#A.publicChat].channel == "YELL", "yell works too")
   A.channels = { 1, "General", false, 2, "Trade", false }
-  local okE, whyE = E.ns.Recruit.Send("I'm no officer", "General")
-  check(not okE and whyE:find("Only officers", 1, true), "non-officers can't send it")
+  local okK, whyK = K.ns.Recruit.Send("I'm only a Vanguard", "General")
+  check(not okK and whyK:find("Veterans and above", 1, true), "ranks below Veteran can't send it")
+  M.publicChat = {}
+  M.ns.Recruit.ResetCooldown()
+  check(M.ns.Recruit.Send("A Veteran recruits!", "General") and M.publicChat[1] and M.publicChat[1].target == 1, "Veterans can send it")
+  check(M.ns.Recruit.CanSend() and E.ns.Recruit.CanSend() and not K.ns.Recruit.CanSend(), "Veteran and above recruit; Vanguard doesn't")
   -- the window: send with a changed message, and it's saved for every officer
   R.ResetCooldown()
   A.ns.UI.OpenRecruit()
@@ -2011,7 +2015,19 @@ do
   check(R.SaveMessage("Ironforged wants YOU. Whisper me!"), "officers save the message")
   H.run(6)
   check(B.ns.Recruit.Message() == "Ironforged wants YOU. Whisper me!", "the saved message reaches other officers")
-  check(not E.ns.Recruit.SaveMessage("hacked"), "non-officers can't change it")
+  check(not E.ns.Recruit.SaveMessage("hacked") and not M.ns.Recruit.SaveMessage("hacked"), "only officers change the saved message")
+  -- a Veteran's window: sends, but their edits don't replace the guild's message
+  M.ns.Recruit.ResetCooldown()
+  M.ns.UI.OpenRecruit()
+  local md = M.env.IronforgedDialog
+  check(md:IsShown(), "the Recruit window opens for Veterans")
+  local mb
+  for _, b in ipairs(md.buttons or {}) do if b.__text == "Send to General" and b:IsShown() then mb = b end end
+  local mBefore = #M.publicChat
+  if mb then mb:Click() end
+  check(#M.publicChat == mBefore + 1, "a Veteran's Send button posts")
+  H.run(4)
+  check(A.ns.Recruit.Message() == "Ironforged wants YOU. Whisper me!", "and the guild's message stays as the officers set it")
   d:Hide()
   A.ns.ToggleMain()
   local okR = pcall(A.ns.UI.Refresh or function() end)

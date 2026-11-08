@@ -204,7 +204,7 @@ local function build(f, w, h)
   f.scan = UI.Button(f, "Scan races", 90, 22, function() ns.Gear.ScanGuild() end)
   scanButton = f.scan
   f.scan:SetPoint("TOPRIGHT", -2, -2)
-  -- officers: post the guild's recruitment message
+  -- Veterans and above: post the guild's recruitment message
   f.recruit = UI.Button(f, "Recruit", 70, 22, function() UI.OpenRecruit() end)
   f.recruit:SetPoint("RIGHT", f.scan, "LEFT", -4, 0)
   f.count = UI.Label(f, "", "GameFontHighlightSmall")
@@ -224,14 +224,16 @@ end
 -- The recruitment message window: change the words if you like, then send it to your zone's General chat.
 function UI.OpenRecruit()
   local R = ns.Recruit
-  if not ns.IAmOfficer() then ns.Print("Only officers can send the recruitment message."); return end
+  if not R.CanSend() then ns.Print("Veterans and above can send the recruitment message."); return end
+  local officer = ns.IAmOfficer()
   UI.OpenForm({
     title = "Send the recruitment message",
     width = 520,
     fields = {
       { key = "text", label = "Message", type = "multiline", value = R.Message(), height = 90, maxLen = 255 },
       { type = "info", font = "GameFontHighlightSmall", value = "Goes to the General chat of the zone you're in. " ..
-        "Changes to the message are saved for every officer. Up to 255 letters. One post a minute." },
+        (officer and "Changes to the message are saved for everyone who recruits. " or "Changes are for this post only; officers set the saved message. ") ..
+        "Up to 255 letters. One post a minute." },
     },
     saveText = "Send to General",
     onSave = function(v)
@@ -239,7 +241,7 @@ function UI.OpenRecruit()
       if text == "" then text = R.DefaultMessage() end
       local ok, why = R.Send(text, "General")
       if not ok then ns.Print(why); return false end
-      R.SaveMessage(text)
+      if officer then R.SaveMessage(text) end
       ns.Print("Recruitment message sent to General.")
     end,
   })
@@ -256,10 +258,10 @@ local function challengeCell(name)
 end
 
 local function refresh(f)
-  local officer = ns.IAmOfficer()
-  f.recruit:SetShown(officer)
+  local recruiter = ns.Recruit.CanSend()
+  f.recruit:SetShown(recruiter)
   f.count:ClearAllPoints()
-  f.count:SetPoint("RIGHT", officer and f.recruit or f.scan, "LEFT", -8, 0)
+  f.count:SetPoint("RIGHT", recruiter and f.recruit or f.scan, "LEFT", -8, 0)
   local items, shown, online = {}, 0, 0
   for _, name in ipairs(ns.rosterList) do
     local info = ns.roster[name]

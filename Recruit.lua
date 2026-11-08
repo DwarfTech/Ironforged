@@ -1,6 +1,6 @@
--- Ironforged: recruitment message. Officers post the guild's recruiting message to the General chat
--- of the zone they're in, from a button on the Roster tab. The message is
--- kept in the guild settings, so every officer posts the same one and any of them can change it.
+-- Ironforged: recruitment message. Veterans and above post the guild's recruiting message to the
+-- General chat of the zone they're in, from a button on the Roster tab. The message is kept in the
+-- guild settings, so everyone posts the same one; officers can change it for everyone.
 local ADDON, ns = ...
 
 local R = {}
@@ -15,6 +15,12 @@ R.CHANNELS = {
   { key = "SAY", text = "Say" },
   { key = "YELL", text = "Yell" },
 }
+
+-- Veterans and above may send it.
+function R.CanSend(name)
+  name = name or ns.PlayerName()
+  return ns.IsOfficer(name) or ns.RankAtLeast(name, ns.RankSetting("recruitRank"))
+end
 
 function R.DefaultMessage()
   local name = ns.Data and ns.Data.GuildDisplayName() or "Ironforged"
@@ -67,7 +73,7 @@ local lastSent = -math.huge
 
 -- Post the message. Returns true, or false and why.
 function R.Send(text, where)
-  if not ns.IAmOfficer() then return false, "Only officers can send the recruitment message." end
+  if not R.CanSend() then return false, "Veterans and above can send the recruitment message." end
   text = ns.Clean and ns.Clean(text, 255) or text
   if type(text) ~= "string" or text == "" then return false, "The message is empty." end
   local now = GetTime and GetTime() or 0

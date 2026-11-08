@@ -359,10 +359,11 @@ end
 
 -- Fixed rank powers, found from the guild's rank names:
 --   officers = Longbeard and above, clans founded by Veteran and above,
---   Clan Leaders give trials up to Veteran.
+--   recruitment message sent by Veteran and above, Clan Leaders give trials up to Veteran.
 local RANK_RULES = {
   officerRank = function() return rankByName("longbeard") or 1 end,
   founderRank = function() return rankByName("veteran") or 4 end,
+  recruitRank = function() return rankByName("veteran") or 4 end,
   nobleRank = function() return rankByName("noble") or 3 end,
 }
 
