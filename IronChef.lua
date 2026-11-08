@@ -1,12 +1,13 @@
 -- Ironforged: the Iron Chef challenge. Eat only food you made yourself.
 -- Cooked food carries no "made by" mark, so the addon keeps a ledger: every "You create: [food]"
 -- message adds to it. When you eat, the food that left your bags is checked against the ledger.
--- Food you made counts down; anything else fails the challenge. Drinks are fine.
+-- Food you made counts down; anything else gets a scolding popup (it's meant to be fun, so it
+-- never fails the challenge). Drinks are fine.
 local ADDON, ns = ...
 local C = ns.Challenges
 
 C.PRESETS.ironchef = { name = "Iron Chef", ironChef = true,
-  rules = "Eat only food you cooked yourself. Bought, looted or quest food fails the challenge. Drinks are fine." }
+  rules = "Eat only food you cooked yourself. Eat bought, looted or quest food and you'll hear about it! Drinks are fine." }
 C.ORDER[#C.ORDER + 1] = "ironchef"
 
 local function isSecret(v) return issecretvalue and issecretvalue(v) end
@@ -98,6 +99,18 @@ local function chef()
   for _, c in ipairs(C.MyEnforced()) do if c.preset.ironChef then return c end end
 end
 
+-- Ate something you didn't cook: a scolding, never a failure.
+function C.Scold(foodName)
+  ns.Print("|cffff8000Iron Chef:|r Don't eat that, lad! You're an Iron Chef!")
+  if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
+  if ns.UI and ns.UI.Notice then
+    ns.UI.Notice({ id = "ironchef", icon = "Interface\\Icons\\INV_Misc_Food_15", title = "Iron Chef",
+      text = "|cffffd040Don't eat that, lad! You're an Iron Chef!|r" ..
+        ((foodName and foodName ~= "") and ("\n(" .. foodName .. " isn't something you cooked.)") or ""),
+      buttons = { { text = "Aye, sorry" } }, timeout = 20 })
+  end
+end
+
 local function resolve()
   if not eatAt then return end
   if now() - eatAt > 3 then -- couldn't tell what was eaten; let it go
@@ -131,7 +144,7 @@ local function resolve()
         l[r.id] = l[r.id] - 1
       else
         local name = (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(r.id)) or "food you didn't cook"
-        C.Fail(c.key, "Ate " .. name .. " at level " .. level() .. ".")
+        C.Scold(name)
       end
       return
     end

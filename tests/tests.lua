@@ -1535,7 +1535,12 @@ do
   -- eating the starter bread fails
   K.bags[1].count = 2; H.fire(K, "BAG_UPDATE_DELAYED"); H.run(0.5)
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f3", 433); H.run(2)
-  check(status() == "failed", "eating food you didn't cook fails Iron Chef")
+  check(status() == "active", "eating food you didn't cook doesn't fail Iron Chef")
+  check(K.env.IronforgedNotice:IsShown() and K.env.IronforgedNotice.id == "ironchef", "it gets a popup instead")
+  local scolded = false
+  for _, m in ipairs(K.chat) do if m:find("Don't eat that, lad! You're an Iron Chef!", 1, true) then scolded = true end end
+  check(scolded, "\"Don't eat that, lad! You're an Iron Chef!\"")
+  K.env.IronforgedNotice:Hide()
   -- classic data: cheese is a plain "Consumable" (subclass 0); its use spell says it's food
   for _, c in ipairs(CK.MyPresets()) do CK.Abandon(c.key) end; H.run(1)
   H.ITEM_TYPES[414] = { 0, 0 }; H.ITEM_SPELLS[414] = "Food"   -- Dalaran Sharp
@@ -1549,10 +1554,11 @@ do
     "classic cheese glows red; water and potions don't glow")
   K.bags[4].count = 2; H.fire(K, "BAG_UPDATE_DELAYED")
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "f4", 433); H.run(2)
-  check(K.ns.Data.Get("challenges", ic3).status == "failed", "eating classic cheese you didn't make fails Iron Chef")
+  check(K.ns.Data.Get("challenges", ic3).status == "active" and K.env.IronforgedNotice.id == "ironchef", "eating classic cheese you didn't make gets the popup")
+  K.env.IronforgedNotice:Hide()
   K.bags[4], K.bags[5] = nil, nil
   -- the bag glow: green for food you cooked, red for food you didn't, yellow for a mixed stack
-  local ic2 = CK.Start("ironchef"); H.run(1)
+  local ic2 = ic3 -- still under way: eating the cheese only got a scolding
   check(CK.FoodVerdict(2683, 2) == "cooked", "cooked food glows green")
   check(CK.FoodVerdict(4540, 2) == "notyours", "bought or looted food glows red")
   check(CK.FoodVerdict(2683, 9) == "mixed", "a stack holding more than you cooked glows yellow")
