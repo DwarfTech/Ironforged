@@ -726,7 +726,7 @@ local bt
 for _, f in ipairs(A.frames) do if f.mine and f.list and not f.champs then bt = f end end
 local mrow2
 for _, row in ipairs(bt.list.rows) do if row.item and row.item.data == "Muradin" then mrow2 = row end end
-check(mrow2 and mrow2.cells[4]:GetText():find("|cff7fff5f40", 1, true), "most elves slain highlighted in the War Hall")
+check(mrow2 and mrow2.cells[5]:GetText():find("|cff7fff5f40", 1, true), "most elves slain highlighted in the War Hall")
 check(not mrow2.cells[2]:GetText():find("[Elfbane]", 1, true), "no title tags in the War Hall")
 -- Titles tab: automatic holders and awarded titles
 A.ns.ToggleMain("titles")
