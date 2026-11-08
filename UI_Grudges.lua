@@ -157,16 +157,16 @@ function UI.GrudgeExportText(includeAvenged)
   return table.concat(out, "\n")
 end
 
--- For a grudge reading: just the name, side, date and the deed, one grudge per line.
+-- For a grudge reading: the name, side, date, the deed and who wrote it, one grudge per line.
 function UI.GrudgeExportReading(includeAvenged)
   local out = {}
   for _, r in ipairs(grudgeRows(includeAvenged)) do
     local g = r.g
     out[#out + 1] = (g.against or "?") .. " | " .. (g.faction or "?") .. " | " .. ns.FormatDate(g.ts) .. " | " .. oneLine(g.deed) ..
-      (r.a and " (avenged)" or "")
+      (r.a and " (avenged)" or "") .. " | " .. (r.by and ns.Name(r.by) or "?")
   end
   if #out == 0 then return "The book is empty. For now." end
-  return "Name | Faction | Date | What they did\n" .. table.concat(out, "\n")
+  return "Name | Faction | Date | What they did | Written by\n" .. table.concat(out, "\n")
 end
 
 local function csv(v)

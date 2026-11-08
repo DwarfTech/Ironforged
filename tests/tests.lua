@@ -1958,7 +1958,9 @@ do
   local reading = A.ns.UI.GrudgeExportReading(true)
   check(reading:find("Quote Guy | Horde | ", 1, true) and reading:find('| Said "dwarves are short", twice', 1, true),
     "the reading export has name, faction, date and the deed on one line")
-  check(not reading:find("Loch Modan", 1, true) and not reading:find("written by", 1, true), "and nothing else")
+  check(reading:find("^Name | Faction | Date | What they did | Written by\n") ~= nil, "the reading header names the writer column")
+  check(reading:find('twice | ' .. A.ns.Name(A.full), 1, true) ~= nil, "and each line ends with who wrote the grudge")
+  check(not reading:find("Loch Modan", 1, true), "and nothing else")
   local okE = pcall(A.ns.UI.ExportGrudges, "csv")
   check(okE and A.env.IronforgedDialog:IsShown(), "officers get the export window")
   A.env.IronforgedDialog:Hide()
