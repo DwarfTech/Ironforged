@@ -41,11 +41,12 @@ local function editClan(id)
         return false
       end
       local founder = id and c.founder or me
+      local leader = id and (c.leader or c.founder) or me
       local firstName = id and (c.firstName or c.name) or nil
       if firstName == name then firstName = (c.firstName and c.firstName ~= name) and c.firstName or nil end
       local ok = Data.Put("clans", newId, {
         name = name, firstName = firstName, motto = ns.Clean(v.motto, 80), desc = ns.Clean(v.desc, 600),
-        founder = founder, leader = founder, -- whoever founds the clan leads it
+        founder = founder, leader = leader, -- whoever founds the clan leads it, until they hand it on
       })
       if ok and not id then
         ns.Print("Clan " .. name .. " is founded. Invite your kin from the clan's page.")
@@ -131,6 +132,19 @@ showClan = function(id)
       return false
     end, true)
   end
+  if officer or isLeader then
+    add("Hand over leadership", function()
+      memberPicker(_G.IronforgedDialog, "New leader of " .. c.name, function(n)
+        return n ~= c.leader and Data.ClanOf(n) == id
+      end, function(n)
+        UI.Confirm("Make " .. ns.Name(n) .. " the leader of clan " .. c.name .. "?", function()
+          Data.HandOverClan(id, n)
+          showClan(id)
+        end)
+      end)
+      return false
+    end, true)
+  end
   if myClan == id and not isLeader then
     add("Leave clan", function()
       UI.Confirm("Leave clan " .. c.name .. "?", function()
@@ -140,7 +154,7 @@ showClan = function(id)
       end)
     end)
   end
-  if Data.ICanWrite("clans", id, { name = c.name, firstName = c.firstName, founder = c.founder, leader = c.leader }) then
+  if Data.ICanWrite("clans", id, { name = c.name, firstName = c.firstName, founder = c.founder, leader = c.leader or c.founder }) then
     add("Edit", function() editClan(id) end)
   end
   if Data.ICanWrite("clans", id, nil) then

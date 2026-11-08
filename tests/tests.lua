@@ -153,14 +153,14 @@ A.ns.UI.ScheduleRefresh()
 H.run(1)
 check(rt.list.sortCol == 1, "sort survives a refresh")
 
--- Clans: founder always leads, no sponsor
+-- Clans: the founder leads to begin with, no sponsor
 local clanId = "bronzebeard"
 check(MD.Put("clans", clanId, { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }), "Veteran founds clan")
-check(not MD.Put("clans", clanId, { name = "Bronzebeard", founder = "Muradin", leader = "Kurdran" }, true), "leader must be the founder")
+check(not MD.Put("clans", "anvilmar", { name = "Anvilmar", founder = "Muradin", leader = "Kurdran" }, true), "a new clan is led by its founder")
 H.run(5) -- Kurdran has to know the clan before he can be refused
 check(not KD.Put("clans", clanId, { name = "Bronzebeard", founder = "Kurdran", leader = "Kurdran" }, true), "nobody takes over an existing clan name")
 check(not MD.Put("clans", "wrongkey", { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }, true), "a clan's key is its name")
-check(not AD.Put("clans", "x", { name = "X", founder = "Muradin", leader = "Thorin" }, true), "even officers cannot set another leader")
+check(not AD.Put("clans", "x", { name = "X", founder = "Muradin", leader = "Thorin" }, true), "even officers found a clan with its founder leading")
 check(KD.Put("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, true), "any guildmate can found a clan")
 AD.Delete("clans", "y") -- tidy up: only a Longbeard or the guild master removes clans
 H.run(3)
@@ -1753,6 +1753,35 @@ do
   check(AD.Get("clans", "ironhelm").name == "Ironhelm" and AD.Get("clans", "ironhelm").firstName == nil, "renaming back to the founding name")
   check(not MD.Put("clans", "fakekey", { name = "Something", firstName = "Other", founder = "Muradin", leader = "Muradin" }, true),
     "a clan's key must match the name it was founded under")
+end
+
+-- Clan leaders hand leadership to another member
+do
+  local MD, KD, AD = M.ns.Data, K.ns.Data, A.ns.Data
+  -- Muradin leads "ironhelm" (from the rename test); Kurdran is a member
+  check(AD.ClanOf("Kurdran") == "ironhelm" and AD.IsClanLeader("Muradin", "ironhelm"), "(setup) Muradin leads, Kurdran is in")
+  check(not KD.HandOverClan("ironhelm", "Kurdran"), "a member can't make themselves leader")
+  check(MD.HandOverClan("ironhelm", "Kurdran"), "the leader hands the clan to Kurdran")
+  H.run(6)
+  check(AD.IsClanLeader("Kurdran", "ironhelm") and KD.IsClanLeader("Kurdran", "ironhelm"), "everyone sees Kurdran as leader")
+  check(AD.Get("clanship", "Muradin") and AD.Get("clanship", "Muradin").clan == "ironhelm" and AD.ClanOf("Kurdran") == "ironhelm",
+    "the old leader stays in the clan as a member")
+  check(AD.Get("clans", "ironhelm").founder == "Muradin", "the founder is still recorded as Muradin")
+  local c = MD.Get("clans", "ironhelm")
+  check(not MD.Put("clans", "ironhelm", { name = "Muradin's Again", firstName = c.firstName or c.name, founder = "Muradin", leader = "Muradin" }, true),
+    "the old leader can't take it back or edit it")
+  local kc = KD.Get("clans", "ironhelm")
+  check(KD.Put("clans", "ironhelm", { name = kc.name, firstName = kc.firstName, motto = "Iron holds", founder = "Muradin", leader = "Kurdran" }),
+    "the new leader edits the clan")
+  check(not KD.Put("clans", "ironhelm", { name = kc.name, firstName = kc.firstName, founder = "Kurdran", leader = "Kurdran" }, true),
+    "the founder can't be rewritten")
+  H.run(5)
+  -- an officer can hand it on too, and the old leader stays a member
+  check(A.ns.Data.HandOverClan("ironhelm", "Muradin"), "an officer hands the clan back to Muradin")
+  H.run(6)
+  check(KD.IsClanLeader("Muradin", "ironhelm") and KD.ClanOf("Kurdran") == "ironhelm", "Muradin leads again; Kurdran is still in")
+  local okS = pcall(M.ns.UI.ShowClan, "ironhelm")
+  check(okS, "the clan page opens with the hand-over button")
 end
 
 -- Call for aid from a solo start: four invites, then a raid, then the rest

@@ -12,7 +12,7 @@ Data.COLLECTIONS = {
   "config",       -- guild-wide settings (rank thresholds, hold name, oath, laws)
   "members",      -- officer-kept member records (title, main/alt, joined, notes)
   "titles",       -- key = member .. "#" .. KeyOf(title); titles awarded by officers
-  "clans",        -- key = KeyOf(clan name); the record names its founder
+  "clans",        -- key = KeyOf(clan name); the record names its founder and its current leader
   "invites",      -- key = clan key .. "#" .. member; written by the clan leader: an invitation, or { removed = true }
   "applications", -- key = clan key .. "#" .. member; old requests to join (no longer used; a pending one counts as joined)
   "clanship",     -- key = member; the member's own choice of clan
@@ -234,6 +234,25 @@ function Data.Applications(clanId)
 end
 
 -- Clans whose applications `name` may answer.
+-- Hand a clan to another member. The old leader stays on as a member (their own choice of clan is
+-- written for them; an officer doing the handing over may write it too).
+function Data.HandOverClan(clanId, newLeader)
+  local c = Data.Get("clans", clanId)
+  if not c or not newLeader or not ns.roster[newLeader] then return false end
+  local oldLeader = c.leader or c.founder
+  if newLeader == oldLeader then return false end
+  local n = {}
+  for k, v in pairs(c) do n[k] = v end
+  n.leader = newLeader
+  if not Data.Put("clans", clanId, n) then return false end
+  if oldLeader and ns.roster[oldLeader] then
+    local me = ns.PlayerName()
+    if oldLeader == me or ns.IAmOfficer() then Data.Put("clanship", oldLeader, { clan = clanId }, true) end
+  end
+  ns.Print(ns.Name(newLeader) .. " now leads clan " .. (c.name or "?") .. ".")
+  return true
+end
+
 function Data.ClansLedBy(name)
   local out = {}
   for id, c in Data.Each("clans") do
@@ -285,15 +304,21 @@ function Data.CanWrite(author, coll, key, data)
     return officer
   elseif coll == "clans" then
     if data == nil then return ns.IsLongbeardOrGM(author) end -- only Longbeards and the guild master delete clans
-    local founder = data.founder
-    if type(founder) ~= "string" or data.leader ~= founder then return false end -- the founder always leads
+    local founder, leader = data.founder, data.leader
+    if type(founder) ~= "string" or type(leader) ~= "string" or leader == "" then return false end
     -- the key comes from the name the clan was founded under (firstName once it has been renamed)
     if type(data.name) ~= "string" or data.name == "" then return false end
     if key ~= Data.KeyOf(type(data.firstName) == "string" and data.firstName or data.name) then return false end
-    if officer then return true end
-    if founder ~= author or ns.roster[author] == nil then return false end -- any guildmate may found a clan
     local old = Data.Get("clans", key)
-    return old == nil or old.founder == author -- but nobody takes over a clan that already has a founder
+    if old and old.founder and founder ~= old.founder then return false end -- the founder never changes
+    -- any guildmate may found a clan, and leads it to begin with
+    if old == nil then return leader == founder and (founder == author or officer) and (officer or ns.roster[author] ~= nil) end
+    if officer then return true end
+    if ns.roster[author] == nil then return false end
+    -- after that, only the current leader edits it or hands it on to another guildmate
+    -- (records from before leadership could change name the founder as leader)
+    local current = old.leader or old.founder
+    return author == current and ns.roster[leader] ~= nil
   elseif coll == "grudges" then
     if data == nil then return ns.IsLongbeardOrGM(author) end -- only Longbeards and the guild master delete grudges
     if ns.roster[author] == nil then return false end
@@ -401,7 +426,7 @@ function Data.Subject(coll, key, data)
   elseif coll == "invites" or coll == "applications" or coll == "rsvp" or coll == "lfdjoin" then
     return select(2, splitKey(key))
   elseif coll == "clans" then
-    return data and data.founder or nil
+    return data and (data.leader or data.founder) or nil
   end
   return nil
 end
