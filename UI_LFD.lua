@@ -22,6 +22,26 @@ local function roleList(joins)
   return #parts > 0 and table.concat(parts, ", ") or "|cff999999No one yet.|r"
 end
 
+-- "Gnomeregan (29-38)" for a dungeon post, else just the text.
+local function whatText(d)
+  if tonumber(d.min) and tonumber(d.max) then
+    return d.what .. " |cff999999(" .. (d.min == d.max and d.min or (d.min .. "-" .. d.max)) .. ")|r"
+  end
+  return d.what
+end
+
+-- The dungeon list, lowest first; ones that fit your level are marked.
+local function pickDungeon(owner, onPick)
+  local lv = L.MyLevel()
+  local options = {}
+  for _, dg in ipairs(L.DUNGEONS) do
+    local fits = lv and lv >= dg.min and lv <= dg.max
+    options[#options + 1] = { value = dg.key, text = (fits and "|cff40ff40" or "") .. L.DungeonLabel(dg) .. (fits and "|r" or "") }
+  end
+  UI.Pick(owner, options, function(key) onPick(L.Dungeon(key)) end, "Pick a dungeon")
+end
+UI.PickDungeon = pickDungeon
+
 local function showPost(postKey)
   local d = Data.Get("lfd", postKey)
   if not d then return end
@@ -39,8 +59,14 @@ local function showPost(postKey)
     lines = {
       "|cffd4a017Leader:|r " .. ns.Name(leader),
       "|cffd4a017Looking for:|r " .. d.need .. (d.need == 1 and " dwarf" or " dwarves") .. " for " .. d.what,
+      tonumber(d.min) and ("|cffd4a017Levels:|r " .. (d.min == d.max and d.min or (d.min .. " to " .. d.max))) or nil,
       "|cffd4a017Posted:|r " .. ago(d.ts),
     }
+  end
+  do -- drop the empty slot left by a post with no level range
+    local kept = {}
+    for i = 1, 4 do if lines[i] then kept[#kept + 1] = lines[i] end end
+    lines = kept
   end
   if d.note and d.note ~= "" then lines[#lines + 1] = "|cffd4a017Note:|r " .. d.note end
   lines[#lines + 1] = " "
@@ -93,7 +119,7 @@ local function refresh(f)
     items[#items + 1] = {
       data = p.key,
       keys = { [3] = n, [4] = -(p.data.ts or 0) },
-      cols = { ns.ColorName(p.leader), p.data.aid and ("|cffff4040" .. p.data.what .. "|r") or p.data.what,
+      cols = { ns.ColorName(p.leader), p.data.aid and ("|cffff4040" .. p.data.what .. "|r") or whatText(p.data),
         p.data.aid and (n .. " answered") or (n .. " / " .. need), ago(p.data.ts), status },
     }
   end
@@ -109,8 +135,12 @@ end
 local function build(f, w, h)
   local wl = UI.Label(f, "Looking for:", "GameFontNormalSmall")
   wl:SetPoint("TOPLEFT", 6, -10)
-  f.what = UI.EditBox(f, 190, 60)
-  f.what:SetPoint("LEFT", wl, "RIGHT", 10, 0)
+  f.dungeonB = UI.Button(f, "Dungeon", 70, 22, function(self)
+    pickDungeon(self, function(dg) if dg then state.what = dg.name; f.what:SetText(dg.name) end end)
+  end)
+  f.dungeonB:SetPoint("LEFT", wl, "RIGHT", 8, 0)
+  f.what = UI.EditBox(f, 170, 60)
+  f.what:SetPoint("LEFT", f.dungeonB, "RIGHT", 10, 0)
   f.what:SetText(state.what)
   f.what:SetScript("OnTextChanged", function(self) state.what = self:GetText() end)
   local nl = UI.Label(f, "Need:", "GameFontNormalSmall")
@@ -155,7 +185,7 @@ local function build(f, w, h)
   f.list:SetPoint("TOPLEFT", 0, -82)
   f.list:SetPoint("BOTTOMRIGHT", 0, 28)
 
-  f.footer = UI.Label(f, "Groups of up to 40 (more than 4 becomes a raid). Posts close after two hours, calls for aid after 30 minutes. Click one to sign up or manage it.", "GameFontDisableSmall")
+  f.footer = UI.Label(f, "Dungeon posts pop up only for guildmates in the dungeon's level range. Groups of up to 40 (more than 4 becomes a raid). Posts close after two hours, calls for aid after 30 minutes.", "GameFontDisableSmall")
   f.footer:SetPoint("BOTTOMLEFT", 4, 6)
   f.footer:SetPoint("BOTTOMRIGHT", -4, 6)
 end

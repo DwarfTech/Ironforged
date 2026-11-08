@@ -1036,8 +1036,13 @@ K.invites = {}
 
 -- Looking for Dwarf
 local LK = K.ns.LFD
+D.level, M.level = 33, 50 -- Gnomeregan is 29-38: Dagna's in range, Muradin isn't
 local postKey = LK.Post("Gnomeregan", 2, "Meet at the tram")
 H.run(3)
+check(not M.env.IronforgedNotice:IsShown() or M.env.IronforgedNotice.id ~= "lfd", "a guildmate outside the dungeon's level range gets no popup")
+check(#M.ns.LFD.Posts() == 1, "but still sees the post in the tab")
+local gp = D.ns.Data.Get("lfd", postKey)
+check(gp and gp.dungeon == "gnomer" and gp.min == 29 and gp.max == 38, "a dungeon post carries its level range")
 check(postKey and #D.ns.LFD.Posts() == 1, "group post reaches the guild")
 check(D.env.IronforgedNotice:IsShown() and D.env.IronforgedNotice.id == "lfd", "guildmates get a sign-up popup")
 local healB
@@ -1062,6 +1067,30 @@ check(D.ns.Data.Get("lfd", postKey) == nil and #D.ns.LFD.Joins(postKey) == 0, "e
 local p2 = LK.Post("Deadmines", 4); H.run(2)
 local p3 = LK.Post("Stockades", 3); H.run(2)
 check(#D.ns.LFD.Posts() == 1 and D.ns.LFD.Posts()[1].data.what == "Stockades", "one post per leader")
+do -- level ranges: names and short names, posts that aren't dungeons, edges of the range
+  local LD = D.ns.LFD
+  check(LD.MatchDungeon("BRD jailbreak").key == "brd" and LD.MatchDungeon("need tank for sm lib").key == "smlib", "short names pick the dungeon")
+  check(LD.MatchDungeon("dm east").key == "direm" and LD.MatchDungeon("DM").key == "dm", "DM is Deadmines, DM East is Dire Maul")
+  check(LD.MatchDungeon("quest help in Westfall") == nil, "plain posts aren't dungeons")
+  local r = { min = 29, max = 38 }
+  check(LD.InRange(r, 29) and LD.InRange(r, 38) and not LD.InRange(r, 28) and not LD.InRange(r, 39), "the range includes both ends")
+  check(LD.InRange({}, 5), "posts with no range are for everyone")
+  -- a plain post pops up for everyone, any level
+  M.env.IronforgedNotice:Hide()
+  local qk = LK.Post("Hogger, need help", 2); H.run(3)
+  check(M.env.IronforgedNotice:IsShown() and M.env.IronforgedNotice.id == "lfd", "a post that isn't a dungeon pops up for every level")
+  check(D.ns.Data.Get("lfd", qk).min == nil, "and carries no range")
+  -- the tab: the Dungeon button fills in the name, and the range shows in the list
+  K.ns.ToggleMain("lfd")
+  local lt
+  for _, f in ipairs(K.frames) do if f.dungeonB and f.what then lt = f end end
+  check(lt ~= nil, "the tab has a Dungeon button")
+  if lt then
+    local okP = pcall(K.ns.UI.PickDungeon, lt.dungeonB, function(dg) lt.what:SetText(dg.name) end)
+    check(okP, "the dungeon list opens")
+  end
+  M.level, D.level = 1, 1
+end
 
 -- Call for aid: one line in chat, no popup, up to a raid of 40
 LK.Close(p3, true); H.run(2)

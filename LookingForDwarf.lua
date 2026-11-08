@@ -1,9 +1,11 @@
 -- Ironforged: Looking for Dwarf, a group board inside the guild.
 -- A leader posts what they need ("Need 2 for Gnomeregan"); guildmates with the addon get a quiet
 -- popup and sign up with a role; the leader invites them. Nothing goes to chat.
+-- A post for a dungeon on the list carries its level range, and the popup only comes up for
+-- guildmates inside that range. Anything else pops up for everyone, as before.
 -- A call for aid is a post too (aid = true): a dwarf beset by the Horde asks for up to 39 more,
 -- a full raid. Guildmates get one line in their chat window, no popup, and answer in the tab.
---   "lfd"     key = leader .. "#" .. id       { what, need, note, ts, aid }
+--   "lfd"     key = leader .. "#" .. id       { what, need, note, ts, aid, dungeon, min, max }
 --   "lfdjoin" key = post key .. "#" .. member { role, ts }
 local ADDON, ns = ...
 local Data = ns.Data
@@ -19,6 +21,80 @@ local HOME = LE_PARTY_CATEGORY_HOME or 1
 local function ttl(d) return (type(d) == "table" and d.aid) and L.AID_TTL or L.TTL end
 L.ROLES = { tank = "Tank", healer = "Healer", dps = "Damage" }
 L.ROLE_ORDER = { "tank", "healer", "dps" }
+
+-- Dungeons and raids with their usual level ranges, lowest first. Typing a name or a common
+-- short name ("gnomer", "brd", "sm lib") picks the dungeon too.
+L.DUNGEONS = {
+  { key = "rfc", name = "Ragefire Chasm", min = 13, max = 18, alias = { "rfc", "ragefire" } },
+  { key = "wc", name = "Wailing Caverns", min = 17, max = 24, alias = { "wc", "wailing" } },
+  { key = "dm", name = "The Deadmines", min = 17, max = 26, alias = { "dm", "vc", "deadmines", "deadmine" } },
+  { key = "sfk", name = "Shadowfang Keep", min = 22, max = 30, alias = { "sfk", "shadowfang" } },
+  { key = "bfd", name = "Blackfathom Deeps", min = 24, max = 32, alias = { "bfd", "blackfathom" } },
+  { key = "stocks", name = "The Stockade", min = 24, max = 32, alias = { "stocks", "stockade", "stockades" } },
+  { key = "gnomer", name = "Gnomeregan", min = 29, max = 38, alias = { "gnomer", "gnomeregan" } },
+  { key = "rfk", name = "Razorfen Kraul", min = 29, max = 38, alias = { "rfk", "kraul" } },
+  { key = "smgy", name = "Scarlet Monastery: Graveyard", min = 26, max = 36, alias = { "sm gy", "smgy", "graveyard", "sm graveyard" } },
+  { key = "smlib", name = "Scarlet Monastery: Library", min = 29, max = 39, alias = { "sm lib", "smlib", "library", "sm library" } },
+  { key = "smarm", name = "Scarlet Monastery: Armory", min = 32, max = 42, alias = { "sm arm", "smarm", "armory", "sm armory", "armoury" } },
+  { key = "smcath", name = "Scarlet Monastery: Cathedral", min = 35, max = 45, alias = { "sm cath", "smcath", "cathedral", "sm cathedral", "cath" } },
+  { key = "rfd", name = "Razorfen Downs", min = 37, max = 46, alias = { "rfd", "downs" } },
+  { key = "ulda", name = "Uldaman", min = 41, max = 51, alias = { "ulda", "uld", "uldaman" } },
+  { key = "zf", name = "Zul'Farrak", min = 42, max = 50, alias = { "zf", "zul'farrak", "zulfarrak", "zul farrak" } },
+  { key = "mara", name = "Maraudon", min = 46, max = 55, alias = { "mara", "maraudon" } },
+  { key = "st", name = "Sunken Temple", min = 50, max = 56, alias = { "st", "sunken temple", "temple of atal'hakkar", "atal'hakkar" } },
+  { key = "brd", name = "Blackrock Depths", min = 52, max = 60, alias = { "brd", "blackrock depths" } },
+  { key = "lbrs", name = "Lower Blackrock Spire", min = 55, max = 60, alias = { "lbrs", "lower blackrock", "lower spire" } },
+  { key = "direm", name = "Dire Maul", min = 55, max = 60, alias = { "dire maul", "diremaul", "dme", "dmw", "dmn", "dm east", "dm west", "dm north", "tribute" } },
+  { key = "ubrs", name = "Upper Blackrock Spire", min = 58, max = 60, alias = { "ubrs", "upper blackrock", "upper spire" } },
+  { key = "scholo", name = "Scholomance", min = 58, max = 60, alias = { "scholo", "scholomance" } },
+  { key = "strat", name = "Stratholme", min = 58, max = 60, alias = { "strat", "stratholme", "strath" } },
+  { key = "zg", name = "Zul'Gurub", min = 60, max = 60, alias = { "zg", "zul'gurub", "zulgurub", "zul gurub" } },
+  { key = "mc", name = "Molten Core", min = 60, max = 60, alias = { "mc", "molten core" } },
+  { key = "ony", name = "Onyxia's Lair", min = 60, max = 60, alias = { "ony", "onyxia", "onyxia's lair" } },
+  { key = "aq20", name = "Ruins of Ahn'Qiraj", min = 60, max = 60, alias = { "aq20", "ruins of ahn'qiraj" } },
+  { key = "bwl", name = "Blackwing Lair", min = 60, max = 60, alias = { "bwl", "blackwing", "blackwing lair" } },
+  { key = "aq40", name = "Temple of Ahn'Qiraj", min = 60, max = 60, alias = { "aq40", "temple of ahn'qiraj", "aq" } },
+  { key = "naxx", name = "Naxxramas", min = 60, max = 60, alias = { "naxx", "naxxramas" } },
+}
+local byKey = {}
+for _, dg in ipairs(L.DUNGEONS) do byKey[dg.key] = dg end
+function L.Dungeon(key) return key and byKey[key] or nil end
+
+-- "Gnomeregan (29-38)", or "Molten Core (60)".
+function L.DungeonLabel(dg)
+  if not dg then return "" end
+  return dg.name .. " (" .. (dg.min == dg.max and dg.min or (dg.min .. "-" .. dg.max)) .. ")"
+end
+
+-- The dungeon a post's text names, if any: the full name, or a short name as a whole word
+-- ("gnomer run", "BRD jailbreak", "need tank for sm lib").
+function L.MatchDungeon(text)
+  if type(text) ~= "string" then return nil end
+  local t = " " .. (text:lower():gsub("[%p]", function(c) return c == "'" and "'" or " " end):gsub("%s+", " ")) .. " "
+  local best, bestLen
+  for _, dg in ipairs(L.DUNGEONS) do
+    local names = { (dg.name:lower():gsub("[%p]", function(c) return c == "'" and "'" or " " end):gsub("%s+", " ")) }
+    for _, a in ipairs(dg.alias) do names[#names + 1] = a end
+    for _, n in ipairs(names) do
+      if t:find(" " .. n .. " ", 1, true) and (not bestLen or #n > bestLen) then best, bestLen = dg, #n end
+    end
+  end
+  return best
+end
+
+-- Is this level inside the post's range? Posts with no range are for everyone.
+function L.InRange(d, level)
+  if type(d) ~= "table" or not tonumber(d.min) or not tonumber(d.max) then return true end
+  level = tonumber(level)
+  if not level or level < 1 then return true end
+  return level >= tonumber(d.min) and level <= tonumber(d.max)
+end
+
+local function myLevel()
+  local ok, lv = pcall(UnitLevel, "player")
+  if ok and type(lv) == "number" and not (issecretvalue and issecretvalue(lv)) then return lv end
+end
+L.MyLevel = myLevel
 
 local function first(name) return (ns.Name(name):match("^(%S+)")) or ns.Name(name) end
 
@@ -92,11 +168,14 @@ function L.Post(what, need, note, aid)
   for k in Data.Each("lfd") do if L.Leader(k) == me then L.Close(k, true) end end
   local key = me .. "#" .. string.format("%x", ns.Stamp())
   local d = { what = what, need = need, note = ns.Clean(note or "", 120), ts = ns.Now(), aid = aid and true or nil }
+  local dg = not aid and L.MatchDungeon(what) or nil
+  if dg then d.dungeon, d.min, d.max = dg.key, dg.min, dg.max end
   if Data.Put("lfd", key, d) then
     if aid then
       ns.Print("|cffff4040You call for aid!|r Your guildmates will see it in the Looking for Dwarf tab.")
     else
-      ns.Print("Posted: looking for " .. need .. (need == 1 and " dwarf" or " dwarves") .. " for " .. what .. ".")
+      ns.Print("Posted: looking for " .. need .. (need == 1 and " dwarf" or " dwarves") .. " for " .. what ..
+        (dg and (". Guildmates level " .. (dg.min == dg.max and dg.min or (dg.min .. " to " .. dg.max)) .. " get the popup.") or "."))
     end
     return key
   end
@@ -234,7 +313,8 @@ local function postPopup(postKey, d)
   UI.Notice({
     id = "lfd", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore", title = "Looking for Dwarf",
     text = "|cffd4a017" .. ns.Name(leader) .. "|r needs " .. d.need .. (d.need == 1 and " dwarf" or " dwarves") ..
-      " for |cffffd040" .. d.what .. "|r." .. ((d.note and d.note ~= "") and ("\n" .. d.note) or "") ..
+      " for |cffffd040" .. d.what .. "|r" ..
+      (tonumber(d.min) and (" (level " .. (d.min == d.max and d.min or (d.min .. "-" .. d.max)) .. ")") or "") .. "." .. ((d.note and d.note ~= "") and ("\n" .. d.note) or "") ..
       (joined > 0 and ("  |cff999999(" .. joined .. " signed up)|r") or "") .. "\nSign up as:",
     buttons = buttons,
     timeout = 90,
@@ -276,6 +356,8 @@ ns.On("DATA_CHANGED", function(coll, key)
       return
     end
     if ns.settings.lfdPopup == false or L.IsFull(key, d) then return end
+    -- a dungeon post pops up only for guildmates inside its level range (it's still in the tab for all)
+    if not L.InRange(d, myLevel()) then return end
     postPopup(key, d)
   elseif coll == "lfdjoin" then
     local d = Data.Get("lfdjoin", key)
