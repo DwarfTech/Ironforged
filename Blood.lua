@@ -214,10 +214,21 @@ Blood.FindFoe = findFoe
 
 -- Who I've had targeted lately, so a kill can be checked against it.
 local targetedAt = {}
-ns.RegisterEvent("PLAYER_TARGET_CHANGED", function()
+-- The last Horde player I had targeted, and when I last saw them as my target.
+local lastFoeTarget
+local function noteTarget()
   local n = UnitExists and UnitExists("target") and ns.UnitDisplayName("target")
-  if n then targetedAt[Data.FoeKey(n)] = GetTime() end
-end)
+  if not n then return end
+  targetedAt[Data.FoeKey(n)] = GetTime()
+  local okP, isPlayer = pcall(UnitIsPlayer, "target")
+  if not okP or isSecret(isPlayer) or not isPlayer or ns.IsGuildmateName(n) then return end
+  local faction = UnitFactionGroup and UnitFactionGroup("target")
+  if isSecret(faction) then faction = nil end
+  if faction == "Alliance" then return end
+  lastFoeTarget = { name = n, t = GetTime() }
+end
+Blood.LastFoeTarget = function() return lastFoeTarget end
+ns.RegisterEvent("PLAYER_TARGET_CHANGED", function() pcall(noteTarget) end)
 
 -- Did I have this player targeted when (or just before) they died?
 local function wasMyTarget(victim, key)
@@ -353,11 +364,18 @@ function Blood.OnKillCountChanged()
   -- match the new kills to players just seen dying
   local now = GetTime()
   for i = #recentDeaths, 1, -1 do if now - recentDeaths[i].t > 10 then table.remove(recentDeaths, i) end end
+  local usedTarget = false
   for _ = 1, gained do
     local r = table.remove(recentDeaths, 1)
-    if not r then break end
-    d.matched = d.matched + 1
-    Blood.OnHonorableKill(r.name)
+    if r then
+      d.matched = d.matched + 1
+      Blood.OnHonorableKill(r.name)
+    elseif not usedTarget and lastFoeTarget and now - lastFoeTarget.t <= 15 then
+      -- no death seen (nameplates vanish, or the game hides it): the Horde player I was fighting
+      usedTarget = true
+      d.fromTarget = (d.fromTarget or 0) + 1
+      Blood.OnHonorableKill(lastFoeTarget.name)
+    end
   end
   schedulePublish(3)
 end
@@ -510,6 +528,7 @@ ns.RegisterEvent("NAME_PLATE_UNIT_ADDED", function(unit) pcall(checkUnit, unit, 
 ns.RegisterEvent("PLAYER_TARGET_CHANGED", function() pcall(checkUnit, "target") end)
 ns.RegisterEvent("UPDATE_MOUSEOVER_UNIT", function() pcall(checkUnit, "mouseover") end)
 ns.RegisterEvent("UNIT_HEALTH", function(unit)
+  if unit == "target" then pcall(noteTarget) end
   if unit == "target" or unit == "mouseover" or (type(unit) == "string" and unit:find("^nameplate")) then
     pcall(checkUnit, unit)
     pcall(noteDeath, unit)

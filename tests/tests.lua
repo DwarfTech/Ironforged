@@ -1740,6 +1740,76 @@ do
   K.target = nil
 end
 
+-- Elf kills when the game holds things back: every way a kill can be noticed on Forever
+do
+  local B = K.ns.Blood
+  local me = K.ns.PlayerName()
+  local function elves() return (K.ns.db.pvp[me] and K.ns.db.pvp[me].elves) or 0 end
+  K.inBG, K.instanceGroup, K.instanceRaid, K.inGroup, K.inRaid, K.instanceType = false, false, false, false, false, nil
+  local function newElf(name)
+    H.clock = H.clock + 3700
+    K.target = { name = name, race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+    H.fire(K, "PLAYER_TARGET_CHANGED"); H.fire(K, "UNIT_HEALTH", "target"); H.run(1)
+  end
+  local function rise() K.sessionHK = (K.sessionHK or 0) + 1; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6) end
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(1)
+
+  -- 1. no kill message, and the death is never seen (the nameplate vanishes): your Horde target gets it
+  local e0 = elves()
+  newElf("Faerin Dawnblade")
+  K.target = nil; H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(2) -- target cleared as they drop
+  rise()
+  check(elves() == e0 + 1, "no message, death not seen: the elf you were fighting counts")
+
+  -- 2. the game hides the kill message's text (a secret value)
+  local e1 = elves()
+  newElf("Caelis Dawnblade")
+  local realSecret = K.env.issecretvalue
+  K.env.issecretvalue = function(v) return v == "SECRET" end
+  local okMsg = pcall(H.fire, K, "CHAT_MSG_COMBAT_HONOR_GAIN", "SECRET")
+  rise()
+  K.env.issecretvalue = realSecret
+  check(okMsg and elves() == e1 + 1, "a hidden kill message: the kill count still catches it")
+
+  -- 3. the game hides whether the unit is dead
+  local e2 = elves()
+  newElf("Rhaelan Dawnblade")
+  K.env.issecretvalue = function(v) return v == "SECRET" end
+  local realDead = K.env.UnitIsDeadOrGhost
+  K.env.UnitIsDeadOrGhost = function(u) if u == "player" then return false end return "SECRET" end
+  H.fire(K, "UNIT_HEALTH", "target"); H.run(1)
+  rise()
+  K.env.UnitIsDeadOrGhost, K.env.issecretvalue = realDead, realSecret
+  check(elves() == e2 + 1, "a hidden death: the elf you were fighting counts")
+
+  -- 4. no daily count on this client: the lifetime count is used
+  local e3 = elves()
+  local realSession = K.env.GetPVPSessionStats
+  K.env.GetPVPSessionStats = nil
+  K.hk = (K.hk or 0) + 0
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(1)
+  newElf("Ithren Dawnblade")
+  K.hk = K.hk + 1; H.fire(K, "PLAYER_PVP_KILLS_CHANGED"); H.run(6)
+  K.env.GetPVPSessionStats = realSession
+  H.fire(K, "PLAYER_ENTERING_WORLD", false, true); H.run(1)
+  check(elves() == e3 + 1, "only a lifetime kill count: still counts")
+
+  -- 5. message and kill count for the same elf: counted once
+  local e4 = elves()
+  newElf("Moriel Dawnblade")
+  H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Moriel Dawnblade dies, honorable kill Rank: Scout (Estimated Honor Points: 12)")
+  rise()
+  check(elves() == e4 + 1, "message plus kill count: one elf")
+
+  -- 6. an old target doesn't get credit for a later kill
+  local e5 = elves()
+  newElf("Sorrel Dawnblade")
+  H.run(30)
+  rise()
+  check(elves() == e5, "a target from half a minute ago doesn't get a later kill")
+  K.target = nil
+end
+
 -- The greeting bar can be dragged by its grip, and right-click puts it back
 do
   local bar, grip = K.env.IronforgedGreetBar, K.env.IronforgedGreetGrip
