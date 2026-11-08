@@ -443,7 +443,7 @@ check(select(2, A.ns.Blood.Tally("Kurdran")) == beforeElves + 1, "a Windshaper S
 check(K.ns.db.lastKills[1].name == "Lyriel" and K.ns.db.lastKills[1].raceName == "Windshaper Skyborne", "last kills remember the race seen")
 K.env.SlashCmdList.IRONFORGED("kills")
 
-check(K.ns.Blood.ELF_RULES:find("battleground", 1, true) and K.ns.Blood.ELF_RULES:find("once an hour", 1, true), "Elfbane rules written for the tooltip")
+check(K.ns.Blood.ELF_RULES:find("Battleground kills don't count", 1, true) and K.ns.Blood.ELF_RULES:find("once an hour", 1, true), "Elfbane rules written for the tooltip")
 check(K.ns.Blood.AVENGED_RULES:find("open grudge", 1, true), "Avenged rules written for the tooltip")
 -- seeing a grudged foe dead does not avenge the grudge
 check(Hh.ns.Data.Put("grudges", "zug", { against = "Zug", faction = "Horde", deed = "Ganked lowbies", ts = 4 }), "second Horde grudge")
@@ -1657,48 +1657,34 @@ do
   K.class, K.level = savedClass, savedLevel
 end
 
--- Elves in Warsong Gulch: the battleground's raid group isn't your raid, and the scoreboard
--- tells the addon who's an elf
+-- Elves in battlegrounds don't count toward Elfbane; out in the world they do
 do
   local B = K.ns.Blood
   local me = K.ns.PlayerName()
   local function elves() return (K.ns.db.pvp[me] and K.ns.db.pvp[me].elves) or 0 end
-  local function kill(name) H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", name .. " dies, honorable kill Rank: Scout (Estimated Honor Points: 12)"); H.run(4) end
+  local function kill(name) H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", name .. " dies, honorable kill Rank: Scout (Estimated Honor Points: 12)"); H.run(11) end
   K.inBG, K.instanceGroup, K.instanceRaid = true, true, true
   K.inGroup, K.inRaid = false, false
   K.scores = {
     { name = "Lyriel Dawnshard", faction = 0, raceName = "Windshaper Skyborne" },
     { name = "Thalor Sunstrider", faction = 0, raceName = "Blood Elf" },
-    { name = "Grukk Bonecrusher", faction = 0, raceName = "Orc" },
-    { name = "Aeris Highwind", faction = 1, raceName = "Skyborne" },
-    { name = "Vaelin Starfall", faction = 0, raceName = "Windshaper Skyborne" },
   }
   H.fire(K, "UPDATE_BATTLEFIELD_SCORE"); H.run(1)
   local before = elves()
   kill("Lyriel Dawnshard")
-  check(elves() == before + 1, "WSG solo-queued: a Windshaper Skyborne you never targeted counts (from the scoreboard)")
+  check(elves() == before, "WSG: elf kills don't count toward Elfbane")
+  local told = false
+  for _, m in ipairs(K.chat) do if m:find("in a battleground don't count toward Elfbane", 1, true) then told = true end end
+  check(told, "WSG: you're told why")
   check(B.IsElf(nil, "Windshaper Skyborne") and B.IsElf(nil, "Blood Elf") and not B.IsElf(nil, "Orc"), "the elf check reads the display name when the internal one is missing")
+  -- out in the world, in a group or a raid, it counts
+  K.inBG, K.instanceGroup, K.instanceRaid, K.inGroup = false, false, false, true
   kill("Thalor Sunstrider")
-  check(elves() == before + 2, "WSG: a Blood Elf counts")
-  kill("Grukk Bonecrusher")
-  check(elves() == before + 2, "WSG: an orc doesn't count")
-  kill("Aeris Highwind")
-  check(elves() == before + 2, "WSG: an Alliance Skyborne never counts")
-  kill("Lyriel Dawnshard")
-  check(elves() == before + 2, "WSG: the same elf only once an hour")
-  -- a premade party inside WSG: counts, target or not
-  K.inGroup = true
-  kill("Vaelin Starfall")
-  check(elves() == before + 3, "WSG premade party: an elf counts, target or not")
-  -- the scoreboard is asked for while in a battleground
-  local asked = K.scoreRequests or 0
-  H.run(25)
-  check((K.scoreRequests or 0) > asked, "the addon asks for the scoreboard while in a battleground")
-  -- an open-world raid counts too
-  K.inBG, K.instanceGroup, K.instanceRaid, K.inGroup, K.inRaid = false, false, false, false, true
+  check(elves() == before + 1, "out in the world, an elf kill in a group counts")
+  K.inGroup, K.inRaid = false, true
   H.clock = H.clock + 3700
-  kill("Thalor Sunstrider")
-  check(elves() == before + 4, "an elf killed in a raid counts")
+  kill("Lyriel Dawnshard")
+  check(elves() == before + 2, "out in the world, an elf kill in a raid counts")
   K.inRaid, K.scores = false, nil
 end
 

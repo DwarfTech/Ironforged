@@ -1,9 +1,8 @@
 -- Ironforged: the Blood Tally and the hunt for grudged foes.
 --   * Horde slain: your lifetime honorable kills, from the game's own PvP stats.
 --   * Elves slain: honorable kills on Horde elves. The victim's race comes from what the addon
---     saw on their nameplate, target or tooltip, or in a battleground from the scoreboard. Every
---     honorable kill on a Horde elf counts, solo, in a group or in a battleground; the same elf
---     counts at most once an hour.
+--     saw on their nameplate, target or tooltip. Honorable kills on Horde elves out in the world
+--     count, solo or grouped; battleground kills don't. The same elf counts at most once an hour.
 --   * World kills (Warbringer): honorable kills made outside battlegrounds, counted by this addon
 --     from the moment it's installed.
 --   * Horde grudges are avenged automatically when a guildmate gets an honorable kill on the
@@ -229,9 +228,9 @@ local function wasMyTarget(victim, key)
   return t ~= nil and GetTime() - t < 15
 end
 
--- Elfbane rules: every honorable kill on a Horde elf counts, solo, grouped or in a battleground.
-Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves.\n" ..
-  "- Solo, in a group or in a battleground, every elf kill counts.\n- The same elf counts at most once an hour."
+-- Elfbane rules: honorable kills on Horde elves out in the world count, solo or grouped.
+Blood.ELF_RULES = "Elves slain counts your honorable kills on Horde elves out in the world.\n" ..
+  "- Solo or in a group, every elf kill counts.\n- Battleground kills don't count.\n- The same elf counts at most once an hour."
 
 Blood.WORLD_RULES = "World kills counts your honorable kills outside battlegrounds:\n" ..
   "the open world, solo or grouped. It starts counting from when you install this version.\n" ..
@@ -245,6 +244,11 @@ function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)
   -- every honorable kill an Alliance dwarf gets is on the Horde, so only Horde elves can turn up here
   if not foe or foe.faction == "Alliance" or not Blood.IsElf(foe.race, foe.raceName) then return false end
+  -- elves count out in the world only
+  if inBattleground() then
+    ns.Print("|cff999999" .. ns.Name(victim) .. " falls, but elf kills in a battleground don't count toward Elfbane.|r")
+    return false
+  end
   ns.db.elfCounted = ns.db.elfCounted or {}
   local last = ns.db.elfCounted[key]
   local now = ns.Now()
