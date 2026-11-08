@@ -1722,6 +1722,39 @@ do
   end
 end
 
+-- Clan leaders rename their clan: the key stays, members stay, everyone sees the new name
+do
+  local MD, KD, AD = M.ns.Data, K.ns.Data, A.ns.Data
+  check(MD.Put("clans", "ironhelm", { name = "Ironhelm", founder = "Muradin", leader = "Muradin" }), "a clan to rename")
+  H.run(5)
+  KD.Put("clanship", "Kurdran", { clan = "ironhelm" }); H.run(5)
+  local function rename(client, id, newName)
+    local UIc, spec = client.ns.UI, nil
+    local real = UIc.OpenForm
+    UIc.OpenForm = function(sp) spec = sp end
+    UIc.EditClan(id)
+    UIc.OpenForm = real
+    local c = client.ns.Data.Get("clans", id)
+    return spec.onSave({ name = newName, motto = c.motto or "", desc = c.desc or "" })
+  end
+  rename(M, "ironhelm", "Stonehelm Brotherhood"); H.run(6)
+  check(AD.Get("clans", "ironhelm").name == "Stonehelm Brotherhood" and KD.Get("clans", "ironhelm").name == "Stonehelm Brotherhood",
+    "the leader renames the clan and everyone sees it")
+  check(AD.ClanOf("Kurdran") == "ironhelm" and KD.ClanName("ironhelm") == "Stonehelm Brotherhood", "members stay in the renamed clan")
+  check(not KD.Put("clans", "ironhelm", { name = "Kurdran's Clan", firstName = "Ironhelm", founder = "Muradin", leader = "Muradin" }, true),
+    "a member who isn't the leader can't rename it")
+  check(D.ns.Data.Put("clans", "goldbeard", { name = "Goldbeard", founder = "Dagna", leader = "Dagna" }), "a second clan")
+  H.run(5)
+  rename(M, "ironhelm", "Goldbeard"); H.run(2)
+  check(MD.Get("clans", "ironhelm").name == "Stonehelm Brotherhood", "a clan can't take another clan's name")
+  rename(D, "goldbeard", "Stonehelm Brotherhood"); H.run(2)
+  check(D.ns.Data.Get("clans", "goldbeard").name == "Goldbeard", "nor the other way round")
+  rename(M, "ironhelm", "Ironhelm"); H.run(6)
+  check(AD.Get("clans", "ironhelm").name == "Ironhelm" and AD.Get("clans", "ironhelm").firstName == nil, "renaming back to the founding name")
+  check(not MD.Put("clans", "fakekey", { name = "Something", firstName = "Other", founder = "Muradin", leader = "Muradin" }, true),
+    "a clan's key must match the name it was founded under")
+end
+
 -- Call for aid from a solo start: four invites, then a raid, then the rest
 do
   local LKa = K.ns.LFD

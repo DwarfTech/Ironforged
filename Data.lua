@@ -287,7 +287,9 @@ function Data.CanWrite(author, coll, key, data)
     if data == nil then return ns.IsLongbeardOrGM(author) end -- only Longbeards and the guild master delete clans
     local founder = data.founder
     if type(founder) ~= "string" or data.leader ~= founder then return false end -- the founder always leads
-    if type(data.name) ~= "string" or key ~= Data.KeyOf(data.name) then return false end
+    -- the key comes from the name the clan was founded under (firstName once it has been renamed)
+    if type(data.name) ~= "string" or data.name == "" then return false end
+    if key ~= Data.KeyOf(type(data.firstName) == "string" and data.firstName or data.name) then return false end
     if officer then return true end
     if founder ~= author or ns.roster[author] == nil then return false end -- any guildmate may found a clan
     local old = Data.Get("clans", key)

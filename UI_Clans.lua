@@ -17,8 +17,8 @@ local function editClan(id)
   local c = id and Data.Get("clans", id) or {}
   local officer = ns.IAmOfficer()
   local fields = {}
-  -- the name is the clan's identity (its key), so it is only chosen when founding
-  if not id then fields[#fields + 1] = { key = "name", label = "Clan name", type = "text", value = c.name, maxLen = 40 } end
+  -- the clan leader (or an officer) may rename it; its key stays the founding name's
+  fields[#fields + 1] = { key = "name", label = "Clan name", type = "text", value = c.name, maxLen = 40 }
   fields[#fields + 1] = { key = "motto", label = "Motto", type = "text", value = c.motto, maxLen = 80 }
   fields[#fields + 1] = { key = "desc", label = "History", type = "multiline", value = c.desc, maxLen = 600, height = 90 }
   UI.OpenForm({
@@ -26,25 +26,37 @@ local function editClan(id)
     width = 500,
     fields = fields,
     onSave = function(v)
-      local name = id and c.name or ns.Clean(v.name, 40)
-      if name == "" then ns.Print("A clan needs a name, and it must suit dwarven roleplay."); return false end
+      local name = ns.Clean(v.name, 40)
+      if name == "" or Data.KeyOf(name) == "" then ns.Print("A clan needs a name, and it must suit dwarven roleplay."); return false end
       local newId = id or Data.KeyOf(name)
-      if newId == "" then ns.Print("A clan needs a name, and it must suit dwarven roleplay."); return false end
+      -- no two clans may share a name (or the name another was founded under)
+      for otherId, other in Data.Each("clans") do
+        if otherId ~= newId and (Data.KeyOf(other.name or "") == Data.KeyOf(name) or otherId == Data.KeyOf(name)) then
+          ns.Print("A clan called " .. name .. " already exists.")
+          return false
+        end
+      end
       if not id and Data.Get("clans", newId) then
         ns.Print("A clan called " .. name .. " already exists.")
         return false
       end
       local founder = id and c.founder or me
+      local firstName = id and (c.firstName or c.name) or nil
+      if firstName == name then firstName = (c.firstName and c.firstName ~= name) and c.firstName or nil end
       local ok = Data.Put("clans", newId, {
-        name = name, motto = ns.Clean(v.motto, 80), desc = ns.Clean(v.desc, 600),
+        name = name, firstName = firstName, motto = ns.Clean(v.motto, 80), desc = ns.Clean(v.desc, 600),
         founder = founder, leader = founder, -- whoever founds the clan leads it
       })
       if ok and not id then
         ns.Print("Clan " .. name .. " is founded. Invite your kin from the clan's page.")
+      elseif ok and c.name ~= name then
+        ns.Print("Clan " .. (c.name or "?") .. " is now called " .. name .. ".")
       end
     end,
   })
 end
+
+UI.EditClan = editClan
 
 local function memberPicker(owner, title, filter, onPick)
   local opts = {}
@@ -128,7 +140,7 @@ showClan = function(id)
       end)
     end)
   end
-  if Data.ICanWrite("clans", id, { name = c.name, founder = c.founder, leader = c.leader }) then
+  if Data.ICanWrite("clans", id, { name = c.name, firstName = c.firstName, founder = c.founder, leader = c.leader }) then
     add("Edit", function() editClan(id) end)
   end
   if Data.ICanWrite("clans", id, nil) then
