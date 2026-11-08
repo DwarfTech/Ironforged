@@ -335,6 +335,32 @@ check(eb.languageID == 6, "/hold dwarvish works")
 local mmb = K.env.IronforgedMinimapButton
 mmb.__scripts.OnClick(mmb, "RightButton")
 check(eb.languageID == 7, "minimap right-click toggles Dwarvish")
+-- chat boxes are left alone unless Dwarvish is on, and always inside battlegrounds and dungeons
+do
+  local hb = Hh.env.ChatFrame1EditBox
+  check(hb.language == nil and hb.languageID == nil, "with Dwarvish off from the start, the chat boxes are never touched")
+  K.ns.Lang.Set(false)
+  K.instanceType = "pvp"
+  local notices = 0
+  local realNotice = K.ns.UI.Notice
+  K.ns.UI.Notice = function(spec) if spec.id == "dwarvish-instance" then notices = notices + 1 end end
+  eb.languageID, eb.language = nil, nil
+  K.ns.Lang.Set(true)
+  check(eb.languageID == nil and eb.language == nil, "turning Dwarvish on in a battleground leaves chat alone")
+  eb.__scripts.OnShow(eb)
+  check(eb.languageID == nil, "opening chat in a battleground leaves it alone too")
+  K.instanceType = nil
+  H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
+  check(eb.languageID == 6, "leaving the battleground puts Dwarvish back on")
+  K.instanceType = "pvp"
+  H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
+  check(notices == 1, "entering a battleground with Dwarvish set offers a reload so chat works")
+  H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
+  check(notices == 1, "only once a session")
+  K.instanceType = nil
+  K.ns.UI.Notice = realNotice
+  H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
+end
 
 -- Book of Grudges: factions, guildmates protected, avenging
 check(not Hh.ns.Data.Put("grudges", "kurdran", { against = "Kurdran", faction = "Horde", deed = "x", ts = 1 }, true), "guildmates can't be grudged")
@@ -2027,7 +2053,7 @@ do
 end
 do
   -- messages from another protocol version are ignored
-  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.6", "version 2.18.6 on protocol 12")
+  check(A.ns.PROTOCOL == 12 and A.ns.VERSION == "2.18.7", "version 2.18.7 on protocol 12")
   local before = A.ns.Data.Get("profiles", "Kurdran")
   local ok = A.ns.Comm.Inject("Kurdran", { op = "P", c = "profiles", k = "Kurdran", p = 11,
     r = { d = { backstory = "from an old version" }, t = A.ns.Stamp() + 5000, b = "Kurdran" } })
