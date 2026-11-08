@@ -331,11 +331,80 @@ local function noteDeath(unit)
   local f = foeCache()[Data.FoeKey(name)]
   if f and f.faction == "Alliance" then return end
   local key = Data.FoeKey(name)
+  -- my own target died: an elf counts even without honor
+  if unit == "target" then pcall(Blood.ElfDied, name, false) end
   for _, r in ipairs(recentDeaths) do if r.key == key and GetTime() - r.t < 10 then return end end
   table.insert(recentDeaths, 1, { name = name, key = key, t = GetTime() })
   while #recentDeaths > 20 do table.remove(recentDeaths) end
 end
 Blood.NoteDeath = noteDeath
+
+-- An elf died without (or before) an honorable kill. It counts when I slew them, or when they were
+-- the Horde player I was fighting (my target within the last 15 seconds). Never avenges grudges:
+-- that still takes an honorable kill.
+function Blood.ElfDied(name, mine)
+  if not name or name == "" then return false end
+  local key, foe = findFoe(name)
+  if not foe or foe.faction == "Alliance" or not Blood.IsElf(foe.race, foe.raceName) then return false end
+  local fighting = mine
+  if not fighting then
+    local first = key:match("^(%S+)")
+    local lt = lastFoeTarget
+    if lt and GetTime() - lt.t <= 15 and Data.FoeKey(lt.name):match("^(%S+)") == first then fighting = true end
+    local cur = UnitExists and UnitExists("target") and ns.UnitDisplayName("target")
+    if cur and Data.FoeKey(cur):match("^(%S+)") == first then fighting = true end
+  end
+  if not fighting then return false end
+  -- its own record of handled deaths, so a later honorable kill still avenges grudges
+  -- (the elf itself counts once either way: CountElf allows one per elf an hour)
+  Blood.elfDeathAt = Blood.elfDeathAt or {}
+  local t = GetTime()
+  if Blood.elfDeathAt[key] and t - Blood.elfDeathAt[key] < 10 then return false end
+  Blood.elfDeathAt[key] = t
+  ns.db.lastKills = ns.db.lastKills or {}
+  table.insert(ns.db.lastKills, 1, { name = name, race = foe.race, raceName = foe.raceName, faction = foe.faction, ts = ns.Now() })
+  while #ns.db.lastKills > 10 do table.remove(ns.db.lastKills) end
+  return Blood.CountElf(name, "slain")
+end
+
+-- The combat log, where the game still writes it to chat: "You have slain X!" and "X dies."
+local slainPatterns, diesPatterns
+local function patternsFrom(names, fallbacks)
+  local out = {}
+  for _, g in ipairs(names) do if type(_G[g]) == "string" then out[#out + 1] = toPattern(_G[g]) end end
+  for _, f in ipairs(fallbacks) do out[#out + 1] = toPattern(f) end
+  return out
+end
+local function deathFromText(text)
+  slainPatterns = slainPatterns or patternsFrom({ "SELFKILLOTHER" }, { "You have slain %s!" })
+  diesPatterns = diesPatterns or patternsFrom({ "UNITDIESOTHER" }, { "%s dies." })
+  for _, p in ipairs(slainPatterns) do local v = text:match(p); if v then return v, true end end
+  for _, p in ipairs(diesPatterns) do local v = text:match(p); if v then return v, false end end
+end
+Blood._deathFromText = deathFromText
+
+local function onDeathMessage(text)
+  local d = diag()
+  d.deathMsgs = (d.deathMsgs or 0) + 1
+  if type(text) ~= "string" or isSecret(text) then return end
+  local victim, mine = deathFromText(text)
+  if victim then pcall(Blood.ElfDied, victim, mine) end
+end
+ns.RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH", onDeathMessage)
+
+-- The full combat log, on clients that still give it to addons (Forever may not).
+local playerGUID
+ns.RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", function()
+  if not CombatLogGetCurrentEventInfo then return end
+  local ok, _, sub, _, srcGUID, _, _, _, _, destName = pcall(CombatLogGetCurrentEventInfo)
+  if not ok or isSecret(sub) then return end
+  local d = diag()
+  d.combatLog = (d.combatLog or 0) + 1
+  if sub ~= "PARTY_KILL" and sub ~= "UNIT_DIED" then return end
+  if isSecret(destName) or type(destName) ~= "string" then return end
+  playerGUID = playerGUID or (UnitGUID and UnitGUID("player"))
+  pcall(Blood.ElfDied, destName, sub == "PARTY_KILL" and srcGUID == playerGUID)
+end)
 
 -- Honorable kills so far: today's count where the game keeps one (it moves at once), else lifetime.
 local function killCount()

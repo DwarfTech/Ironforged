@@ -1810,6 +1810,62 @@ do
   K.target = nil
 end
 
+-- Elf kills without honor, and the combat log
+do
+  local B = K.ns.Blood
+  local me = K.ns.PlayerName()
+  local function elves() return (K.ns.db.pvp[me] and K.ns.db.pvp[me].elves) or 0 end
+  K.inBG, K.instanceType = false, nil
+  local function elf(name)
+    H.clock = H.clock + 3700
+    K.units.nameplate9 = { name = name, race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+    H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate9"); H.run(1)
+    K.units.nameplate9 = nil
+  end
+  -- "You have slain X!" with no honor: counts
+  local e0 = elves()
+  elf("Talwyn Gray")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "You have slain Talwyn Gray!"); H.run(2)
+  check(elves() == e0 + 1, "an elf you slew with no honor counts")
+  -- "X dies." for an elf you weren't fighting: doesn't
+  elf("Quillon Gray")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "Quillon Gray dies."); H.run(2)
+  check(elves() == e0 + 1, "an elf someone else killed, that you weren't fighting, doesn't count")
+  -- "X dies." for the elf on your target: counts
+  elf("Merith Gray")
+  K.target = { name = "Merith Gray", race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+  H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(1)
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "Merith Gray dies."); H.run(2)
+  check(elves() == e0 + 2, "the elf you were fighting dies: counts")
+  -- your target seen dead with no message at all: counts
+  H.clock = H.clock + 3700
+  K.target = { name = "Orrin Gray", race = "Skyborne", raceName = "Windshaper Skyborne", faction = "Horde" }
+  H.fire(K, "PLAYER_TARGET_CHANGED"); H.run(1)
+  K.target.dead = true; H.fire(K, "UNIT_HEALTH", "target"); H.run(2)
+  check(elves() == e0 + 3, "your target elf seen dead, no honor, no message: counts")
+  -- then the honorable kill arrives for the same elf: still counted once, and a grudge on them is avenged
+  A.ns.Data.Put("grudges", A.ns.Data.KeyOf("Orrin Gray"), { against = "Orrin Gray", faction = "Horde", deed = "camped the flight master", ts = A.ns.Now() })
+  H.run(4)
+  H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Orrin Gray dies, honorable kill Rank: Scout (Estimated Honor Points: 12)"); H.run(4)
+  check(elves() == e0 + 3, "the same elf isn't counted twice")
+  check(K.ns.Data.Avenged(A.ns.Data.KeyOf("Orrin Gray")) ~= nil, "and the honorable kill still avenges the grudge")
+  -- the full combat log, where a client still has it
+  local realInfo = K.env.CombatLogGetCurrentEventInfo
+  H.clock = H.clock + 3700
+  elf("Vessa Gray")
+  K.env.CombatLogGetCurrentEventInfo = function() return 0, "PARTY_KILL", false, "Player-" .. K.full, me, 0, 0, "Player-x", "Vessa Gray" end
+  H.fire(K, "COMBAT_LOG_EVENT_UNFILTERED"); H.run(2)
+  K.env.CombatLogGetCurrentEventInfo = realInfo
+  check(elves() == e0 + 4, "a combat-log killing blow on an elf counts")
+  -- in a battleground: still no
+  K.inBG = true
+  elf("Wyn Gray")
+  H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "You have slain Wyn Gray!"); H.run(2)
+  K.inBG = false
+  check(elves() == e0 + 4, "battleground elves still don't count")
+  K.target = nil
+end
+
 -- The greeting bar can be dragged by its grip, and right-click puts it back
 do
   local bar, grip = K.env.IronforgedGreetBar, K.env.IronforgedGreetGrip

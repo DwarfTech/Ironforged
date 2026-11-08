@@ -515,7 +515,8 @@ SlashCmdList.IRONFORGED = function(msg)
     local list = ns.db and ns.db.lastKills or {}
     local d = ns.Blood.Diag()
     ns.Print("Kill messages from the game: " .. d.msgs .. " (" .. d.named .. " naming the victim). Kill-count rises: " ..
-      d.counts .. " (" .. d.matched .. " matched to a Horde player seen dying, " .. (d.fromTarget or 0) .. " to your last Horde target).")
+      d.counts .. " (" .. d.matched .. " matched to a Horde player seen dying, " .. (d.fromTarget or 0) .. " to your last Horde target). " ..
+      "Combat log deaths in chat: " .. (d.deathMsgs or 0) .. ". Full combat log events: " .. (d.combatLog or 0) .. ".")
     if #list == 0 then ns.Print("No honorable kills seen yet.") end
     for _, k in ipairs(list) do
       local race = (k.race or k.raceName) and (tostring(k.raceName) .. " / " .. tostring(k.race)) or "race never seen"
