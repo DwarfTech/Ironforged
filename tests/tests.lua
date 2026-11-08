@@ -1849,20 +1849,14 @@ do
   H.fire(K, "CHAT_MSG_COMBAT_HONOR_GAIN", "Orrin Gray dies, honorable kill Rank: Scout (Estimated Honor Points: 12)"); H.run(4)
   check(elves() == e0 + 3, "the same elf isn't counted twice")
   check(K.ns.Data.Avenged(A.ns.Data.KeyOf("Orrin Gray")) ~= nil, "and the honorable kill still avenges the grudge")
-  -- the full combat log, where a client still has it
-  local realInfo = K.env.CombatLogGetCurrentEventInfo
-  H.clock = H.clock + 3700
-  elf("Vessa Gray")
-  K.env.CombatLogGetCurrentEventInfo = function() return 0, "PARTY_KILL", false, "Player-" .. K.full, me, 0, 0, "Player-x", "Vessa Gray" end
-  H.fire(K, "COMBAT_LOG_EVENT_UNFILTERED"); H.run(2)
-  K.env.CombatLogGetCurrentEventInfo = realInfo
-  check(elves() == e0 + 4, "a combat-log killing blow on an elf counts")
+  -- the full combat log is off-limits on Forever: never registered (it pops "blocked from an action")
+  check((_G.IRONFORGED_FORBIDDEN or 0) == 0, "the addon never registers the protected full combat log")
   -- in a battleground: still no
   K.inBG = true
   elf("Wyn Gray")
   H.fire(K, "CHAT_MSG_COMBAT_HOSTILE_DEATH", "You have slain Wyn Gray!"); H.run(2)
   K.inBG = false
-  check(elves() == e0 + 4, "battleground elves still don't count")
+  check(elves() == e0 + 3, "battleground elves still don't count")
   K.target = nil
 end
 

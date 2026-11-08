@@ -392,19 +392,8 @@ local function onDeathMessage(text)
 end
 ns.RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH", onDeathMessage)
 
--- The full combat log, on clients that still give it to addons (Forever may not).
-local playerGUID
-ns.RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", function()
-  if not CombatLogGetCurrentEventInfo then return end
-  local ok, _, sub, _, srcGUID, _, _, _, _, destName = pcall(CombatLogGetCurrentEventInfo)
-  if not ok or isSecret(sub) then return end
-  local d = diag()
-  d.combatLog = (d.combatLog or 0) + 1
-  if sub ~= "PARTY_KILL" and sub ~= "UNIT_DIED" then return end
-  if isSecret(destName) or type(destName) ~= "string" then return end
-  playerGUID = playerGUID or (UnitGUID and UnitGUID("player"))
-  pcall(Blood.ElfDied, destName, sub == "PARTY_KILL" and srcGUID == playerGUID)
-end)
+-- No COMBAT_LOG_EVENT_UNFILTERED: on Forever (Midnight client) registering it is a protected action
+-- and the game shows "Ironforged has been blocked from an action". The chat death lines above stay.
 
 -- Honorable kills so far: today's count where the game keeps one (it moves at once), else lifetime.
 local function killCount()

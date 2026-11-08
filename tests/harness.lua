@@ -58,7 +58,13 @@ local function newStub(kind, name)
   function methods.GetStringHeight(self) local n = 1; for _ in tostring(self.__text):gmatch("\n") do n = n + 1 end; return n * 14 end
   function methods.CreateFontString(self) return newStub("FontString") end
   function methods.CreateTexture(self) return newStub("Texture") end
-  function methods.RegisterEvent(self, e) self.__events[e] = true end
+  -- Forever (Midnight client): registering the full combat log is a protected action and pops
+  -- "blocked from an action" even under pcall, so the harness records any attempt.
+  local PROTECTED_EVENTS = { COMBAT_LOG_EVENT_UNFILTERED = true }
+  function methods.RegisterEvent(self, e)
+    if PROTECTED_EVENTS[e] then _G.IRONFORGED_FORBIDDEN = (_G.IRONFORGED_FORBIDDEN or 0) + 1 end
+    self.__events[e] = true
+  end
   function methods.SetEnabled(self, v) self.__enabled = v end
   function methods.SetAttribute(self, k, v) self.__attr = self.__attr or {}; self.__attr[k] = v end
   function methods.GetAttribute(self, k) return self.__attr and self.__attr[k] end
