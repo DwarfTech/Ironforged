@@ -601,6 +601,14 @@ function UI.OpenForm(spec)
         local m = UI.MultiLine(body, inputW, f.height or 90, f.maxLen)
         put(m, labelW + 8, y, i, true)
         m:SetText(f.value or "")
+        if f.select then
+          -- a copy box: keep the text as given and keep it selected
+          local keep, e = f.value or "", m.edit
+          e:SetScript("OnTextChanged", function(self, user) if user then self:SetText(keep); self:HighlightText() end end)
+          e:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+          e:SetFocus()
+          e:HighlightText()
+        end
         getters[f.key] = function() return m:GetText() end
         if i == stretchIdx then stretch = { frame = m, bottom = y + (f.height or 90), shrink = math.max(0, (f.height or 90) - 50) } end
       elseif f.type == "choice" then

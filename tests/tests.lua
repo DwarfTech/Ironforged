@@ -1784,6 +1784,33 @@ do
   check(okS, "the clan page opens with the hand-over button")
 end
 
+-- Officers export the Book of Grudges as text or CSV
+do
+  A.ns.Data.Put("grudges", A.ns.Data.KeyOf("Quote Guy"), { against = "Quote Guy", faction = "Horde", where = "Loch Modan", deed = 'Said "dwarves are short", twice', ts = A.ns.Now() })
+  H.run(3)
+  local txt = A.ns.UI.GrudgeExportText(true)
+  check(txt:find("Book of Grudges", 1, true) and txt:find("Quote Guy (Horde)", 1, true) and txt:find("[Loch Modan]", 1, true),
+    "export as text lists the grudges")
+  check(txt:find("__UNAVENGED__", 1, true) ~= nil, "text export groups unavenged grudges")
+  local csvText = A.ns.UI.GrudgeExportCSV(true)
+  check(csvText:find("^Date,Against,Side,Where,What they did") ~= nil, "CSV export has a header row")
+  check(csvText:find('"Said ""dwarves are short"", twice"', 1, true) ~= nil, "CSV quotes commas and quotation marks properly")
+  local avengedOnlyHidden = A.ns.UI.GrudgeExportText(false)
+  check(not avengedOnlyHidden:find("__AVENGED__", 1, true), "avenged grudges left out when not shown")
+  local reading = A.ns.UI.GrudgeExportReading(true)
+  check(reading:find("Quote Guy | Horde | ", 1, true) and reading:find('| Said "dwarves are short", twice', 1, true),
+    "the reading export has name, faction, date and the deed on one line")
+  check(not reading:find("Loch Modan", 1, true) and not reading:find("written by", 1, true), "and nothing else")
+  local okE = pcall(A.ns.UI.ExportGrudges, "csv")
+  check(okE and A.env.IronforgedDialog:IsShown(), "officers get the export window")
+  A.env.IronforgedDialog:Hide()
+  local before = #D.chat
+  D.ns.UI.ExportGrudges("text")
+  local refused = false
+  for i = before + 1, #D.chat do if D.chat[i]:find("Only officers can export", 1, true) then refused = true end end
+  check(refused, "regular members can't export")
+end
+
 -- Call for aid from a solo start: four invites, then a raid, then the rest
 do
   local LKa = K.ns.LFD

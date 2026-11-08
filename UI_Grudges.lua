@@ -115,6 +115,99 @@ local function showGrudge(key)
     fields = { { type = "info", value = table.concat(lines, "\n") } }, buttons = buttons })
 end
 
+----------------------------------------------------------------------
+-- Export (officers): the whole book as text to copy, for Discord or a spreadsheet
+----------------------------------------------------------------------
+local function grudgeRows(includeAvenged)
+  local rows = {}
+  for key, g in Data.Each("grudges") do
+    local a = Data.Avenged(key)
+    if includeAvenged or not a then
+      local _, rec = Data.Get("grudges", key)
+      rows[#rows + 1] = { g = g, a = a, by = rec and rec.b }
+    end
+  end
+  table.sort(rows, function(x, y)
+    if (x.a == nil) ~= (y.a == nil) then return x.a == nil end
+    return (x.g.ts or 0) > (y.g.ts or 0)
+  end)
+  return rows
+end
+
+local function oneLine(s) return ((s or ""):gsub("[\r\n]+", " ")) end
+
+function UI.GrudgeExportText(includeAvenged)
+  local rows = grudgeRows(includeAvenged)
+  local open, done = 0, 0
+  for _, r in ipairs(rows) do if r.a then done = done + 1 else open = open + 1 end end
+  local out = { "**Book of Grudges** (exported " .. date("%Y-%m-%d") .. "): " .. open .. " unavenged" ..
+    (includeAvenged and (", " .. done .. " avenged") or "") }
+  local section
+  for _, r in ipairs(rows) do
+    local s = r.a and "AVENGED" or "UNAVENGED"
+    if s ~= section then section = s; out[#out + 1] = ""; out[#out + 1] = "__" .. s .. "__" end
+    local g = r.g
+    local line = "- " .. ns.FormatDate(g.ts) .. "  " .. (g.against or "?") .. " (" .. (g.faction or "?") .. "): " .. oneLine(g.deed) ..
+      ((g.where and g.where ~= "") and (" [" .. g.where .. "]") or "") ..
+      (r.by and (" (written by " .. ns.Name(r.by) .. ")") or "")
+    if r.a then line = line .. " (avenged by " .. ns.Name(r.a.by or "?") .. " on " .. ns.FormatDate(r.a.ts) .. ")" end
+    out[#out + 1] = line
+  end
+  if #rows == 0 then out[#out + 1] = ""; out[#out + 1] = "The book is empty. For now." end
+  return table.concat(out, "\n")
+end
+
+-- For a grudge reading: just the name, side, date and the deed, one grudge per line.
+function UI.GrudgeExportReading(includeAvenged)
+  local out = {}
+  for _, r in ipairs(grudgeRows(includeAvenged)) do
+    local g = r.g
+    out[#out + 1] = (g.against or "?") .. " | " .. (g.faction or "?") .. " | " .. ns.FormatDate(g.ts) .. " | " .. oneLine(g.deed) ..
+      (r.a and " (avenged)" or "")
+  end
+  if #out == 0 then return "The book is empty. For now." end
+  return "Name | Faction | Date | What they did\n" .. table.concat(out, "\n")
+end
+
+local function csv(v)
+  v = oneLine(tostring(v or ""))
+  if v:find('[,"]') then v = '"' .. v:gsub('"', '""') .. '"' end
+  return v
+end
+
+function UI.GrudgeExportCSV(includeAvenged)
+  local out = { "Date,Against,Side,Where,What they did,Written by,Status,Avenged by,Avenged on" }
+  for _, r in ipairs(grudgeRows(includeAvenged)) do
+    local g, a = r.g, r.a
+    out[#out + 1] = table.concat({ csv(ns.FormatDate(g.ts)), csv(g.against), csv(g.faction), csv(g.where), csv(g.deed),
+      csv(r.by and ns.Name(r.by) or ""), csv(a and "Avenged" or "Unavenged"), csv(a and ns.Name(a.by or "?") or ""),
+      csv(a and ns.FormatDate(a.ts) or "") }, ",")
+  end
+  return table.concat(out, "\n")
+end
+
+local function exportGrudges(format)
+  if not ns.IAmOfficer() then ns.Print("Only officers can export the Book of Grudges."); return end
+  format = format or "reading"
+  local all = state.showAvenged
+  local text = (format == "csv" and UI.GrudgeExportCSV(all)) or (format == "text" and UI.GrudgeExportText(all)) or UI.GrudgeExportReading(all)
+  UI.OpenForm({
+    title = "Export the Book of Grudges",
+    width = 620,
+    fields = {
+      { key = "format", label = "Format", type = "choice", value = format,
+        options = { { text = "For a grudge reading", value = "reading" }, { text = "Full text (for Discord)", value = "text" },
+          { text = "Spreadsheet (CSV)", value = "csv" } },
+        onChange = function(v) if v ~= format then exportGrudges(v) end end },
+      { type = "info", font = "GameFontHighlightSmall", value = "Press |cffd4a017Ctrl+C|r to copy, then paste it where you like." ..
+        (all and "" or " Avenged grudges are left out; tick Show avenged to include them.") ..
+        (format == "text" and " Discord takes 2000 characters per message, so a long book may need splitting." or "") },
+      { key = "out", label = "", type = "multiline", value = text, height = 260, select = true },
+    },
+  })
+end
+UI.ExportGrudges = exportGrudges
+
 local function build(f, w, h)
   f.writeButton = UI.Button(f, "Write a grudge", 130, 22, function() writeGrudge(nil) end)
   f.writeButton:SetPoint("TOPLEFT", 4, -2)
@@ -133,6 +226,9 @@ local function build(f, w, h)
   avengedBox:SetPoint("LEFT", f.targetButton, "RIGHT", 10, 0)
   f.count = UI.Label(f, "", "GameFontHighlightSmall")
   f.count:SetPoint("TOPRIGHT", -6, -7)
+  f.exportButton = UI.Button(f, "Export", 70, 22, function() exportGrudges("reading") end)
+  f.exportButton:SetPoint("RIGHT", f.count, "LEFT", -10, 0)
+  f.exportButton:Hide()
   f.list = UI.List(f, w, h - 30, {
     { title = "Date", width = 74 }, { title = "Against", width = 118 }, { title = "Side", width = 58 },
     { title = "What they did", width = 200 }, { title = "Status", width = 140 },
@@ -168,6 +264,7 @@ local function refresh(f)
   end)
   f.list:SetItems(items, "The book is empty. For now.")
   f.count:SetText("|cffff6060" .. open .. " unavenged|r   |cffffd040" .. avenged .. " avenged|r")
+  f.exportButton:SetShown(ns.IAmOfficer())
 end
 
 UI.RegisterTab("grudges", "Book of Grudges", build, refresh)
