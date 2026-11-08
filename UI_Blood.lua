@@ -3,7 +3,7 @@ local ADDON, ns = ...
 local UI = ns.UI
 local Data = ns.Data
 
--- Ranked by Horde slain; click any column title to sort by it instead.
+-- Ranked by world kills (then Horde slain); click any column title to sort by it instead.
 local function build(f, w, h)
   f.mine = UI.Label(f, "", "GameFontHighlight")
   f.mine:SetPoint("TOPLEFT", 6, -7)
@@ -45,6 +45,7 @@ local function refresh(f)
     end
   end
   table.sort(rows, function(a, b)
+    if a.world ~= b.world then return a.world > b.world end
     if a.hk ~= b.hk then return a.hk > b.hk end
     return a.name < b.name
   end)

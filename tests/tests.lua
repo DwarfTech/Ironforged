@@ -754,6 +754,15 @@ local mrow2
 for _, row in ipairs(bt.list.rows) do if row.item and row.item.data == "Muradin" then mrow2 = row end end
 check(mrow2 and mrow2.cells[5]:GetText():find("|cff7fff5f40", 1, true), "most elves slain highlighted in the War Hall")
 check(not mrow2.cells[2]:GetText():find("[Elfbane]", 1, true), "no title tags in the War Hall")
+do -- ranked by world kills, then Horde slain
+  M.ns.Data.Put("pvp", "Muradin", { hk = 10, elves = 40, avenged = 2, world = 99 })
+  H.run(3)
+  A.ns.ToggleMain("blood"); A.ns.ToggleMain("blood")
+  local first = bt.list.rows[1] and bt.list.rows[1].item
+  check(first and first.data == "Muradin", "the War Hall ranks by world kills")
+  M.ns.Data.Put("pvp", "Muradin", { hk = 10, elves = 40, avenged = 2 })
+  H.run(3)
+end
 -- Titles tab: automatic holders and awarded titles
 A.ns.ToggleMain("titles")
 local tt
