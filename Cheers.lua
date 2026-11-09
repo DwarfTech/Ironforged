@@ -269,8 +269,17 @@ local function refreshFrame()
 end
 Cheers.Refresh = refreshFrame
 
+-- The popup holds the game's secure drink button, which can't be built or shown mid-fight;
+-- a call that comes in during combat pops up as soon as the fight ends (if it's still open).
+local showAfterCombat = false
 local function showFrame()
   if ns.settings and ns.settings.cheersPopup == false then return end
+  if InCombatLockdown and InCombatLockdown() then
+    showAfterCombat = true
+    ns.Print("|cffd4a017Cheers!|r A mug's been raised to the hold. Your popup comes up when this fight is done.")
+    return
+  end
+  showAfterCombat = false
   buildFrame()
   refreshFrame()
   frame:Show()
@@ -289,7 +298,7 @@ function Cheers.Call()
   end
   lastCall = now
   local id = string.format("%x", ns.Hash(me .. ns.Now()) % 0xFFFFFF)
-  ns.Comm.Send({ op = "C", id = id }, "GUILD")
+  ns.Comm.Send({ op = "C", id = id }, "GUILD", nil, true)
   sayGuild("CHEERS! " .. shortFirst(me) .. " raises a mug to the hold. Grab an ale and drink!")
   Cheers.OnCall(me, id)
 end
@@ -329,7 +338,7 @@ local function checkPending()
     local me = ns.PlayerName()
     local name = pending.name
     pending = nil
-    ns.Comm.Send({ op = "G", id = current.id, item = name }, "GUILD")
+    ns.Comm.Send({ op = "G", id = current.id, item = name }, "GUILD", nil, true)
     local what = (type(name) == "string" and name ~= "") and name or "an ale"
     local n = #current.order + 1
     sayGuild(shortFirst(me) .. " chugs " .. (what:find("^an? ") and what or ("a " .. what)) .. "! Cheers to " ..
@@ -341,7 +350,14 @@ Cheers._checkPending = checkPending
 
 ns.RegisterEvent("BAG_UPDATE_DELAYED", function() checkPending() end)
 ns.RegisterEvent("BAG_UPDATE", function() if C_Timer then C_Timer.After(0.2, checkPending) else checkPending() end end)
-ns.RegisterEvent("PLAYER_REGEN_ENABLED", function() if frame and frame:IsShown() then refreshFrame() end end)
+ns.RegisterEvent("PLAYER_REGEN_ENABLED", function()
+  if showAfterCombat and current then showFrame()
+  elseif frame and frame:IsShown() then refreshFrame() end
+end)
+-- build the popup early, out of combat, so it's ready when a call comes
+ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
+  if not frame and not (InCombatLockdown and InCombatLockdown()) then pcall(buildFrame) end
+end)
 
 ns.On("CHEERS_CALL", function(sender, id) Cheers.OnCall(sender, id) end)
 ns.On("CHEERS_DRINK", function(sender, id, item) Cheers.OnDrink(sender, id, item) end)

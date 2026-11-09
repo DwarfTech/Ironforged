@@ -20,6 +20,7 @@ local RELAY_TTL = 4 * 60 * 60 -- how long a heard-from Longbeard counts as a rel
 local MAX_PARTS = 600
 
 local queue = {}
+local urgent = {} -- time-sensitive calls (Cheers!): sent ahead of sync traffic, even in combat
 local tokens, TOKEN_CAP, TOKEN_RATE = 6, 6, 1.4 -- messages per second
 local backoffUntil = 0
 local msgCounter = 0
@@ -62,9 +63,26 @@ local function rawSend(item)
   return "drop"
 end
 
+local function lockedDown()
+  if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown then
+    local ok, locked = pcall(C_ChatInfo.InChatMessagingLockdown)
+    if ok and locked then return true end
+  end
+  return false
+end
+
 local function pump(elapsed)
   tokens = math.min(TOKEN_CAP, tokens + elapsed * TOKEN_RATE)
-  if #queue == 0 or paused() or now() < backoffUntil then return end
+  if now() < backoffUntil then return end
+  -- urgent messages first; only a chat lockdown holds them back
+  while #urgent > 0 and tokens >= 1 and not lockedDown() do
+    local item = urgent[1]
+    local res = rawSend(item)
+    if res == "retry" then backoffUntil = now() + 2; return end
+    table.remove(urgent, 1)
+    if res == "ok" then tokens = tokens - 1; Comm.stats.sent = Comm.stats.sent + 1 end
+  end
+  if #queue == 0 or paused() then return end
   while #queue > 0 and tokens >= 1 do
     local item = queue[1]
     local res = rawSend(item)
@@ -83,8 +101,9 @@ end
 local pumpFrame = CreateFrame("Frame")
 pumpFrame:SetScript("OnUpdate", function(_, elapsed) pump(elapsed) end)
 
--- Send a table to GUILD or WHISPER(target).
-function Comm.Send(payload, channel, target)
+-- Send a table to GUILD or WHISPER(target). `isUrgent` puts it ahead of everything else waiting
+-- (sync can queue up hundreds of messages after a login; a toast can't wait behind them).
+function Comm.Send(payload, channel, target, isUrgent)
   if not IsInGuild or not IsInGuild() then return end
   payload.p = ns.PROTOCOL
   local ok, packed = pcall(Ser.Pack, payload)
@@ -94,11 +113,12 @@ function Comm.Send(payload, channel, target)
   local n = math.max(1, math.ceil(#packed / CHUNK))
   for i = 1, n do
     local part = packed:sub((i - 1) * CHUNK + 1, i * CHUNK)
-    queue[#queue + 1] = { text = id .. "\t" .. i .. "\t" .. n .. "\t" .. part, channel = channel, target = target }
+    local q = isUrgent and urgent or queue
+    q[#q + 1] = { text = id .. "\t" .. i .. "\t" .. n .. "\t" .. part, channel = channel, target = target }
   end
 end
 
-function Comm.QueueLength() return #queue end
+function Comm.QueueLength() return #queue + #urgent end
 
 ----------------------------------------------------------------------
 -- Relays: online Longbeards and the guild master (other than me)

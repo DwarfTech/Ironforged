@@ -561,6 +561,31 @@ local afterCount = 0
 for _, c in pairs(H.clients) do afterCount = afterCount + #c.guildChat end
 check(afterCount == beforeCount + 2 and #A.guildChat > 0 and A.guildChat[#A.guildChat]:find("CHEERS!", 1, true), "cheers: the call and each drink go to guild chat")
 
+-- A call gets through a sync backlog, and reaches guildmates who are mid-fight
+do
+  kf:Hide()
+  H.clock = H.clock + 120 -- past the officer cooldown
+  for i = 1, 300 do A.ns.Comm.Send({ op = "S", n = "backlog " .. i, z = "x" }, "GUILD") end
+  K.inCombat = true
+  A.ns.Cheers.Call()
+  H.run(3)
+  check(not kf:IsShown(), "a guildmate mid-fight gets no popup yet")
+  check(A.ns.Comm.QueueLength() > 200, "with 300 sync messages still waiting...")
+  K.inCombat = false
+  H.fire(K, "PLAYER_REGEN_ENABLED"); H.run(1)
+  check(kf:IsShown() and kf.sub.__text:find("Thorin", 1, true), "...the call still got through, and pops up when the fight ends")
+  kf:Hide()
+  -- the caller mid-fight still gets the call out
+  H.clock = H.clock + 120
+  A.inCombat = true
+  A.ns.Cheers.Call()
+  H.run(3)
+  A.inCombat = false
+  check(kf:IsShown(), "an officer can call for cheers mid-fight")
+  kf:Hide()
+  H.run(300) -- let the backlog drain
+end
+
 -- Cross Gambling
 check(D.ns.Gamble._parseRoll("Kurdran rolls 57 (1-100)") == "Kurdran", "roll message parsed")
 K.ns.Gamble.Open(100)
