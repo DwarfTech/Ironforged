@@ -81,6 +81,7 @@ local function pump(elapsed)
     if res == "retry" then backoffUntil = now() + 2; return end
     table.remove(urgent, 1)
     if res == "ok" then tokens = tokens - 1; Comm.stats.sent = Comm.stats.sent + 1 end
+    if item.onSent then pcall(item.onSent, res == "ok") end
   end
   if #queue == 0 or paused() then return end
   while #queue > 0 and tokens >= 1 do
@@ -103,7 +104,7 @@ pumpFrame:SetScript("OnUpdate", function(_, elapsed) pump(elapsed) end)
 
 -- Send a table to GUILD or WHISPER(target). `isUrgent` puts it ahead of everything else waiting
 -- (sync can queue up hundreds of messages after a login; a toast can't wait behind them).
-function Comm.Send(payload, channel, target, isUrgent)
+function Comm.Send(payload, channel, target, isUrgent, onSent)
   if not IsInGuild or not IsInGuild() then return end
   payload.p = ns.PROTOCOL
   local ok, packed = pcall(Ser.Pack, payload)
@@ -114,7 +115,8 @@ function Comm.Send(payload, channel, target, isUrgent)
   for i = 1, n do
     local part = packed:sub((i - 1) * CHUNK + 1, i * CHUNK)
     local q = isUrgent and urgent or queue
-    q[#q + 1] = { text = id .. "\t" .. i .. "\t" .. n .. "\t" .. part, channel = channel, target = target }
+    q[#q + 1] = { text = id .. "\t" .. i .. "\t" .. n .. "\t" .. part, channel = channel, target = target,
+      onSent = (i == n) and onSent or nil }
   end
 end
 

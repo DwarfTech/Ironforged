@@ -582,6 +582,9 @@ do
   H.run(3)
   A.inCombat = false
   check(kf:IsShown(), "an officer can call for cheers mid-fight")
+  local told = false
+  for _, l in ipairs(A.chat or {}) do if l:find("Your call went out to the hold", 1, true) then told = true end end
+  check(told, "the caller is told once the call has gone out")
   kf:Hide()
   H.run(300) -- let the backlog drain
 end

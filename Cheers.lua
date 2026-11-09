@@ -298,7 +298,14 @@ function Cheers.Call()
   end
   lastCall = now
   local id = string.format("%x", ns.Hash(me .. ns.Now()) % 0xFFFFFF)
-  ns.Comm.Send({ op = "C", id = id }, "GUILD", nil, true)
+  -- tell the caller once the call has actually gone out to the addon, so a stuck call shows
+  ns.Comm.Send({ op = "C", id = id }, "GUILD", nil, true, function(ok)
+    if ok then
+      ns.Print("|cffd4a017Cheers!|r Your call went out to the hold.")
+    else
+      ns.Print("|cffff8000Cheers:|r the game wouldn't send your call to guildmates' addons. Try again in a moment.")
+    end
+  end)
   sayGuild("CHEERS! " .. shortFirst(me) .. " raises a mug to the hold. Grab an ale and drink!")
   Cheers.OnCall(me, id)
 end
