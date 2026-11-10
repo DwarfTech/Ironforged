@@ -309,57 +309,58 @@ check(not memberManage, "non-officers get no Manage button")
 check(A.env.IronforgedMinimapButton ~= nil and A.env.IronforgedMinimapButton:IsShown(), "minimap button shown")
 A.env.IronforgedMinimapButton.__scripts.OnClick(A.env.IronforgedMinimapButton)
 
--- Speak Dwarvish toggle
+-- Speak Dwarvish toggle: off by default, never touches chat unless you turn it on, lasts the session
 local eb = K.env.ChatFrame1EditBox
-check(K.ns.settings.speakDwarvish == true and eb.languageID == 6, "new installs speak Dwarvish by default")
-check(Hh.env.ChatFrame1EditBox.languageID ~= 6, "non-dwarves keep their own tongue by default")
-K.ns.Lang.Set(false)
+check(K.ns.settings.speakDwarvish == false and eb.languageID == nil and eb.language == nil,
+  "Dwarvish is off by default and the chat boxes are never touched")
+check(Hh.env.ChatFrame1EditBox.languageID == nil, "non-dwarves' chat is never touched")
+check(eb.__scripts.OnShow == nil, "no hooks on the game's chat boxes")
 K.ns.ToggleMain()
 local lb
 for _, f in ipairs(K.frames) do if f.__text == "Dwarvish: OFF" then lb = f end end
 check(lb ~= nil, "big Dwarvish toggle in the header")
 if lb then lb.__scripts.OnClick(lb) end
-check(eb.languageID == 6 and eb.language == "Dwarvish" and K.env.ChatFrame2EditBox.languageID == 6, "chat boxes set to Dwarvish")
+check(eb.languageID == 6 and eb.language == "Dwarvish" and K.env.ChatFrame2EditBox.languageID == 6, "turning it on sets the chat boxes to Dwarvish")
 check(lb and lb.__text == "Dwarvish: ON", "toggle shows ON")
-check(K.ns.settings.speakDwarvish == true, "choice saved")
-eb.languageID, eb.language = 7, "Common"
-eb.__shown = false
-eb.__scripts.OnShow(eb)
-check(eb.languageID == 6, "re-applied when chat opens")
 if lb then lb.__scripts.OnClick(lb) end
 check(eb.languageID == 7 and eb.language == "Common", "toggle back to Common")
 Hh.ns.Lang.Set(true)
-check(Hh.ns.settings.speakDwarvish == false and Hh.env.ChatFrame1EditBox.languageID ~= 6, "non-dwarf cannot speak Dwarvish")
+check(Hh.ns.settings.speakDwarvish == false and Hh.env.ChatFrame1EditBox.languageID == nil, "non-dwarf cannot speak Dwarvish")
 K.env.SlashCmdList.IRONFORGED("dwarvish")
 check(eb.languageID == 6, "/hold dwarvish works")
 local mmb = K.env.IronforgedMinimapButton
 mmb.__scripts.OnClick(mmb, "RightButton")
 check(eb.languageID == 7, "minimap right-click toggles Dwarvish")
--- chat boxes are left alone unless Dwarvish is on, and always inside battlegrounds and dungeons
 do
-  local hb = Hh.env.ChatFrame1EditBox
-  check(hb.language == nil and hb.languageID == nil, "with Dwarvish off from the start, the chat boxes are never touched")
-  K.ns.Lang.Set(false)
+  -- inside a battleground: turning it on leaves chat alone
   K.instanceType = "pvp"
+  eb.languageID, eb.language = nil, nil
+  K.ns.Lang.Set(true)
+  check(eb.languageID == nil, "turning Dwarvish on in a battleground leaves chat alone")
+  K.ns.Lang.Set(false)
+  K.instanceType = nil
+  -- on in the world, then into a battleground: a reload is offered every time
   local notices = 0
   local realNotice = K.ns.UI.Notice
   K.ns.UI.Notice = function(spec) if spec.id == "dwarvish-instance" then notices = notices + 1 end end
-  eb.languageID, eb.language = nil, nil
   K.ns.Lang.Set(true)
-  check(eb.languageID == nil and eb.language == nil, "turning Dwarvish on in a battleground leaves chat alone")
-  eb.__scripts.OnShow(eb)
-  check(eb.languageID == nil, "opening chat in a battleground leaves it alone too")
-  K.instanceType = nil
-  H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
-  check(eb.languageID == 6, "leaving the battleground puts Dwarvish back on")
   K.instanceType = "pvp"
   H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
-  check(notices == 1, "entering a battleground with Dwarvish set offers a reload so chat works")
   H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
-  check(notices == 1, "only once a session")
+  check(notices == 2, "with Dwarvish set this session, every battleground offers a reload")
   K.instanceType = nil
   K.ns.UI.Notice = realNotice
-  H.fire(K, "PLAYER_ENTERING_WORLD"); H.run(2)
+  -- the next login starts in your normal language
+  K.ns.Lang.OnLogin(); H.run(1)
+  check(K.ns.settings.speakDwarvish == false, "Dwarvish doesn't carry over to the next login")
+  K.ns.Lang.Set(false)
+end
+-- everyone who had it on from the old default is switched off once
+do
+  K.ns.settings.dwarvishSessionOnly = nil
+  K.ns.settings.speakDwarvish = true
+  K.ns.Lang.OnLogin(); H.run(1)
+  check(K.ns.settings.speakDwarvish == false and K.ns.settings.dwarvishSessionOnly == true, "the old always-on default is switched off")
 end
 
 -- Book of Grudges: factions, guildmates protected, avenging

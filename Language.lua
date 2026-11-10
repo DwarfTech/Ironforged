@@ -1,8 +1,9 @@
--- Ironforged: "Speak Dwarvish" toggle. Sets the chat box's default language to Dwarvish,
--- the same as picking it from the chat language menu, and keeps it set every time you chat.
--- Inside battlegrounds, arenas and dungeons the game blocks chat sent from a chat box an addon has
--- touched, so the addon leaves the chat boxes alone in there, and never touches them at all unless
--- Dwarvish is on (or needs switching back off).
+-- Ironforged: "Speak Dwarvish" toggle. Sets the chat box's language to Dwarvish, the same as
+-- picking it from the chat language menu.
+-- On WoW: Forever the game blocks chat in battlegrounds and dungeons from a chat box an addon has
+-- touched, and the mark lasts until you reload. So the addon only touches the chat boxes when you
+-- turn Dwarvish on yourself, for that session: it's off by default, never switched on at login,
+-- and never touched inside an instance. A reload clears it.
 local ADDON, ns = ...
 
 local Lang = {}
@@ -98,7 +99,8 @@ function Lang.Set(on)
   if on and Lang.InInstance() then
     ns.Print("|cff40ff40You'll speak Dwarvish once you leave this place.|r In battlegrounds and dungeons the game won't let addons change your chat.")
   elseif on then
-    ns.Print("|cff40ff40You now speak Dwarvish.|r Those who don't know the tongue will hear only gibberish.")
+    ns.Print("|cff40ff40You now speak Dwarvish.|r Those who don't know the tongue will hear only gibberish. " ..
+      "It lasts until you reload or log out. In a battleground, reload first or your chat may not send.")
   else
     ns.Print("You now speak " .. (select(1, Lang.Default()) or "Common") .. ".")
   end
@@ -107,42 +109,25 @@ end
 
 function Lang.Toggle() Lang.Set(not Lang.IsOn()) end
 
--- Re-apply whenever a chat box opens, so the game's resets don't undo it.
-local hooked = {}
-local function hookBoxes()
-  for _, eb in ipairs(editBoxes()) do
-    if not hooked[eb] and eb.HookScript then
-      hooked[eb] = true
-      eb:HookScript("OnShow", function(self)
-        if Lang.IsOn() and not Lang.InInstance() then
-          local name, id = Lang.Dwarvish()
-          if name and self.languageID ~= id then applyTo(self, name, id) end
-        end
-      end)
-    end
+-- Each login starts in your normal language: Dwarvish lasts the session you turn it on in.
+-- (Everyone who had it on from the old default is switched off once.)
+function Lang.OnLogin()
+  if ns.settings and not ns.settings.dwarvishSessionOnly then
+    ns.settings.dwarvishSessionOnly = true
+    ns.settings.speakDwarvish = false
   end
+  if ns.settings then ns.settings.speakDwarvish = false end
+  ns.Fire("LANGUAGE")
 end
+ns.RegisterEvent("PLAYER_LOGIN", function() Lang.OnLogin() end)
 
-ns.RegisterEvent("PLAYER_LOGIN", function()
-  hookBoxes()
-  if C_Timer then C_Timer.After(2, Lang.Apply) else Lang.Apply() end
-end)
-ns.RegisterEvent("LANGUAGE_LIST_CHANGED", function() Lang.Apply() end)
-
--- Entering an instance: chat set to Dwarvish out in the world still counts as touched, and the game
--- may block it in there. A reload clears it (the addon won't touch chat again inside), so offer one.
--- Leaving: Dwarvish goes back on.
-local warned = false
+-- Entering an instance with chat set to Dwarvish this session: the game may block chat in there,
+-- and a reload clears it, so offer one each time.
 ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
-  if not Lang.InInstance() then
-    if Lang.IsOn() and C_Timer then C_Timer.After(1, Lang.Apply) elseif Lang.IsOn() then Lang.Apply() end
-    return
-  end
-  if not applied or warned then return end
-  warned = true
+  if not Lang.InInstance() or not applied then return end
   if ns.UI and ns.UI.Notice then
     ns.UI.Notice({ id = "dwarvish-instance", icon = "Interface\\Icons\\INV_Misc_Book_09", title = "Speak Dwarvish",
-      text = "Speak Dwarvish rests in battlegrounds and dungeons. If your chat won't send in here, reload and it will.",
+      text = "You turned on Speak Dwarvish this session, and the game blocks chat from it in battlegrounds and dungeons. Reload so your chat works in here.",
       buttons = { { text = "Reload now", onClick = function() if ReloadUI then ReloadUI() end end }, { text = "Later" } },
       timeout = 30 })
   end
