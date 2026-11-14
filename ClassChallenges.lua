@@ -65,15 +65,15 @@ P.doomseeker = { name = "Doomseeker", classes = set({ WARRIOR }), fromLevel = 5,
     return true
   end,
   rules = "Warriors. From level 5, never use a shield and never learn Defensive Stance. Skip the Defensive Stance quests: learning the stance fails the challenge." }
-P.brawler = { name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN, SHAMAN }), weapons = set({ 13 }), warnOnly = true,
+P.brawler = { rangedStatStick = set({ WARRIOR }), name = "Brawler", classes = set({ WARRIOR, HUNTER, ROGUE, PALADIN, SHAMAN }), weapons = set({ 13 }), warnOnly = true,
   weaponWhat = { what = "weapon other than a fist weapon", fail = "a weapon other than a fist weapon" },
-  rules = "Warriors, Hunters, Rogues, Paladins and Shamans. Fight with fist weapons or bare hands only. No other weapons, ranged included. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
-P.hammerer = { name = "Hammerer", classes = set({ WARRIOR, PALADIN, ROGUE, SHAMAN }), fromLevel = 10, weapons = set({ 4, 5 }), warnOnly = true,
+  rules = "Warriors, Hunters, Rogues, Paladins and Shamans. Fight with fist weapons or bare hands only. No other weapons, ranged included. Warriors may keep a bow, gun, crossbow or thrown weapon in the ranged slot for its stats. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
+P.hammerer = { rangedStatStick = set({ WARRIOR }), name = "Hammerer", classes = set({ WARRIOR, PALADIN, ROGUE, SHAMAN }), fromLevel = 10, weapons = set({ 4, 5 }), warnOnly = true,
   weaponWhat = { what = "weapon that isn't a mace", fail = "a weapon that wasn't a mace" },
-  rules = "Warriors, Paladins, Rogues and Shamans. From level 10, maces are your only weapons. No other weapons, ranged included. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
-P.cleaver = { name = "Cleaver", classes = set({ WARRIOR, PALADIN, HUNTER, SHAMAN }), fromLevel = 10, weapons = set({ 0, 1 }), warnOnly = true,
+  rules = "Warriors, Paladins, Rogues and Shamans. From level 10, maces are your only weapons. No other weapons, ranged included. Warriors may keep a bow, gun, crossbow or thrown weapon in the ranged slot for its stats. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
+P.cleaver = { rangedStatStick = set({ WARRIOR }), name = "Cleaver", classes = set({ WARRIOR, PALADIN, HUNTER, SHAMAN }), fromLevel = 10, weapons = set({ 0, 1 }), warnOnly = true,
   weaponWhat = { what = "weapon that isn't an axe", fail = "a weapon that wasn't an axe" },
-  rules = "Warriors, Paladins, Hunters and Shamans. From level 10, axes are your only weapons. No other weapons, ranged included. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
+  rules = "Warriors, Paladins, Hunters and Shamans. From level 10, axes are your only weapons. No other weapons, ranged included. Warriors may keep a bow, gun, crossbow or thrown weapon in the ranged slot for its stats. Equip another weapon and the addon reminds you; no weapon at all, or a fishing pole, is always fine." }
 P.earthbreaker = { name = "Earthbreaker", classes = set({ SHAMAN }), fromLevel = 10, weapons = set({ 1, 5 }), noShield = true, warnOnly = true,
   weaponWhat = { what = "weapon that isn't a two-handed axe or mace", fail = "a weapon that wasn't a two-handed axe or mace" },
   spellRule = function(n) if SHAMAN_HEALS[n] then return "a healing spell" end end,
@@ -144,12 +144,21 @@ end
 
 -- What a rule set objects to right now: { [slot] = { what =, fail = } }. Weapon challenges
 -- (warnOnly) only ever remind you; the others take the item off and fail after a minute.
+local function playerClass()
+  local ok, _, file = pcall(UnitClass, "player")
+  if ok and type(file) == "string" and not isSecret(file) then return file end
+end
+
 local function gearProblems(p)
   local out = {}
   if fishing() then return out end
+  -- Warriors in a weapon challenge may wear a ranged weapon for its stats
+  local statStick = p.rangedStatStick and p.rangedStatStick[playerClass() or ""]
   for _, slot in ipairs({ 16, 17, 18 }) do
     local cls, sub = itemType(slot)
-    if cls == 4 and sub == 6 and p.noShield then
+    if slot == 18 and statStick then
+      -- the ranged slot is free
+    elseif cls == 4 and sub == 6 and p.noShield then
       out[slot] = SHIELD
     elseif cls == 2 and sub ~= 20 then -- a fishing pole is never a weapon
       if p.noWand and sub == 19 then out[slot] = WAND

@@ -1334,6 +1334,25 @@ do
   K.equip[16] = nil
   clear()
 
+  -- Warriors keep a ranged weapon for its stats in weapon challenges; other classes get the reminder
+  H.ITEM_TYPES[9010] = { 2, 2 } -- a bow
+  K.class = "WARRIOR"; K.level = 10
+  K.equip[16], K.equip[18] = 9004, 9010
+  local wBefore = #K.chat
+  CK.Start("hammerer"); H.run(12)
+  local bowNag = false
+  for i = wBefore + 1, #K.chat do if K.chat[i]:find("doesn't count against you", 1, true) then bowNag = true end end
+  check(not bowNag and K.equip[18] == 9010, "a Warrior's bow is a stat stick: no reminder in Hammerer")
+  clear()
+  K.class = "ROGUE"
+  wBefore = #K.chat
+  CK.Start("hammerer"); H.run(12)
+  bowNag = false
+  for i = wBefore + 1, #K.chat do if K.chat[i]:find("doesn't count against you", 1, true) then bowNag = true end end
+  check(bowNag, "a Rogue still gets the reminder for a ranged weapon")
+  K.equip[16], K.equip[18] = nil, nil
+  clear()
+
   -- Hammerer (rogue, level 10): maces only
   K.class = "ROGUE"; K.level = 10
   K.equip[16], K.equip[17] = 9004, 9002
