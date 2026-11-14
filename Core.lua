@@ -225,7 +225,6 @@ local SETTINGS_DEFAULTS = {
   arrivalNotices = true,
   tooltips = true,
   minimapHidden = false,
-  speakDwarvish = false,
   grudgeAlerts = true,
   cheersPopup = true,
   gamblePopup = true,
@@ -543,7 +542,7 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Print("debug " .. (ns.debug and "on" or "off"))
   else
     ns.Print("/hold  - open the hold")
-    ns.Print("/hold dwarvish  - turn speaking Dwarvish on or off")
+    ns.Print("/hold dwarvish  - how to speak Dwarvish")
     ns.Print("/hold cheers  - officers: call the hold to raise a mug")
     ns.Print("/hold sync  - ask guildmates for the latest records")
     ns.Print("/hold pvp  - check whether the addon can flag you for PvP (for Slayer)")

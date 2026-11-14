@@ -6,7 +6,7 @@ Open it with the gold hammer button on the minimap, from the addon list beside t
 
 ## Speak Dwarvish
 
-The big **Dwarvish: ON/OFF** button at the top of the window sets your chat language to Dwarvish, the same as picking it from the game's chat language menu. Fellow dwarves understand you, and everyone else sees gibberish. The choice is remembered for each character and re-applied every time you open chat. You can also right-click the minimap button or type `/hold dwarvish`. Dwarvish is on by default for new installs. Only characters who know Dwarvish can turn it on.
+The big **Dwarvish: ON/OFF** button at the top of the window shows whether you're speaking Dwarvish. Click it, right-click the minimap button, or type `/hold dwarvish` to see how to switch: open the chat menu (the speech bubble button beside your chat), choose Language, then Dwarvish. Fellow dwarves understand you, and everyone else sees gibberish. The addon never changes your chat itself, because on WoW: Forever an addon touching the chat box stops party, raid, whisper and battleground chat from sending.
 
 ## Cheers
 
@@ -124,7 +124,7 @@ Everyone needs the same version for records to sync. An older copy tells its own
 ## Commands
 
 - `/hold` (or `/if`, `/ironforged`) opens the hold.
-- `/hold dwarvish` turns speaking Dwarvish on or off.
+- `/hold dwarvish` shows how to speak Dwarvish.
 - `/hold cheers` (officers) calls the hold to raise a mug.
 - `/hold sync` asks guildmates for the latest records.
 - `/hold status` shows who the addon thinks you are and your rank.

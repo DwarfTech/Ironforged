@@ -185,13 +185,18 @@ local function build()
   lang:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
     GameTooltip:AddLine("Speak Dwarvish", 0.95, 0.78, 0.38)
-    GameTooltip:AddLine("Sets your chat language to Dwarvish. Fellow dwarves understand you; everyone else hears gibberish.", 1, 1, 1, true)
-    GameTooltip:AddLine("Lasts until you reload or log out. The game blocks it in battlegrounds and dungeons, so reload before you go in.", 0.7, 0.7, 0.7, true)
+    GameTooltip:AddLine("Shows whether you're speaking Dwarvish. Click for how to switch it in the game's chat menu. Fellow dwarves understand you; everyone else hears gibberish.", 1, 1, 1, true)
     GameTooltip:Show()
   end)
   lang:SetScript("OnLeave", function() GameTooltip:Hide() end)
   main.langButton = lang
   UI.UpdateLanguageButton()
+  -- follow the game's language as you change it in the chat menu
+  local since = 0
+  lang:SetScript("OnUpdate", function(_, dt)
+    since = since + (dt or 0)
+    if since >= 1 then since = 0; UI.UpdateLanguageButton() end
+  end)
 
   main.motto = UI.Label(main, "By hammer and hearth", "GameFontDisableSmall")
   if not main.motto:SetFont(UI.TITLE_FONT, 13, "") then main.motto:SetFontObject("GameFontDisableSmall") end
