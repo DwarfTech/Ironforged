@@ -1161,8 +1161,11 @@ local aid = D.ns.Data.Get("lfd", aidKey)
 check(aid and aid.aid and aid.need == 39 and aid.what == "Aid in Refuge Pointe, Arathi Highlands", "call for aid posts where you are, for a full raid")
 check(aid and aid.note:find("Grashnak", 1, true), "call for aid names the Horde seen")
 local heard = false
-for i = dChat + 1, #D.chat do if D.chat[i]:find("Kurdran calls for aid!", 1, true) and D.chat[i]:find("Looking for Dwarf tab", 1, true) then heard = true end end
-check(heard, "guildmates get one chat line for a call for aid")
+for i = dChat + 1, #D.chat do
+  local l = D.chat[i]:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  if l:find("Kurdran calls for aid in Refuge Pointe, Arathi Highlands!", 1, true) and l:find("Looking for Dwarf tab", 1, true) then heard = true end
+end
+check(heard, "guildmates get one chat line for a call for aid, saying where")
 check(not D.env.IronforgedNotice:IsShown(), "no popup for a call for aid")
 check(D.ns.LFD.Posts()[1].key == aidKey, "calls for aid list first")
 D.ns.LFD.Join(aidKey, "dps"); H.run(3)

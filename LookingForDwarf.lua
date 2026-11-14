@@ -362,7 +362,10 @@ ns.On("DATA_CHANGED", function(coll, key)
     if ns.Now() - (tonumber(d.ts) or 0) > 300 or not L.IsOpen(key, d) then return end
     if d.aid then
       -- one line in chat, no popup
-      ns.Print("|cffff4040" .. ns.Name(L.Leader(key)) .. " calls for aid!|r Heed the call in the Looking for Dwarf tab.")
+      -- where they are: from the call itself ("Aid in Thelsamar, Loch Modan")
+      local where = type(d.what) == "string" and d.what:match("^Aid in (.+)$")
+      ns.Print("|cffff4040" .. ns.Name(L.Leader(key)) .. " calls for aid" ..
+        (where and (" in |cffffd040" .. where .. "|r|cffff4040") or "") .. "!|r Heed the call in the Looking for Dwarf tab.")
       return
     end
     if ns.settings.lfdPopup == false or L.IsFull(key, d) then return end
