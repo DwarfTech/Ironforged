@@ -821,8 +821,51 @@ local function buildNotice()
   return notice
 end
 
+-- Popups wait until you're out of combat: in a fight, they queue up and come up one after
+-- another once it's over (a newer one with the same id replaces the older).
+local pendingNotices = {}
+local function inCombat()
+  if InCombatLockdown and InCombatLockdown() then return true end
+  if UnitAffectingCombat then
+    local ok, c = pcall(UnitAffectingCombat, "player")
+    if ok and c == true then return true end
+  end
+  return false
+end
+UI.InCombat = inCombat
+
+-- Run fn now, or as soon as the fight is over.
+local afterCombat = {}
+function UI.WhenOutOfCombat(fn)
+  if not inCombat() then return fn() end
+  afterCombat[#afterCombat + 1] = fn
+end
+
+local showNotice
+local function showNextNotice()
+  if #pendingNotices == 0 or inCombat() then return end
+  if notice and notice:IsShown() then return end
+  showNotice(table.remove(pendingNotices, 1))
+end
+UI.PendingNotices = function() return #pendingNotices end
+
 function UI.Notice(spec)
+  if inCombat() then
+    for i = #pendingNotices, 1, -1 do
+      if spec.id and pendingNotices[i].id == spec.id then table.remove(pendingNotices, i) end
+    end
+    pendingNotices[#pendingNotices + 1] = spec
+    return nil
+  end
+  return showNotice(spec)
+end
+
+showNotice = function(spec)
   local n = buildNotice()
+  if not n.__queueHooked then
+    n.__queueHooked = true
+    n:HookScript("OnHide", function() if C_Timer then C_Timer.After(0.5, showNextNotice) else showNextNotice() end end)
+  end
   n.id = spec.id
   n.icon:SetTexture(spec.icon or "Interface\\Icons\\INV_Misc_Note_01")
   n.title:SetText(spec.title or "")
@@ -852,5 +895,20 @@ function UI.Notice(spec)
 end
 
 function UI.HideNotice(id)
+  for i = #pendingNotices, 1, -1 do
+    if not id or pendingNotices[i].id == id then table.remove(pendingNotices, i) end
+  end
   if notice and notice:IsShown() and (not id or notice.id == id) then notice:Hide() end
+end
+
+-- When a fight ends: run what waited, then the waiting popups one at a time.
+do
+  local f = CreateFrame("Frame")
+  f:RegisterEvent("PLAYER_REGEN_ENABLED")
+  f:SetScript("OnEvent", function()
+    local run = afterCombat
+    afterCombat = {}
+    for _, fn in ipairs(run) do pcall(fn) end
+    showNextNotice()
+  end)
 end

@@ -42,7 +42,7 @@ local function newStub(kind, name)
   function methods.GetScript(self, k) return self.__scripts[k] end
   function methods.HookScript(self, k, f) self.__scripts[k] = f end
   function methods.Show(self) local was = self.__shown; self.__shown = true; if not was and self.__scripts.OnShow then self.__scripts.OnShow(self) end end
-  function methods.Hide(self) self.__shown = false end
+  function methods.Hide(self) local was = self.__shown; self.__shown = false; if was and self.__scripts.OnHide then self.__scripts.OnHide(self) end end
   function methods.IsShown(self) return self.__shown end
   function methods.IsVisible(self) return self.__shown end
   function methods.SetShown(self, v) if v then self:Show() else self:Hide() end end

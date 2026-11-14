@@ -374,6 +374,7 @@ function Gear.CheckIntruders()
   end
 
   if #popupLines > 0 and ns.IAmOfficer() and ns.UI and ns.UI.OpenForm then
+    ns.UI.WhenOutOfCombat(function()
     if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then PlaySound(SOUNDKIT.RAID_WARNING) end
     ns.UI.OpenForm({
       title = "|cffff4040A non-dwarf in the hold!|r",
@@ -381,6 +382,7 @@ function Gear.CheckIntruders()
       fields = { { type = "info", value = table.concat(popupLines, "\n") .. "\n\nOpen the roster and tick Rule problems to see them, and to remove them from the guild." } },
       buttons = { { text = "Open roster", onClick = function() ns.ToggleMain("roster", { problems = true }) end } },
     })
+    end)
   end
 end
 

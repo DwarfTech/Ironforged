@@ -2085,6 +2085,42 @@ do
   K.target = nil
 end
 
+-- Every popup waits until the fight is over, then they come up one at a time
+do
+  local n = M.env.IronforgedNotice
+  if n then n:Hide() end
+  M.inCombat = true
+  M.ns.UI.Notice({ id = "t1", title = "First", text = "one" })
+  M.ns.UI.Notice({ id = "t2", title = "Second", text = "two" })
+  M.ns.UI.Notice({ id = "t2", title = "Second (newer)", text = "two again" })
+  M.ns.UI.Notice({ id = "t3", title = "Dropped", text = "three" })
+  M.ns.UI.HideNotice("t3")
+  n = M.env.IronforgedNotice
+  check(not (n and n:IsShown()), "no popup mid-fight")
+  check(M.ns.UI.PendingNotices() == 2, "they wait, a newer one replacing the older with the same id")
+  M.inCombat = false
+  H.fire(M, "PLAYER_REGEN_ENABLED"); H.run(1)
+  n = M.env.IronforgedNotice
+  check(n and n:IsShown() and n.id == "t1", "the first comes up when the fight ends")
+  n:Hide(); H.run(1)
+  check(n:IsShown() and n.id == "t2" and n.title.__text == "Second (newer)", "then the next, the newer version")
+  n:Hide(); H.run(1)
+  check(not n:IsShown() and M.ns.UI.PendingNotices() == 0, "and nothing left over")
+  -- a fight starting between popups holds the rest
+  M.inCombat = true
+  M.ns.UI.Notice({ id = "t4", title = "Later", text = "four" })
+  M.inCombat = false
+  M.ns.UI.Notice({ id = "t5", title = "Now", text = "five" })
+  check(n:IsShown() and n.id == "t5", "out of combat a popup shows right away")
+  M.inCombat = true
+  n:Hide(); H.run(1)
+  check(not n:IsShown(), "closing one mid-fight doesn't bring up the next")
+  M.inCombat = false
+  H.fire(M, "PLAYER_REGEN_ENABLED"); H.run(1)
+  check(n:IsShown() and n.id == "t4", "it comes up after")
+  n:Hide(); H.run(1)
+end
+
 -- Officers post the recruitment message from the Roster tab
 do
   local R = A.ns.Recruit
