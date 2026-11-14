@@ -2085,6 +2085,31 @@ do
   K.target = nil
 end
 
+-- "X has arrived": only for a real login, never for a reload
+-- (members say hello to the relays, so an officer is the one who hears it)
+do
+  local function arrivals(c, who, from)
+    local n = 0
+    for i = from + 1, #c.chat do
+      for _, a in ipairs(c.ns.Flavor.lines.arrival) do
+        if c.chat[i]:find((a:gsub("%%s", who)), 1, true) then n = n + 1 end
+      end
+    end
+    return n
+  end
+  local c0 = #A.chat
+  D = H.relog(D); H.run(60)
+  check(arrivals(A, "Dagna", c0) == 0, "a guildmate who reloads isn't announced")
+  c0 = #A.chat
+  H.logout(D); H.run(5)
+  D = H.relog(D); H.run(60)
+  check(arrivals(A, "Dagna", c0) == 1, "a guildmate who logs in is announced once")
+  c0 = #A.chat
+  H.run(1000)
+  check(arrivals(A, "Dagna", c0) == 0, "and not again while they stay on")
+  check(arrivals(D, "Thorin", 0) == 0, "someone logging in isn't told about everyone already on")
+end
+
 -- Every popup waits until the fight is over, then they come up one at a time
 do
   local n = M.env.IronforgedNotice

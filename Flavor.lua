@@ -73,13 +73,28 @@ ns.On("DATA_READY", function()
   if C_Timer then C_Timer.After(4, greet) else greet() end
 end)
 
--- One notice per guildmate per login, however many sync messages they send.
-local lastArrival = {}
+-- One notice when a guildmate logs in while you're on: the guild roster showed them offline,
+-- then their addon said hello. A reload keeps them online in the roster, so it says nothing,
+-- and guildmates already on when you log in (or reload) aren't announced either.
+local presence = {} -- name -> "offline" (seen offline), "back" (came online, not yet told), "here"
+ns.On("ROSTER", function()
+  -- gone from the roster counts as offline too
+  for name in pairs(presence) do if not ns.roster[name] then presence[name] = "offline" end end
+  for name, m in pairs(ns.roster) do
+    if not m.online then
+      presence[name] = "offline"
+    elseif presence[name] == "offline" then
+      presence[name] = "back"
+    elseif presence[name] == nil then
+      presence[name] = "here"
+    end
+  end
+end)
 ns.On("PEER_ARRIVED", function(sender)
+  local p = presence[sender]
+  if p ~= "offline" and p ~= "back" then return end
+  presence[sender] = "here"
   if not ns.settings.arrivalNotices then return end
-  local t = GetTime and GetTime() or 0
-  if lastArrival[sender] and t - lastArrival[sender] < 300 then return end
-  lastArrival[sender] = t
   ns.Print(Flavor.Random("arrival", ns.Name(sender)))
 end)
 
