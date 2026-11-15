@@ -176,6 +176,41 @@ end
 ----------------------------------------------------------------------
 -- Avenging grudges
 ----------------------------------------------------------------------
+-- Guildmates in my own party or raid (a battleground's group of strangers doesn't count).
+local function groupGuildmates()
+  local out, seen = {}, {}
+  local me = ns.PlayerName()
+  local home = LE_PARTY_CATEGORY_HOME
+  local inRaid = IsInRaid and IsInRaid(home)
+  local inGroup = IsInGroup and IsInGroup(home)
+  if not inGroup and not inRaid then return out end
+  local prefix, n = "party", 4
+  if inRaid then prefix, n = "raid", 40 end
+  for i = 1, n do
+    local unit = prefix .. i
+    if UnitExists and UnitExists(unit) then
+      local name = ns.UnitDisplayName(unit)
+      if name and not isSecret(name) then
+        name = ns.Name(name)
+        if name ~= "" and name ~= me and ns.roster[name] and not seen[name] then
+          seen[name] = true
+          out[#out + 1] = name
+        end
+      end
+    end
+  end
+  table.sort(out)
+  return out
+end
+Blood.GroupGuildmates = groupGuildmates
+
+-- Credit for avenged grudges: the slayer counts it right away; guildmates grouped with them
+-- count it on their own tally when the record reaches them.
+local function creditedTable()
+  ns.db.avengedCredited = ns.db.avengedCredited or {}
+  return ns.db.avengedCredited
+end
+
 local function avenge(foeName, how)
   local me = ns.PlayerName()
   local count = 0
@@ -184,10 +219,13 @@ local function avenge(foeName, how)
     local key, foe = Blood.FindFoe(foeName)
     if foe and foe.name and Data.FoeKey(foe.name):match("^(%S+)") == Data.FoeKey(foeName) then foeName = foe.name end
   end
+  local party = groupGuildmates()
   for _, g in ipairs(Data.GrudgesAgainst(foeName)) do
     if g.data.faction == "Horde" then
-      if Data.Put("avenged", g.key, { by = me, how = how or "slain", ts = ns.Now() }, true) then
+      if Data.Put("avenged", g.key, { by = me, how = how or "slain", party = #party > 0 and party or nil,
+        ts = ns.Now() }, true) then
         count = count + 1
+        creditedTable()[g.key] = true
       end
     end
   end
@@ -214,8 +252,43 @@ local function announcedTable()
   return ns.db.avengedSeen
 end
 
+-- "Thorin, with Dagna and Muradin"
+local function withParty(a)
+  local s = ns.Name(a.by)
+  if type(a.party) == "table" and #a.party > 0 then
+    local names = {}
+    for i, n in ipairs(a.party) do names[i] = ns.Name(n) end
+    local last = table.remove(names)
+    s = s .. ", with " .. (#names > 0 and (table.concat(names, ", ") .. " and ") or "") .. last
+  end
+  return s
+end
+Blood.AvengedBy = withParty
+
+-- A grudge avenged by a group I was in counts on my tally too.
+local function creditGroup()
+  if not Data.Ready() then return end
+  local me = ns.PlayerName()
+  local credited = creditedTable()
+  local gained = 0
+  for key, a in Data.Each("avenged") do
+    if not credited[key] and a.by ~= me and type(a.party) == "table" then
+      for _, n in ipairs(a.party) do
+        if n == me then credited[key] = true; gained = gained + 1; break end
+      end
+    end
+  end
+  if gained > 0 then
+    local p = personal()
+    p.avenged = (p.avenged or 0) + gained
+    schedulePublish(2)
+  end
+end
+Blood.CreditGroup = creditGroup
+
 local function announceAvenged()
   if not Data.Ready() then return end
+  creditGroup()
   local seen = announcedTable()
   for key, a in Data.Each("avenged") do
     if not seen[key] then
@@ -224,7 +297,7 @@ local function announceAvenged()
       if g and (a.ts or 0) > ns.Now() - 3600 then
         local how = a.how == "officer" and "has been avenged" or "has fallen"
         ns.Print("|cffffd040GRUDGE AVENGED!|r " .. (g.against or "?") .. " " .. how .. ". " ..
-          (a.by and ("Honor to " .. ns.Name(a.by) .. ". ") or "") .. "The book is one line lighter.")
+          (a.by and ("Honor to " .. withParty(a) .. ". ") or "") .. "The book is one line lighter.")
         if RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo then
           pcall(RaidNotice_AddMessage, RaidWarningFrame, "Grudge avenged: " .. (g.against or "?"), ChatTypeInfo.RAID_WARNING)
         end
@@ -315,7 +388,8 @@ Blood.WORLD_RULES = "World kills counts your honorable kills outside battlegroun
 Blood.AVENGED_RULES = "Grudges from the Book of Grudges that you avenged.\n" ..
   "You avenge one by killing a Horde player with an open grudge against them: an honorable kill,\n" ..
   "or a kill that gives no honor on a foe you were fighting.\n" ..
-  "Each open grudge counts once. Alliance grudges are marked avenged by an officer and don't add to this count."
+  "Each open grudge counts once. Guildmates grouped with the slayer get it on their count too. " ..
+  "Alliance grudges are marked avenged by an officer and don't add to this count."
 
 function Blood.CountElf(victim, how)
   local key, foe = findFoe(victim)

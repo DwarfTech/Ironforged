@@ -68,7 +68,7 @@ local function avengedText(a)
   elseif a.how == "witnessed" then
     return "Avenged: seen falling by " .. ns.Name(a.by)
   end
-  return "Avenged: slain by " .. ns.Name(a.by)
+  return "Avenged: slain by " .. ns.Blood.AvengedBy(a)
 end
 
 local function showGrudge(key)
@@ -150,7 +150,7 @@ function UI.GrudgeExportText(includeAvenged)
     local line = "- " .. ns.FormatDate(g.ts) .. "  " .. (g.against or "?") .. " (" .. (g.faction or "?") .. "): " .. oneLine(g.deed) ..
       ((g.where and g.where ~= "") and (" [" .. g.where .. "]") or "") ..
       (r.by and (" (written by " .. ns.Name(r.by) .. ")") or "")
-    if r.a then line = line .. " (avenged by " .. ns.Name(r.a.by or "?") .. " on " .. ns.FormatDate(r.a.ts) .. ")" end
+    if r.a then line = line .. " (avenged by " .. (r.a.by and ns.Blood.AvengedBy(r.a) or "?") .. " on " .. ns.FormatDate(r.a.ts) .. ")" end
     out[#out + 1] = line
   end
   if #rows == 0 then out[#out + 1] = ""; out[#out + 1] = "The book is empty. For now." end
@@ -180,7 +180,7 @@ function UI.GrudgeExportCSV(includeAvenged)
   for _, r in ipairs(grudgeRows(includeAvenged)) do
     local g, a = r.g, r.a
     out[#out + 1] = table.concat({ csv(ns.FormatDate(g.ts)), csv(g.against), csv(g.faction), csv(g.where), csv(g.deed),
-      csv(r.by and ns.Name(r.by) or ""), csv(a and "Avenged" or "Unavenged"), csv(a and ns.Name(a.by or "?") or ""),
+      csv(r.by and ns.Name(r.by) or ""), csv(a and "Avenged" or "Unavenged"), csv(a and (a.by and ns.Blood.AvengedBy(a) or "?") or ""),
       csv(a and ns.FormatDate(a.ts) or "") }, ",")
   end
   return table.concat(out, "\n")

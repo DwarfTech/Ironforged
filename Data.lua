@@ -329,6 +329,10 @@ function Data.CanWrite(author, coll, key, data)
     return not ns.IsGuildmateName(data.against) -- guildmates can't be grudged
   elseif coll == "avenged" then
     if data == nil then return officer end
+    if data.party ~= nil then
+      if type(data.party) ~= "table" or #data.party > 40 then return false end
+      for _, n in ipairs(data.party) do if type(n) ~= "string" then return false end end
+    end
     if officer then return true end
     -- anyone in the guild avenges a Horde grudge by slaying the foe
     local g = Data.Get("grudges", key)

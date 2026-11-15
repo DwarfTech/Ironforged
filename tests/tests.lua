@@ -2226,6 +2226,36 @@ do
   check(#D_.GrudgesAgainst("Zugrak Bonecrusher") == 0, "a different surname doesn't match")
 end
 
+-- A grudge avenged in a group counts for every guildmate in the group
+do
+  local function grudge(name)
+    A.ns.Data.Put("grudges", A.ns.Data.KeyOf(name), { against = name, faction = "Horde", deed = "ganked the flight master", ts = A.ns.Now() })
+    H.run(4)
+    return A.ns.Data.KeyOf(name)
+  end
+  local function tally(c) local p = c.ns.db.pvp[c.ns.PlayerName()]; return p and p.avenged or 0 end
+  local k1 = grudge("Grimtusk Gorefang")
+  K.inGroup = true
+  K.units.party1 = { name = "Muradin" }
+  K.units.party2 = { name = "Randomhuman" } -- not in the guild
+  local kBefore, mBefore, dBefore = tally(K), tally(M), tally(D)
+  H.clock = H.clock + 3700
+  K.ns.Blood.OnHonorableKill("Grimtusk Gorefang"); H.run(8)
+  local a = A.ns.Data.Avenged(k1)
+  check(a and a.by == "Kurdran" and type(a.party) == "table" and #a.party == 1 and a.party[1] == "Muradin",
+    "the avenged record names the guildmates in the group")
+  check(tally(K) == kBefore + 1 and tally(M) == mBefore + 1, "the slayer and their grouped guildmate both get it")
+  check(tally(D) == dBefore, "guildmates outside the group don't")
+  H.run(20)
+  check(tally(M) == mBefore + 1, "and it counts only once")
+  check(A.ns.Blood.AvengedBy(a) == "Kurdran, with Muradin", "the Book reads \"Kurdran, with Muradin\"")
+  -- a battleground's group of strangers isn't a group for this
+  K.inGroup = false; K.units.party1 = nil; K.units.party2 = nil
+  K.instanceGroup = true; K.units.raid1 = { name = "Dagna" }
+  check(#K.ns.Blood.GroupGuildmates() == 0, "a battleground's random group doesn't share the credit")
+  K.instanceGroup = false; K.units.raid1 = nil
+end
+
 -- Officers post the recruitment message from the Roster tab
 do
   local R = A.ns.Recruit
