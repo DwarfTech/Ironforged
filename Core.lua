@@ -529,8 +529,10 @@ SlashCmdList.IRONFORGED = function(msg)
     if #list == 0 then ns.Print("No honorable kills seen yet.") end
     for _, k in ipairs(list) do
       local race = (k.race or k.raceName) and (tostring(k.raceName) .. " / " .. tostring(k.race)) or "race never seen"
+      local grudges = #ns.Data.GrudgesAgainst(k.name, true)
       ns.Print(k.name .. ": " .. race .. (k.faction and (", " .. k.faction) or "") ..
-        (ns.Blood.IsElf(k.race, k.raceName) and " |cff7fff5f(elf)|r" or ""))
+        (ns.Blood.IsElf(k.race, k.raceName) and " |cff7fff5f(elf)|r" or "") ..
+        (grudges > 0 and (" |cffffd040(" .. grudges .. " grudge" .. (grudges > 1 and "s" or "") .. " in the Book)|r") or ""))
     end
   elseif cmd == "pvp" then
     if ns.Challenges then ns.Challenges.PvPReport() end

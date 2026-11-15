@@ -2198,6 +2198,34 @@ do
   n:Hide(); H.run(1)
 end
 
+-- Grudges are matched even when the names don't line up exactly
+do
+  local function grudge(name)
+    A.ns.Data.Put("grudges", A.ns.Data.KeyOf(name), { against = name, faction = "Horde", deed = "camped the flight master", ts = A.ns.Now() })
+    H.run(4)
+    return A.ns.Data.KeyOf(name)
+  end
+  local D_ = K.ns.Data
+  -- the kill message gives just the first name; the grudge has the surname
+  local k1 = grudge("Zugrak Bonesplitter")
+  check(#D_.GrudgesAgainst("Zugrak") == 1, "a first name alone finds the grudge written with the surname")
+  H.clock = H.clock + 3700
+  K.ns.Blood.OnHonorableKill("Zugrak"); H.run(4)
+  check(D_.Avenged(k1) ~= nil, "and a kill naming only the first name avenges it")
+  -- the grudge was typed without the accent the game uses
+  local k2 = grudge("Jael Darkleaf")
+  check(#D_.GrudgesAgainst("Jaël Darkleaf") == 1, "accents don't stop a match")
+  H.clock = H.clock + 3700
+  K.ns.Blood.OnHonorableKill("Jaël Darkleaf"); H.run(4)
+  check(D_.Avenged(k2) ~= nil, "a kill on the accented name avenges the plain-typed grudge")
+  -- and the other way round
+  local k3 = grudge("Ñoam Stompsky")
+  check(#D_.GrudgesAgainst("Noam Stompsky") == 1, "an accented grudge matches the plain name")
+  -- different people stay different
+  local k4 = grudge("Zugrak Skullcrusher")
+  check(#D_.GrudgesAgainst("Zugrak Bonecrusher") == 0, "a different surname doesn't match")
+end
+
 -- Officers post the recruitment message from the Roster tab
 do
   local R = A.ns.Recruit

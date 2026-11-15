@@ -748,15 +748,37 @@ function Data.FoeKey(name)
   return ns.NameKey(name)
 end
 
+-- Names as written in a grudge and as the game gives them can differ in accents
+-- ("Jael" typed for "Jaël"); compare them with the accents taken off.
+local ACCENTS = {
+  ["à"] = "a", ["á"] = "a", ["â"] = "a", ["ã"] = "a", ["ä"] = "a", ["å"] = "a", ["æ"] = "ae", ["ç"] = "c",
+  ["è"] = "e", ["é"] = "e", ["ê"] = "e", ["ë"] = "e", ["ì"] = "i", ["í"] = "i", ["î"] = "i", ["ï"] = "i",
+  ["ñ"] = "n", ["ò"] = "o", ["ó"] = "o", ["ô"] = "o", ["õ"] = "o", ["ö"] = "o", ["ø"] = "o",
+  ["ù"] = "u", ["ú"] = "u", ["û"] = "u", ["ü"] = "u", ["ý"] = "y", ["ÿ"] = "y", ["ß"] = "ss",
+  ["À"] = "a", ["Á"] = "a", ["Â"] = "a", ["Ã"] = "a", ["Ä"] = "a", ["Å"] = "a", ["Æ"] = "ae", ["Ç"] = "c",
+  ["È"] = "e", ["É"] = "e", ["Ê"] = "e", ["Ë"] = "e", ["Ì"] = "i", ["Í"] = "i", ["Î"] = "i", ["Ï"] = "i",
+  ["Ñ"] = "n", ["Ò"] = "o", ["Ó"] = "o", ["Ô"] = "o", ["Õ"] = "o", ["Ö"] = "o", ["Ø"] = "o",
+  ["Ù"] = "u", ["Ú"] = "u", ["Û"] = "u", ["Ü"] = "u", ["Ý"] = "y",
+}
+local function foeMatchKey(name)
+  local k = Data.FoeKey(name)
+  return (k:gsub("[\195\197][\128-\191]", function(c) return ACCENTS[c] or c end))
+end
+Data.FoeMatchKey = foeMatchKey
+
 -- Open (not yet avenged) grudges against a name: { {key=, data=} }
+-- A first name alone matches a grudge written with the surname, and the other way round
+-- (kill messages and typed grudges don't always both carry the surname).
 function Data.GrudgesAgainst(name, includeAvenged)
-  local want = Data.FoeKey(name)
+  local want = foeMatchKey(name)
   local first = want:match("^(%S+)")
   local out = {}
   if want == "" then return out end
+  local wantHasSurname = want:find(" ", 1, true) ~= nil
   for key, g in Data.Each("grudges") do
-    local against = Data.FoeKey(g.against)
-    local hit = against == want or (not against:find(" ") and against == first)
+    local against = foeMatchKey(g.against)
+    local hit = against == want or (not against:find(" ", 1, true) and against == first)
+      or (not wantHasSurname and against:match("^(%S+)") == want)
     if hit and (includeAvenged or not Data.Avenged(key)) then out[#out + 1] = { key = key, data = g } end
   end
   table.sort(out, function(a, b) return (a.data.ts or 0) < (b.data.ts or 0) end)

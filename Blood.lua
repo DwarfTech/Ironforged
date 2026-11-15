@@ -179,6 +179,11 @@ end
 local function avenge(foeName, how)
   local me = ns.PlayerName()
   local count = 0
+  -- a first name alone: use the full name of the Horde player I saw by that name, when I saw one
+  if type(foeName) == "string" and not foeName:find(" ", 1, true) then
+    local key, foe = Blood.FindFoe(foeName)
+    if foe and foe.name and Data.FoeKey(foe.name):match("^(%S+)") == Data.FoeKey(foeName) then foeName = foe.name end
+  end
   for _, g in ipairs(Data.GrudgesAgainst(foeName)) do
     if g.data.faction == "Horde" then
       if Data.Put("avenged", g.key, { by = me, how = how or "slain", ts = ns.Now() }, true) then
