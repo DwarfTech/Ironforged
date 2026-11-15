@@ -85,7 +85,8 @@ function UI.ShowMember(name, opts)
     if value and value ~= "" then lines[#lines + 1] = "|cffd4a017" .. label .. ":|r " .. value end
   end
 
-  add("Rank", info.rankName)
+  add("Rank", info.rankName and ns.CharInfo.RankText(name, info.rankName))
+  add("Note", ns.CharInfo.Note(name) and ("\"" .. ns.CharInfo.Note(name) .. "\""))
   add("Level", info.level and (info.level .. " " .. (info.className or "")) or nil)
   add("Race", ns.Gear.RaceStatus(name) .. (report and report.race and (" |cff999999(" .. report.race .. ")|r") or ""))
   local inviters = ns.Gear.InvitersOf(name)
@@ -288,7 +289,7 @@ local function refresh(f)
         data = name,
         sortRank = info.rankIndex or 99,
         keys = { [1] = ns.NameKey(name), [2] = info.rankIndex or 99, [8] = ns.SeenKey(info) },
-        cols = { display, info.rankName or "", info.level or "", clan, titles[1] and (titles[1].title .. (#titles > 1 and (" |cff999999+" .. (#titles - 1) .. "|r") or "")) or "",
+        cols = { display, ns.CharInfo.RankText(name, info.rankName or ""), info.level or "", clan, titles[1] and (titles[1].title .. (#titles > 1 and (" |cff999999+" .. (#titles - 1) .. "|r") or "")) or "",
           challengeCell(name),
           ns.Gear.RaceStatus(name), ns.LastSeenText(info) },
       }

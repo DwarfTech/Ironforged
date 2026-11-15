@@ -126,6 +126,16 @@ local function addTooltipLines(tooltip)
     parts[#parts + 1] = (ns.Data.IsClanLeader(full, clanId) and "Leader of clan " or "of clan ") .. clan
   end
   local added = false
+  local note = ns.CharInfo and ns.CharInfo.Note(full)
+  if note then
+    tooltip:AddLine("\"" .. note .. "\"", 1, 1, 1, true)
+    added = true
+  end
+  local best = ns.CharInfo and ns.CharInfo.BestRank(full)
+  if best then
+    tooltip:AddLine((ns.roster[full].rankName or "") .. " (" .. best .. " on another character)", 0.6, 0.6, 0.6)
+    added = true
+  end
   if #parts > 0 then
     tooltip:AddLine(table.concat(parts, " "), 0.83, 0.63, 0.09)
     added = true

@@ -55,6 +55,7 @@ local function newStub(kind, name)
   function methods.SetHeight(self, h) self.__h = h end
   function methods.GetWidth(self) return self.__w end
   function methods.GetHeight(self) return self.__h end
+  function methods.HasFocus(self) return self.__focus == true end
   function methods.GetStringHeight(self) local n = 1; for _ in tostring(self.__text):gmatch("\n") do n = n + 1 end; return n * 14 end
   function methods.CreateFontString(self) return newStub("FontString") end
   function methods.CreateTexture(self) return newStub("Texture") end

@@ -14,6 +14,7 @@ Core.lua
 Data.lua
 Comm.lua
 Gear.lua
+CharInfo.lua
 Flavor.lua
 Language.lua
 Blood.lua

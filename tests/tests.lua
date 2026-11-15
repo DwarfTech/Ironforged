@@ -2085,6 +2085,34 @@ do
   K.target = nil
 end
 
+-- Character notes and account ranks
+do
+  local CK, CM, CA = K.ns.CharInfo, M.ns.CharInfo, A.ns.CharInfo
+  -- a note, shown to everyone
+  check(CK.SetNote("Known as Grimbeard on the forums"), "a member saves a note for their character")
+  H.run(6)
+  check(CA.Note("Kurdran") == "Known as Grimbeard on the forums", "guildmates see the note")
+  check(not A.ns.Data.CanWrite("charinfo", "Kurdran", { note = "hacked" }, "Muradin"), "nobody else can write your note")
+  check(not CK.SetNote(string.rep("x", 200)) or #CA.Note("Kurdran") <= 60, "notes are kept short")
+  CK.SetNote("Known as Grimbeard"); H.run(6)
+  check(pcall(A.ns.UI.ShowMember, "Kurdran"), "the member card shows it")
+  check(pcall(K.ns.ToggleMain, "profile") and pcall(K.ns.ToggleMain, "profile"), "the Standing tab draws with the note box")
+  -- account ranks: Kurdran (Vanguard) and Muradin (Veteran) are on one account
+  K.env.IronforgedDB.accountChars = { Kurdran = true, Muradin = true }
+  M.env.IronforgedDB.accountChars = { Kurdran = true, Muradin = true }
+  CK.Refresh(); CM.Refresh(); H.run(8)
+  local best, from = CA.BestRank("Kurdran")
+  check(best == "Veteran" and from == "Muradin", "an alt shows the account's highest rank")
+  check(CA.RankText("Kurdran"):find("Vanguard", 1, true) and CA.RankText("Kurdran"):find("(Veteran)", 1, true), "as \"Vanguard (Veteran)\"")
+  check(CA.BestRank("Muradin") == nil, "the higher-ranked character shows just its own rank")
+  -- a claim the other character doesn't back up shows nothing
+  E.env.IronforgedDB.accountChars = { Elda = true, Thorin = true }
+  E.ns.CharInfo.Refresh(); H.run(8)
+  check(CA.BestRank("Elda") == nil, "listing the Thane as your alt doesn't borrow their rank")
+  check(pcall(K.ns.ToggleMain, "roster"), "the roster draws with account ranks")
+  check(CA.Note("Kurdran") == "Known as Grimbeard", "note still there after the account update")
+end
+
 -- "X has arrived": only for a real login, never for a reload
 -- (members say hello to the relays, so an officer is the one who hears it)
 do

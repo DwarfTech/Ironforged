@@ -13,6 +13,17 @@ local function build(f, w, h)
   f.standing:SetPoint("TOPRIGHT", -6, -26)
   f.standing:SetJustifyV("TOP")
   f.standing:SetSpacing(3)
+  -- my note, shown when guildmates hover this character
+  f.noteLabel = UI.Label(f, "Your note (guildmates see it when they hover you):", "GameFontNormal")
+  f.noteBox = UI.EditBox(f, 330, ns.CharInfo.MAX_NOTE)
+  f.noteSave = UI.Button(f, "Save note", 90, 22, function()
+    if ns.CharInfo.SetNote(f.noteBox:GetText()) then
+      f.noteBox:ClearFocus()
+      ns.Print("Note saved. Guildmates see it when they hover " .. ns.Name(ns.PlayerName()) .. ".")
+    end
+  end)
+  f.noteBox:SetScript("OnEnterPressed", function() f.noteSave:Click() end)
+  f.noteHint = UI.Label(f, "Like the name you go by in the community. Up to 60 letters. Each character has its own.", "GameFontDisableSmall")
 end
 
 local function refresh(f)
@@ -23,7 +34,9 @@ local function refresh(f)
   local function add(label, value)
     if value and value ~= "" then lines[#lines + 1] = "|cffd4a017" .. label .. ":|r " .. value end
   end
-  add("Rank", info.rankName)
+  add("Rank", info.rankName and ns.CharInfo.RankText(me, info.rankName))
+  local best, bestChar = ns.CharInfo.BestRank(me)
+  if best then add("Account rank", best .. " |cff999999(from " .. ns.Name(bestChar) .. ")|r") end
   local clanId = Data.ClanOf(me)
   add("Clan", clanId and (Data.ClanName(clanId) .. (Data.IsClanLeader(me, clanId) and " (Clan Leader)" or ""))
     or "|cff999999not sworn to a clan|r")
@@ -40,6 +53,13 @@ local function refresh(f)
   if Data.Get("requests", me) then add("Promotion", "requested, awaiting a trial") end
   add("Race", ns.Gear.RaceStatus(me))
   f.standing:SetText(table.concat(lines, "\n"))
+  -- the note sits under the standing lines
+  local h = (f.standing.GetStringHeight and f.standing:GetStringHeight()) or (#lines * 16)
+  f.noteLabel:ClearAllPoints(); f.noteLabel:SetPoint("TOPLEFT", 4, -26 - h - 18)
+  f.noteBox:ClearAllPoints(); f.noteBox:SetPoint("TOPLEFT", f.noteLabel, "BOTTOMLEFT", 6, -6)
+  f.noteSave:ClearAllPoints(); f.noteSave:SetPoint("LEFT", f.noteBox, "RIGHT", 8, 0)
+  f.noteHint:ClearAllPoints(); f.noteHint:SetPoint("TOPLEFT", f.noteBox, "BOTTOMLEFT", -6, -6)
+  if not f.noteBox:HasFocus() then f.noteBox:SetText(ns.CharInfo.SuggestedNote()) end
 end
 
 UI.RegisterTab("profile", "Standing", build, refresh)

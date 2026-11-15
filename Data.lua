@@ -35,6 +35,8 @@ Data.COLLECTIONS = {
   "lfdjoin",      -- key = post key .. "#" .. member; who signed up for a post
   "challenges",   -- key = member .. "#" .. id; challenges a member took on, written by their own client
   "appeals",      -- key = challenge key; a member's appeal of a failed challenge, and the ruling on it
+  "charinfo",     -- key = member; their note ("known as") and the guild characters on their account,
+                  -- written by that character's own client
 }
 -- Collections that are NOT part of login digests or guild-wide broadcasts. Each member's own
 -- client writes them and pushes them (by whisper) to the online Longbeards, who hand them out
@@ -51,6 +53,7 @@ Data.ALWAYS_SYNC = {
   pvp = true,                                                             -- War Hall
   titles = true,                                                          -- Titles
   appeals = true,                                                         -- Challenge appeals
+  charinfo = true,                                                        -- notes and account ranks
 }
 
 -- Collections kept as they are in saved variables but no longer used: never synced, sent, accepted,
@@ -384,6 +387,15 @@ function Data.CanWrite(author, coll, key, data)
     return false
   elseif coll == "selfreport" then
     return author == key
+  elseif coll == "charinfo" then
+    if data == nil then return author == key or officer end
+    if author ~= key then return false end
+    if data.note ~= nil and (type(data.note) ~= "string" or #data.note > 80) then return false end
+    if data.account ~= nil then
+      if type(data.account) ~= "table" or #data.account > 50 then return false end
+      for _, n in ipairs(data.account) do if type(n) ~= "string" then return false end end
+    end
+    return true
   elseif coll == "racecheck" then
     return officer
   elseif coll == "progress" then
@@ -418,7 +430,7 @@ end
 -- Who a row is about (the member whose standing it describes), or nil when it is about no one.
 function Data.Subject(coll, key, data)
   if coll == "clanship" or coll == "requests" or coll == "pvp" or coll == "profiles" or coll == "selfreport"
-    or coll == "racecheck" or coll == "members" or coll == "progress" or coll == "taskmarks" then
+    or coll == "charinfo" or coll == "racecheck" or coll == "members" or coll == "progress" or coll == "taskmarks" then
     return key
   elseif coll == "titles" or coll == "crafts" or coll == "challenges" or coll == "appeals" or coll == "invitelog"
     or coll == "gambles" or coll == "lfd" then
