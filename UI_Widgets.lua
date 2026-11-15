@@ -251,9 +251,11 @@ function UI.List(parent, width, height, columns, onClick, rowHeight)
 
   -- The list stretches with its anchors: column widths are scaled from the widths given here
   -- and as many rows are shown as fit the height.
-  local baseInner = width - 28
+  -- scale from the columns' own total, so the columns always fill the list exactly
+  local baseInner = 0
   local colX, colW = {}, {}
-  for c, col in ipairs(columns) do colW[c] = col.width end
+  for c, col in ipairs(columns) do colW[c] = col.width; baseInner = baseInner + col.width end
+  if baseInner <= 0 then baseInner = width - 28 end
 
   local header = CreateFrame("Frame", nil, list)
   header:SetPoint("TOPLEFT", 6, -5)

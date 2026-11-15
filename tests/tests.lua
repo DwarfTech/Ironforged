@@ -2099,10 +2099,24 @@ do
   local cell
   for _, it in ipairs(rl and rl.items or {}) do if it.data == "Kurdran" then cell = it.cols[4] end end
   check(cell == "R7 Knight-Lt", "the Roster shows it in the PvP column")
+  local total = 0
+  for _, h in ipairs(rl.headers) do total = total + h:GetWidth() + 2 end
+  check(total <= rl:GetWidth() - 20, "the Roster's columns fit inside the window")
   check(A.ns.Blood.PvPRankName(7) == "R7 Knight-Lieutenant", "the member card spells it out")
   K.env.UnitPVPRank = function() return 14 end
   check(B.MyPvPRank() == 10, "the game's rank function is used when it has one")
   K.env.UnitPVPRank = nil
+  -- Forever: the rank is a renown track (faction 2800), as the game's PvP pane reads it
+  K.env.C_MajorFactions = { GetMajorFactionProgressionInfo = function(id) if id == 2800 then return { renownLevel = 5 } end end }
+  local r, from = B.MyPvPRank()
+  check(r == 5 and from == "pvp", "on Forever the rank comes from the PvP rank track")
+  K.env.C_MajorFactions.GetMajorFactionProgressionInfo = function(id) if id == 2800 then return { renownLevel = 0 } end end
+  check(B.MyPvPRank() == 0 and B.PvPRankName(0) == "Unranked", "no rank yet reads Unranked")
+  K.env.C_MajorFactions = nil
+  -- Forever's lifetime stats: (kills, highest rank)
+  K.env.GetPVPLifetimeStats = function() return 120, 9 end
+  check(B.MyPvPRank() == 5, "Forever's lifetime stats give the highest rank")
+  K.env.GetPVPLifetimeStats = nil
   K.titles = {}
   K.env.SlashCmdList.IRONFORGED("pvprank")
   check(K.chat[#K.chat]:find("couldn't read your PvP rank", 1, true) ~= nil, "/hold pvprank says when it can't read the rank")

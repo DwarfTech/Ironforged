@@ -104,22 +104,32 @@ for i, n in ipairs(HORDE_RANKS) do rankOfTitle[n:lower()] = rankOfTitle[n:lower(
 -- "R7 Knight-Lieutenant"
 function Blood.PvPRankName(rank)
   rank = tonumber(rank)
+  if rank == 0 then return "Unranked" end
   if not rank or not Blood.PVP_RANKS[rank] then return nil end
   return "R" .. rank .. " " .. Blood.PVP_RANKS[rank]
 end
 
 -- My PvP rank, and where it came from (for /hold pvprank). Tries the game's rank functions, then
 -- the PvP rank titles I've earned.
+Blood.PVP_RANK_FACTION = 2800 -- Forever's PvP rank: a renown track; its level is the rank (0 unranked)
+
 function Blood.MyPvPRank()
   local function num(v) return type(v) == "number" and not isSecret(v) and v or nil end
+  -- Forever: the same place the game's own PvP pane reads it
+  if C_MajorFactions and C_MajorFactions.GetMajorFactionProgressionInfo then
+    local ok, info = pcall(C_MajorFactions.GetMajorFactionProgressionInfo, Blood.PVP_RANK_FACTION)
+    local lvl = ok and type(info) == "table" and num(info.renownLevel)
+    if lvl and lvl >= 0 and lvl <= 14 then return lvl, "pvp" end
+  end
   if UnitPVPRank then
     local ok, id = pcall(UnitPVPRank, "player")
     id = ok and num(id)
     if id and id >= 5 and id <= 18 then return id - 4, "rank" end
   end
   if GetPVPLifetimeStats then
-    local ok, _, _, highest = pcall(GetPVPLifetimeStats)
-    highest = ok and num(highest)
+    -- Forever returns (kills, highest rank); Classic (kills, dishonorable kills, highest rank)
+    local res = { pcall(GetPVPLifetimeStats) }
+    local highest = res[1] and num(#res == 3 and res[3] or res[4])
     if highest and highest >= 5 and highest <= 18 then return highest - 4, "lifetime" end
   end
   local best
@@ -641,7 +651,8 @@ if C_Timer and C_Timer.NewTicker then
   end)
 end
 -- a new PvP rank (and a fresh login) gets shared
-for _, ev in ipairs({ "PLAYER_PVP_RANK_CHANGED", "PLAYER_TITLE_CHANGED", "KNOWN_TITLES_UPDATE", "HONOR_LEVEL_UPDATE" }) do
+for _, ev in ipairs({ "PLAYER_PVP_RANK_CHANGED", "PLAYER_TITLE_CHANGED", "KNOWN_TITLES_UPDATE", "HONOR_LEVEL_UPDATE",
+  "MAJOR_FACTION_RENOWN_LEVEL_CHANGED", "MAJOR_FACTION_UNLOCKED" }) do
   pcall(ns.RegisterEvent, ev, function() schedulePublish(5) end)
 end
 ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()

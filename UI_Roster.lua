@@ -266,6 +266,7 @@ local SHORT = { ["Master Sergeant"] = "Master Sgt", ["Sergeant Major"] = "Sgt Ma
   ["Lieutenant Commander"] = "Lt Commander", ["Field Marshal"] = "Field Marshal", ["Grand Marshal"] = "Grand Marshal" }
 local function pvpCell(name)
   local r = ns.Blood.PvPRankOf(name)
+  if r == 0 then return "|cff777777-|r" end
   if not r or not ns.Blood.PVP_RANKS[r] then return "" end
   local n = ns.Blood.PVP_RANKS[r]
   return (r >= 10 and "|cffffd040" or "") .. "R" .. r .. " " .. (SHORT[n] or n) .. (r >= 10 and "|r" or "")
@@ -315,7 +316,7 @@ local function refresh(f)
     return a.data < b.data
   end)
   f.list:SetItems(items, "No guildmates match.")
-  f.count:SetText(string.format("%d shown  |cff40ff40%d online|r", shown, online))
+  f.count:SetText(string.format("|cff40ff40%d|r/%d online", online, shown))
 end
 
 UI.RegisterTab("roster", "Roster", build, refresh)
