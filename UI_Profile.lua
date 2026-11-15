@@ -35,8 +35,6 @@ local function refresh(f)
     if value and value ~= "" then lines[#lines + 1] = "|cffd4a017" .. label .. ":|r " .. value end
   end
   add("Rank", info.rankName and ns.CharInfo.RankText(me, info.rankName))
-  local best, bestChar = ns.CharInfo.BestRank(me)
-  if best then add("Account rank", best .. " |cff999999(from " .. ns.Name(bestChar) .. ")|r") end
   local clanId = Data.ClanOf(me)
   add("Clan", clanId and (Data.ClanName(clanId) .. (Data.IsClanLeader(me, clanId) and " (Clan Leader)" or ""))
     or "|cff999999not sworn to a clan|r")

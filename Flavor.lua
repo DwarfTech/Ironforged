@@ -133,7 +133,7 @@ local function addTooltipLines(tooltip)
   end
   local best = ns.CharInfo and ns.CharInfo.BestRank(full)
   if best then
-    tooltip:AddLine((ns.roster[full].rankName or "") .. " (" .. best .. " on another character)", 0.6, 0.6, 0.6)
+    tooltip:AddLine((ns.roster[full].rankName or "") .. " (" .. best .. ")", 0.6, 0.6, 0.6)
     added = true
   end
   if #parts > 0 then
