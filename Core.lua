@@ -511,6 +511,14 @@ SlashCmdList.IRONFORGED = function(msg)
     if ns.Challenges and ns.Challenges.Diagnose then ns.Challenges.Diagnose() end
   elseif cmd == "aid" then
     if ns.LFD then ns.LFD.CallForAid() end
+  elseif cmd == "pvprank" then
+    local r, from = ns.Blood.MyPvPRank()
+    if r then
+      ns.Print("Your PvP rank: " .. ns.Blood.PvPRankName(r) .. " (read from " .. from .. "). Guildmates see it in the Roster.")
+    else
+      ns.Print("The addon couldn't read your PvP rank from the game. Send a screenshot of this to the guild master.")
+    end
+    ns.Blood.Publish()
   elseif cmd == "kills" then
     -- what the addon knew about your last few honorable kills (for checking elf detection)
     local list = ns.db and ns.db.lastKills or {}
@@ -549,6 +557,7 @@ SlashCmdList.IRONFORGED = function(msg)
     ns.Print("/hold aid  - call the guild to your side (shows in the Looking for Dwarf tab)")
     ns.Print("/hold check  - what the addon sees for your challenges (for testing)")
     ns.Print("/hold kills  - your last honorable kills and the race the addon saw for each")
+    ns.Print("/hold pvprank  - your PvP rank as the guild sees it")
   end
 end
 

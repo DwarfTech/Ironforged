@@ -88,15 +88,75 @@ local function lifetimeHKs()
   return nil
 end
 
+----------------------------------------------------------------------
+-- PvP rank (1 to 14), read by each member's own client and shared with their War Hall numbers
+----------------------------------------------------------------------
+Blood.PVP_RANKS = { "Private", "Corporal", "Sergeant", "Master Sergeant", "Sergeant Major", "Knight",
+  "Knight-Lieutenant", "Knight-Captain", "Knight-Champion", "Lieutenant Commander", "Commander", "Marshal",
+  "Field Marshal", "Grand Marshal" }
+-- the Horde names too, so a title is recognised whichever side's name the game gives
+local HORDE_RANKS = { "Scout", "Grunt", "Sergeant", "Senior Sergeant", "First Sergeant", "Stone Guard",
+  "Blood Guard", "Legionnaire", "Centurion", "Champion", "Lieutenant General", "General", "Warlord", "High Warlord" }
+local rankOfTitle = {}
+for i, n in ipairs(Blood.PVP_RANKS) do rankOfTitle[n:lower()] = i end
+for i, n in ipairs(HORDE_RANKS) do rankOfTitle[n:lower()] = rankOfTitle[n:lower()] or i end
+
+-- "R7 Knight-Lieutenant"
+function Blood.PvPRankName(rank)
+  rank = tonumber(rank)
+  if not rank or not Blood.PVP_RANKS[rank] then return nil end
+  return "R" .. rank .. " " .. Blood.PVP_RANKS[rank]
+end
+
+-- My PvP rank, and where it came from (for /hold pvprank). Tries the game's rank functions, then
+-- the PvP rank titles I've earned.
+function Blood.MyPvPRank()
+  local function num(v) return type(v) == "number" and not isSecret(v) and v or nil end
+  if UnitPVPRank then
+    local ok, id = pcall(UnitPVPRank, "player")
+    id = ok and num(id)
+    if id and id >= 5 and id <= 18 then return id - 4, "rank" end
+  end
+  if GetPVPLifetimeStats then
+    local ok, _, _, highest = pcall(GetPVPLifetimeStats)
+    highest = ok and num(highest)
+    if highest and highest >= 5 and highest <= 18 then return highest - 4, "lifetime" end
+  end
+  local best
+  if GetNumTitles and GetTitleName and IsTitleKnown then
+    local okN, n = pcall(GetNumTitles)
+    for id = 1, (okN and num(n) or 0) do
+      local okK, known = pcall(IsTitleKnown, id)
+      if okK and known then
+        local okT, t = pcall(GetTitleName, id)
+        if okT and type(t) == "string" and not isSecret(t) then
+          local r = rankOfTitle[ns.Trim((t:gsub("%%s", ""))):lower()]
+          if r and (not best or r > best) then best = r end
+        end
+      end
+    end
+  end
+  if best then return best, "titles" end
+  return nil, "none"
+end
+
 function Blood.Publish()
   if not Data.Ready() then return end
   local me = ns.PlayerName()
   local p = personal()
   local hk = lifetimeHKs() or p.hk or 0
   p.hk = hk
+  local rank = Blood.MyPvPRank()
   local old = Data.Get("pvp", me)
-  if old and old.hk == hk and old.elves == p.elves and old.avenged == p.avenged and old.world == (p.world or 0) then return end
-  Data.Put("pvp", me, { hk = hk, elves = p.elves or 0, avenged = p.avenged or 0, world = p.world or 0, ts = ns.Now() }, true)
+  if old and old.hk == hk and old.elves == p.elves and old.avenged == p.avenged and old.world == (p.world or 0)
+    and old.rank == rank then return end
+  Data.Put("pvp", me, { hk = hk, elves = p.elves or 0, avenged = p.avenged or 0, world = p.world or 0, rank = rank,
+    ts = ns.Now() }, true)
+end
+
+function Blood.PvPRankOf(name)
+  local t = Data.Get("pvp", name)
+  return t and tonumber(t.rank) or nil
 end
 
 local publishPending = false
@@ -500,6 +560,10 @@ if C_Timer and C_Timer.NewTicker then
   C_Timer.NewTicker(20, function()
     if inBattleground() and RequestBattlefieldScoreData then pcall(RequestBattlefieldScoreData) end
   end)
+end
+-- a new PvP rank (and a fresh login) gets shared
+for _, ev in ipairs({ "PLAYER_PVP_RANK_CHANGED", "PLAYER_TITLE_CHANGED", "KNOWN_TITLES_UPDATE", "HONOR_LEVEL_UPDATE" }) do
+  pcall(ns.RegisterEvent, ev, function() schedulePublish(5) end)
 end
 ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
   if C_Timer then C_Timer.After(5, function()

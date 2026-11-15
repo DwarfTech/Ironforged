@@ -224,6 +224,11 @@ local function makeClient(shortName, race, fullName)
       if channel == "RAID" and client.inRaid then H.raidBus = H.raidBus or {}; table.insert(H.raidBus, { from = client.full, text = text }) end
     end,
   }
+  -- titles the character has earned (PvP rank titles come from these)
+  client.titles = {}
+  env.GetNumTitles = function() return 40 end
+  env.IsTitleKnown = function(id) return client.titles[id] ~= nil end
+  env.GetTitleName = function(id) return client.titles[id] end
   -- joined chat channels: id, name, disabled triples
   client.channels = { 1, "General", false, 2, "Trade", false }
   env.GetChannelList = function() return unpack(client.channels) end

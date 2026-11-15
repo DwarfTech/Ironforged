@@ -2085,6 +2085,30 @@ do
   K.target = nil
 end
 
+-- PvP ranks in the Roster
+do
+  local B = K.ns.Blood
+  check(B.MyPvPRank() == nil, "no PvP rank before any rank title is earned")
+  K.titles[3] = "Private %s"; K.titles[19] = "Knight-Lieutenant %s"; K.titles[5] = "Corporal "
+  check(B.MyPvPRank() == 7, "the PvP rank comes from the highest rank title earned")
+  B.Publish(); H.run(6)
+  check(A.ns.Blood.PvPRankOf("Kurdran") == 7, "guildmates get the PvP rank")
+  A.ns.ToggleMain("roster")
+  local rl
+  for _, f in ipairs(A.frames) do if f.list and f.scan then rl = f.list end end
+  local cell
+  for _, it in ipairs(rl and rl.items or {}) do if it.data == "Kurdran" then cell = it.cols[4] end end
+  check(cell == "R7 Knight-Lt", "the Roster shows it in the PvP column")
+  check(A.ns.Blood.PvPRankName(7) == "R7 Knight-Lieutenant", "the member card spells it out")
+  K.env.UnitPVPRank = function() return 14 end
+  check(B.MyPvPRank() == 10, "the game's rank function is used when it has one")
+  K.env.UnitPVPRank = nil
+  K.titles = {}
+  K.env.SlashCmdList.IRONFORGED("pvprank")
+  check(K.chat[#K.chat]:find("couldn't read your PvP rank", 1, true) ~= nil, "/hold pvprank says when it can't read the rank")
+  B.Publish(); H.run(6)
+end
+
 -- Character notes and account ranks
 do
   local CK, CM, CA = K.ns.CharInfo, M.ns.CharInfo, A.ns.CharInfo

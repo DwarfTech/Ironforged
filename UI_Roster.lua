@@ -87,6 +87,7 @@ function UI.ShowMember(name, opts)
 
   add("Rank", info.rankName and ns.CharInfo.RankText(name, info.rankName))
   add("Note", ns.CharInfo.Note(name) and ("\"" .. ns.CharInfo.Note(name) .. "\""))
+  add("PvP rank", ns.Blood.PvPRankName(ns.Blood.PvPRankOf(name)))
   add("Level", info.level and (info.level .. " " .. (info.className or "")) or nil)
   add("Race", ns.Gear.RaceStatus(name) .. (report and report.race and (" |cff999999(" .. report.race .. ")|r") or ""))
   local inviters = ns.Gear.InvitersOf(name)
@@ -212,8 +213,9 @@ local function build(f, w, h)
   f.count:SetPoint("RIGHT", f.recruit, "LEFT", -8, 0)
 
   f.list = UI.List(f, w, h - 30, {
-    { title = "Name", width = 150 }, { title = "Rank", width = 78 }, { title = "Lvl", width = 26 },
-    { title = "Clan", width = 84 }, { title = "Title", width = 76 }, { title = "Challenge", width = 88 },
+    { title = "Name", width = 136 }, { title = "Rank", width = 78 }, { title = "Lvl", width = 26 },
+    { title = "PvP", width = 84 },
+    { title = "Clan", width = 84 }, { title = "Title", width = 70 }, { title = "Challenge", width = 88 },
     { title = "Race", width = 44 }, { title = "Seen", width = 62 },
   }, function(name, row, button)
     if button == "RightButton" then rowMenu(row, name) else UI.ShowMember(name) end
@@ -258,6 +260,17 @@ local function challengeCell(name)
   return text
 end
 
+-- "R7 Knight-Lieutenant" (shortened to fit); blank until the member's addon has shared it
+local SHORT = { ["Master Sergeant"] = "Master Sgt", ["Sergeant Major"] = "Sgt Major",
+  ["Knight-Lieutenant"] = "Knight-Lt", ["Knight-Captain"] = "Knight-Capt", ["Knight-Champion"] = "Knight-Champ",
+  ["Lieutenant Commander"] = "Lt Commander", ["Field Marshal"] = "Field Marshal", ["Grand Marshal"] = "Grand Marshal" }
+local function pvpCell(name)
+  local r = ns.Blood.PvPRankOf(name)
+  if not r or not ns.Blood.PVP_RANKS[r] then return "" end
+  local n = ns.Blood.PVP_RANKS[r]
+  return (r >= 10 and "|cffffd040" or "") .. "R" .. r .. " " .. (SHORT[n] or n) .. (r >= 10 and "|r" or "")
+end
+
 local function refresh(f)
   local recruiter = ns.Recruit.CanSend()
   f.recruit:SetShown(recruiter)
@@ -288,8 +301,9 @@ local function refresh(f)
       items[#items + 1] = {
         data = name,
         sortRank = info.rankIndex or 99,
-        keys = { [1] = ns.NameKey(name), [2] = info.rankIndex or 99, [8] = ns.SeenKey(info) },
-        cols = { display, ns.CharInfo.RankText(name, info.rankName or ""), info.level or "", clan, titles[1] and (titles[1].title .. (#titles > 1 and (" |cff999999+" .. (#titles - 1) .. "|r") or "")) or "",
+        keys = { [1] = ns.NameKey(name), [2] = info.rankIndex or 99, [4] = -(ns.Blood.PvPRankOf(name) or 0), [9] = ns.SeenKey(info) },
+        cols = { display, ns.CharInfo.RankText(name, info.rankName or ""), info.level or "",
+          pvpCell(name), clan, titles[1] and (titles[1].title .. (#titles > 1 and (" |cff999999+" .. (#titles - 1) .. "|r") or "")) or "",
           challengeCell(name),
           ns.Gear.RaceStatus(name), ns.LastSeenText(info) },
       }
