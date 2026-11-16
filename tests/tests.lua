@@ -2099,6 +2099,40 @@ do
   K.target = nil
 end
 
+-- Regions: Aussie dwarves find each other
+do
+  local CK = K.ns.CharInfo
+  check(CK.MyRegion() == nil, "no region until you pick one")
+  check(CK.SetRegion("oce") and M.ns.CharInfo.SetRegion("oce") and D.ns.CharInfo.SetRegion("eu"), "members pick their region")
+  check(not CK.SetRegion("mars"), "only the listed regions")
+  H.run(8)
+  check(A.ns.CharInfo.RegionName("Kurdran") == "Australia / NZ", "guildmates see the region")
+  local oce = A.ns.CharInfo.InRegion("oce")
+  check(#oce == 2, "the Australia / NZ group has its two dwarves")
+  -- the Roster finds them by region words
+  A.ns.ToggleMain("roster")
+  local rf
+  for _, f in ipairs(A.frames) do if f.list and f.scan then rf = f end end
+  rf.search:SetText("aussie"); rf.search.__scripts.OnTextChanged(rf.search); H.run(2)
+  local names = {}
+  for _, it in ipairs(rf.list.items or {}) do names[#names + 1] = it.data end
+  table.sort(names)
+  check(table.concat(names, ",") == "Kurdran,Muradin", "searching \"aussie\" in the Roster shows that group")
+  rf.search:SetText(""); rf.search.__scripts.OnTextChanged(rf.search); H.run(2)
+  -- the Standing tab shows the group and opens it in the Roster
+  K.ns.ToggleMain("profile")
+  local pf
+  for _, f in ipairs(K.frames) do if f.regionInfo then pf = f end end
+  check(pf and pf.regionButton.__text == "Australia / NZ" and pf.regionInfo.__text:find("2 in the guild", 1, true),
+    "Standing shows your region and how many share it")
+  check(pf.regionInfo.__text:find("Muradin", 1, true) ~= nil, "and who from it is online")
+  check(pcall(K.ns.UI.ShowRegionInRoster, "oce"), "the Show them in the Roster button works")
+  K.ns.ToggleMain()
+  -- one choice covers every character on the account
+  check(K.ns.db.region == "oce", "the region is kept for the whole account")
+  check(CK.SetRegion(nil) and (H.run(6) or true) and A.ns.CharInfo.Region("Kurdran") == nil, "and can be cleared")
+end
+
 -- PvP ranks in the Roster
 do
   local B = K.ns.Blood

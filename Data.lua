@@ -399,6 +399,7 @@ function Data.CanWrite(author, coll, key, data)
     if data == nil then return author == key or officer end
     if author ~= key then return false end
     if data.note ~= nil and (type(data.note) ~= "string" or #data.note > 80) then return false end
+    if data.region ~= nil and (type(data.region) ~= "string" or #data.region > 8) then return false end
     if data.account ~= nil then
       if type(data.account) ~= "table" or #data.account > 50 then return false end
       for _, n in ipairs(data.account) do if type(n) ~= "string" then return false end end

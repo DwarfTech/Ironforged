@@ -131,6 +131,11 @@ local function addTooltipLines(tooltip)
     tooltip:AddLine("\"" .. note .. "\"", 1, 1, 1, true)
     added = true
   end
+  local region = ns.CharInfo and ns.CharInfo.RegionName(full)
+  if region then
+    tooltip:AddLine("Plays from " .. region, 0.6, 0.6, 0.6)
+    added = true
+  end
   local best = ns.CharInfo and ns.CharInfo.BestRank(full)
   if best then
     tooltip:AddLine((ns.roster[full].rankName or "") .. " (" .. best .. ")", 0.6, 0.6, 0.6)

@@ -12,6 +12,18 @@ local Data = ns.Data
 local CI = {}
 ns.CharInfo = CI
 
+-- Regions: players pick theirs in the Standing tab, so dwarves in the same part of the world
+-- (and the same hours) find each other. One choice covers every character on the account.
+CI.REGIONS = {
+  { key = "am", name = "Americas", search = { "americas", "america", "us", "usa", "na", "canada" } },
+  { key = "eu", name = "Europe", search = { "europe", "eu", "uk" } },
+  { key = "oce", name = "Australia / NZ", search = { "australia", "aussie", "aus", "nz", "new zealand", "oce", "oceania" } },
+  { key = "asia", name = "Asia", search = { "asia" } },
+}
+local regionByKey = {}
+for _, r in ipairs(CI.REGIONS) do regionByKey[r.key] = r end
+function CI.RegionInfo(key) return key and regionByKey[key] or nil end
+
 CI.MAX_NOTE = 60
 
 -- The guild characters on this account, as the saved variables know them.
@@ -48,8 +60,68 @@ function CI.Publish(note)
   if note == nil then note = old.note end
   if note == "" then note = nil end
   local account = sortedAccount()
-  if old.note == note and sameList(old.account, account) then return true end
-  return Data.Put("charinfo", me, { note = note, account = account })
+  local region = regionByKey[ns.db.region or ""] and ns.db.region or nil
+  if old.note == note and sameList(old.account, account) and old.region == region then return true end
+  return Data.Put("charinfo", me, { note = note, account = account, region = region })
+end
+
+-- A member's region key ("oce"), if they've picked one.
+function CI.Region(name)
+  local r = CI.Get(name)
+  return r and regionByKey[r.region or ""] and r.region or nil
+end
+function CI.RegionName(name)
+  local r = regionByKey[CI.Region(name) or ""]
+  return r and r.name or nil
+end
+
+function CI.MyRegion() return regionByKey[ns.db.region or ""] and ns.db.region or nil end
+
+-- Pick my region (nil to clear); every character on the account takes it.
+function CI.SetRegion(key)
+  if key ~= nil and not regionByKey[key] then return false end
+  ns.db.region = key
+  return CI.Publish()
+end
+
+-- A guess from the computer's clock, offered when nothing is picked yet.
+function CI.GuessRegion()
+  local ok, offset = pcall(function()
+    local now = time()
+    local utc = date("!*t", now)
+    utc.isdst = false
+    return (now - time(utc)) / 3600
+  end)
+  if not ok or type(offset) ~= "number" then return nil end
+  if offset >= 8 and offset <= 14 then return "oce" end
+  if offset >= -10 and offset <= -3 then return "am" end
+  if offset >= -1 and offset <= 4 then return "eu" end
+  if offset > 4 and offset < 8 then return "asia" end
+  return nil
+end
+
+-- Guildmates in a region: { names }, online ones first.
+function CI.InRegion(key, onlineOnly)
+  local out = {}
+  if not regionByKey[key or ""] then return out end
+  for name, m in pairs(ns.roster) do
+    if CI.Region(name) == key and (m.online or not onlineOnly) then out[#out + 1] = name end
+  end
+  table.sort(out, function(a, b)
+    local ao, bo = ns.roster[a].online and 1 or 0, ns.roster[b].online and 1 or 0
+    if ao ~= bo then return ao > bo end
+    return a < b
+  end)
+  return out
+end
+
+-- Words that find a region in the Roster search ("aussie", "nz", "europe").
+function CI.RegionMatches(name, query)
+  local r = regionByKey[CI.Region(name) or ""]
+  if not r or not query or query == "" then return false end
+  if r.name:lower():find(query, 1, true) then return true end
+  for _, w in ipairs(r.search) do if w == query or (#query >= 3 and w:find(query, 1, true) == 1) then return true end end
+  return false
 end
 
 function CI.SetNote(text)

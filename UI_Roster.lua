@@ -87,6 +87,7 @@ function UI.ShowMember(name, opts)
 
   add("Rank", info.rankName and ns.CharInfo.RankText(name, info.rankName))
   add("Note", ns.CharInfo.Note(name) and ("\"" .. ns.CharInfo.Note(name) .. "\""))
+  add("Region", ns.CharInfo.RegionName(name))
   add("PvP rank", ns.Blood.PvPRankName(ns.Blood.PvPRankOf(name)))
   add("Level", info.level and (info.level .. " " .. (info.className or "")) or nil)
   add("Race", ns.Gear.RaceStatus(name) .. (report and report.race and (" |cff999999(" .. report.race .. ")|r") or ""))
@@ -178,9 +179,22 @@ local function rowMenu(row, name)
   end
 end
 
+local searchBox
+-- Open the Roster on one region's guildmates (from the Standing tab).
+function UI.ShowRegionInRoster(key)
+  local r = ns.CharInfo.RegionInfo(key)
+  if not r then return end
+  ns.ToggleMain("roster")
+  if searchBox then searchBox:SetText(r.search[1]) end
+  state.search = r.search[1]
+  UI.ScheduleRefresh()
+end
+
 local function build(f, w, h)
   local search = UI.EditBox(f, 170, 40)
   search:SetPoint("TOPLEFT", 6, -2)
+  f.search = search
+  searchBox = search
   local hint = UI.Label(search, "Search names, clans, titles", "GameFontDisableSmall")
   hint:SetPoint("LEFT", 4, 0)
   search:SetScript("OnTextChanged", function(self)
@@ -291,7 +305,7 @@ local function refresh(f)
     for _, ch in ipairs(ns.Challenges.Showing(name)) do chs[#chs + 1] = ch.data.name end
     local hay = (name .. " " .. clan .. " " .. ns.Titles.Text(name, " ") .. " " .. table.concat(chs, " ")):lower()
     if (not filterOn("rosterOnlineOnly") or info.online) and (not filterOn("rosterProblemsOnly") or problem)
-      and (state.search == "" or hay:find(state.search, 1, true)) then
+      and (state.search == "" or hay:find(state.search, 1, true) or ns.CharInfo.RegionMatches(name, state.search)) then
       local display = ns.ColorName(name)
       if m.main then display = display .. " |cff888888(alt)|r" end
       if shamed then display = display .. " |cffff4040(shamed)|r" end
