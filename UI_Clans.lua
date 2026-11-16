@@ -9,7 +9,9 @@ local Data = ns.Data
 local showClan
 
 local function canFound(me)
-  return me ~= nil and ns.roster[me] ~= nil -- any guildmate may found a clan
+  -- Veterans and above found clans (officers always can)
+  return me ~= nil and ns.roster[me] ~= nil
+    and (ns.IsOfficer(me) or ns.RankAtLeast(me, ns.RankSetting("founderRank")))
 end
 
 local function editClan(id)
@@ -202,7 +204,7 @@ local function refresh(f)
     elseif canFound(me) then
       f.help:SetText("Click a clan to join it, or found your own.")
     else
-      f.help:SetText("Click a clan and press Join clan.")
+      f.help:SetText("Click a clan and press Join clan. Veterans and above can found their own.")
     end
   end
 

@@ -315,7 +315,11 @@ function Data.CanWrite(author, coll, key, data)
     local old = Data.Get("clans", key)
     if old and old.founder and founder ~= old.founder then return false end -- the founder never changes
     -- any guildmate may found a clan, and leads it to begin with
-    if old == nil then return leader == founder and (founder == author or officer) and (officer or ns.roster[author] ~= nil) end
+    -- a new clan: founded by a Veteran or above (or set up by an officer)
+    if old == nil then
+      return leader == founder and (founder == author or officer)
+        and (officer or (ns.roster[author] ~= nil and ns.RankAtLeast(author, ns.RankSetting("founderRank"))))
+    end
     if officer then return true end
     if ns.roster[author] == nil then return false end
     -- after that, only the current leader edits it or hands it on to another guildmate

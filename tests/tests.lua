@@ -161,9 +161,23 @@ H.run(5) -- Kurdran has to know the clan before he can be refused
 check(not KD.Put("clans", clanId, { name = "Bronzebeard", founder = "Kurdran", leader = "Kurdran" }, true), "nobody takes over an existing clan name")
 check(not MD.Put("clans", "wrongkey", { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }, true), "a clan's key is its name")
 check(not AD.Put("clans", "x", { name = "X", founder = "Muradin", leader = "Thorin" }, true), "even officers found a clan with its founder leading")
-check(KD.Put("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, true), "any guildmate can found a clan")
+check(not KD.Put("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, true), "a Vanguard can't found a clan")
+check(not AD.CanWrite("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, "Kurdran"),
+  "and guildmates refuse a clan a Vanguard founded")
+check(AD.Put("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, true), "an officer can still set one up for anyone")
 AD.Delete("clans", "y") -- tidy up: only a Longbeard or the guild master removes clans
 H.run(3)
+do -- the button follows the rule
+  K.ns.ToggleMain("clans")
+  local nb
+  for _, f in ipairs(K.frames) do if f.newButton then nb = f.newButton end end
+  check(nb and not nb:IsShown(), "no Found a clan button below Veteran")
+  M.ns.ToggleMain("clans")
+  local mb
+  for _, f in ipairs(M.frames) do if f.newButton then mb = f.newButton end end
+  check(mb and mb:IsShown(), "Veterans see the Found a clan button")
+  K.ns.ToggleMain(); M.ns.ToggleMain()
+end
 H.run(5)
 check(KD.Clan(clanId) ~= nil, "clan active everywhere")
 check(MD.Put("invites", clanId .. "#Kurdran", { by = "Muradin" }), "leader invites")

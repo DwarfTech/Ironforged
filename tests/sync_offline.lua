@@ -13,7 +13,9 @@ end
 
 local M = H.makeClient("Muradin")   -- Veteran
 local D = H.makeClient("Dagna")     -- Noble
-local K = H.makeClient("Kurdran")   -- Vanguard
+-- Kurdran founds a clan here, and founding takes Veteran
+for _, r in ipairs(H.ROSTER) do if r[1] == "Kurdran-Forever" then r[2], r[3] = "Veteran", 7 end end
+local K = H.makeClient("Kurdran")   -- Veteran in this test
 for _, c in ipairs({ M, D, K }) do H.boot(c) end
 H.run(60)
 

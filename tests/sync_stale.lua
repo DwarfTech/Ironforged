@@ -11,6 +11,8 @@ end
 for _, r in ipairs(H.ROSTER) do
   if r[2] == "Thane" or r[2] == "Longbeard" then H.offline[r[1]] = true end
 end
+-- Kurdran founds a clan here, and founding takes Veteran
+for _, r in ipairs(H.ROSTER) do if r[1] == "Kurdran-Forever" then r[2], r[3] = "Veteran", 7 end end
 local K = H.makeClient("Kurdran")   -- founds the clan
 local X = H.makeClient("Gimli")     -- online when it's founded
 local M = H.makeClient("Muradin")   -- away
