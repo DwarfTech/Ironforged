@@ -557,15 +557,24 @@ end)
 ----------------------------------------------------------------------
 local function xpNow() return level(), (UnitXP and UnitXP("player")) or 0 end
 
--- Level and XP at the moment of logging in, before anything this session could change them.
+-- Level and XP at the moment of logging in, before anything this session could change them,
+-- and where the addon last saw this character (the previous session's final snapshot).
+-- The snapshot is then kept up to date for the whole session, whether or not the guild has
+-- synced yet: an addon that was running never leaves a gap behind.
 local loginLv, loginXp
+local prevSnap, captured = nil, false
 local audited = false
 ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
   if not loginLv and level() > 0 then loginLv, loginXp = xpNow() end
+  if not captured and ns.db and ns.PlayerName() then
+    local s = ns.db.xpSnap and ns.db.xpSnap[ns.PlayerName()]
+    prevSnap = s and { lv = s.lv, xp = s.xp, t = s.t } or nil
+    captured = true
+  end
 end)
 
 function C.SaveSnapshot()
-  if not audited then return end -- keep last session's snapshot until it has been checked
+  if not captured then return end -- keep last session's snapshot until it has been read
   local me = ns.PlayerName()
   if not me or not ns.db then return end
   ns.db.xpSnap = ns.db.xpSnap or {}
@@ -594,7 +603,15 @@ function C.Audit(force)
   audited = true
   local lv, xp = loginLv, loginXp
   if force or not lv then lv, xp = xpNow() end
-  local snap = ns.db and ns.db.xpSnap and ns.db.xpSnap[me]
+  local snap = prevSnap
+  if force or not captured then snap = ns.db and ns.db.xpSnap and ns.db.xpSnap[me] end
+  -- notes left by the old check (it often missed play with the addon on) are cleared once
+  if ns.db and not ns.db.auditCleared then
+    for k, d in Data.Each("challenges") do
+      if Data.SplitKey(k) == me and ((tonumber(d.flags) or 0) > 0 or d.audit) then update(k, { flags = 0, audit = "" }) end
+    end
+    ns.db.auditCleared = true
+  end
   for k, d in Data.Each("challenges") do
     if Data.SplitKey(k) == me and d.status == "active" then
       -- compare with whichever the addon saw last: this computer's snapshot or the synced record
@@ -604,7 +621,8 @@ function C.Audit(force)
       else
         refLv, refXp, exact = tonumber(d.lvl), tonumber(d.xp), false -- another computer: go by level
       end
-      if refLv and (lv > refLv or (exact and lv == refLv and xp > (refXp or 0))) then
+      -- whole levels only: a few points of experience can go missing in a crash
+      if refLv and lv > refLv then
         -- a quiet note on the challenge itself; nothing is announced
         local note = "Played without Ironforged: level " .. refLv .. " to " .. lv .. " (" .. ns.FormatDate(ns.Now()) .. ")."
         local notes = (type(d.audit) == "string" and d.audit ~= "") and (d.audit .. "\n" .. note) or note

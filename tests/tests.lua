@@ -955,10 +955,14 @@ local ak = CK.Start(nil, "Audit Me", "Play fair.")
 H.run(2)
 CK.SaveSnapshot()
 local chatBefore = #A.chat
-K.xp = 900 -- played with the addon off: no events seen
+K.xp = 900 -- a little experience the addon didn't see (a crash, say): no note
+CK.Audit(true); H.run(2)
+check((tonumber(D.ns.Data.Get("challenges", ak).flags) or 0) == 0, "experience within the same level leaves no note")
+CK.SaveSnapshot()
+K.level = 21 -- a level gained with the addon off
 CK.Audit(true); H.run(2)
 local ad = D.ns.Data.Get("challenges", ak)
-check(ad.flags == 1 and ad.audit:find("level 20 to 20", 1, true), "XP gained with the addon off leaves a note")
+check(ad.flags == 1 and ad.audit:find("level 20 to 21", 1, true), "a level gained with the addon off leaves a note")
 local announced = false
 for i = chatBefore + 1, #A.chat do if A.chat[i]:find("Audit Me", 1, true) or A.chat[i]:find("without Ironforged", 1, true) then announced = true end end
 check(not announced, "nothing is announced")
@@ -971,12 +975,30 @@ K.xp = 1500
 CK.Audit(true); H.run(2)
 check(D.ns.Data.Get("challenges", ak).flags == 1, "same level on another computer: no note")
 K.ns.db.xpSnap = nil
-K.level = 22
+K.level = 23
 CK.Audit(true); H.run(2)
 local ad2 = D.ns.Data.Get("challenges", ak)
-check(ad2.flags == 2 and ad2.audit:find("level 20 to 22", 1, true), "levels gained with the addon off: noted")
+check(ad2.flags == 2 and ad2.audit:find("level 21 to 23", 1, true), "levels gained with the addon off: noted")
 CK.Abandon(ak); H.run(1)
 K.level, K.xp = 1, 0
+-- leveling before the guild has synced still counts as playing with the addon on
+do
+  K.level, K.xp = 10, 0
+  local bk = CK.Start(nil, "Fresh Dwarf", "Play fair.")
+  H.run(2)
+  CK.SaveSnapshot()
+  -- the guild isn't ready yet, but experience keeps being saved
+  local realReady = K.ns.Data.Ready
+  K.ns.Data.Ready = function() return false end
+  K.level = 14
+  H.fire(K, "PLAYER_XP_UPDATE", "player")
+  K.ns.Data.Ready = realReady
+  check(K.ns.db.xpSnap[K.ns.PlayerName()].lv == 14, "experience is saved before the guild has synced")
+  CK.Audit(true); H.run(2)
+  check((tonumber(D.ns.Data.Get("challenges", bk).flags) or 0) == 0, "and the next check finds no gap")
+  CK.Abandon(bk); H.run(1)
+  K.level, K.xp = 1, 0
+end
 
 -- old records that said "Start at level 1" get today's wording
 local oldKey = "Kurdran#old1"
