@@ -982,6 +982,7 @@ K.level, K.xp = 1, 0
 -- leveling before the guild has synced still counts as playing with the addon on
 do
   K.level, K.xp = 10, 0
+  K.ns.db.xpSnap[K.ns.PlayerName()] = nil -- a fresh character
   local bk = CK.Start(nil, "Fresh Dwarf", "Play fair.")
   H.run(2)
   CK.SaveSnapshot()
@@ -995,6 +996,33 @@ do
   CK.Audit(true); H.run(2)
   check((tonumber(D.ns.Data.Get("challenges", bk).flags) or 0) == 0, "and the next check finds no gap")
   CK.Abandon(bk); H.run(1)
+  K.level, K.xp = 1, 0
+end
+
+-- the snapshot never goes backwards: logging out (or the moment of a level-up) can report
+-- an old level with no experience, and that mustn't read as play with the addon off next time
+do
+  K.level, K.xp = 32, 5000
+  K.ns.db.xpSnap[K.ns.PlayerName()] = nil
+  local sk = CK.Start(nil, "Snapshot Check", "Play fair.")
+  H.run(2)
+  CK.SaveSnapshot()
+  K.level, K.xp = 33, 100
+  H.fire(K, "PLAYER_LEVEL_UP", 33); H.fire(K, "PLAYER_XP_UPDATE", "player"); H.run(1)
+  -- logging out: the game reports level 32 with no experience
+  K.level, K.xp = 32, 0
+  H.fire(K, "PLAYER_LOGOUT"); H.fire(K, "PLAYER_XP_UPDATE", "player"); H.run(1)
+  check(K.ns.db.xpSnap[K.ns.PlayerName()].lv == 33, "a bad reading while logging out doesn't lower the snapshot")
+  -- next login, at 33: no note
+  K.level, K.xp = 33, 100
+  CK.Audit(true); H.run(2)
+  check((tonumber(D.ns.Data.Get("challenges", sk).flags) or 0) == 0, "and the next login finds no gap")
+  -- the moment of a level-up: experience resets before the level does
+  K.level, K.xp = 33, 0
+  H.fire(K, "PLAYER_XP_UPDATE", "player")
+  H.fire(K, "PLAYER_LEVEL_UP", 34); H.run(1)
+  check(K.ns.db.xpSnap[K.ns.PlayerName()].lv == 34, "a level-up is saved at the new level straight away")
+  CK.Abandon(sk); H.run(1)
   K.level, K.xp = 1, 0
 end
 

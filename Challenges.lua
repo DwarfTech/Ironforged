@@ -573,12 +573,20 @@ ns.RegisterEvent("PLAYER_ENTERING_WORLD", function()
   end
 end)
 
-function C.SaveSnapshot()
+-- Save where the addon last saw me. It only ever moves forward: the game can report an old level
+-- with no experience while logging out, and for a moment when you level up, and those readings
+-- must never stand in for where you really were.
+function C.SaveSnapshot(newLevel)
   if not captured then return end -- keep last session's snapshot until it has been read
   local me = ns.PlayerName()
   if not me or not ns.db then return end
   ns.db.xpSnap = ns.db.xpSnap or {}
   local lv, xp = xpNow()
+  if type(newLevel) == "number" and newLevel > lv then lv, xp = newLevel, 0 end
+  if type(lv) ~= "number" or lv < 1 then return end
+  local old = ns.db.xpSnap[me]
+  if old and (old.lv or 0) > lv then return end
+  if old and old.lv == lv and (old.xp or 0) > (xp or 0) then return end
   ns.db.xpSnap[me] = { lv = lv, xp = xp, t = ns.Now() }
 end
 
@@ -606,11 +614,11 @@ function C.Audit(force)
   local snap = prevSnap
   if force or not captured then snap = ns.db and ns.db.xpSnap and ns.db.xpSnap[me] end
   -- notes left by the old check (it often missed play with the addon on) are cleared once
-  if ns.db and not ns.db.auditCleared then
+  if ns.db and not ns.db.auditCleared2 then
     for k, d in Data.Each("challenges") do
       if Data.SplitKey(k) == me and ((tonumber(d.flags) or 0) > 0 or d.audit) then update(k, { flags = 0, audit = "" }) end
     end
-    ns.db.auditCleared = true
+    ns.db.auditCleared, ns.db.auditCleared2 = true, true
   end
   for k, d in Data.Each("challenges") do
     if Data.SplitKey(k) == me and d.status == "active" then
@@ -642,7 +650,10 @@ ns.RegisterEvent("PLAYER_XP_UPDATE", function(unit)
   C.SaveSnapshot()
   pushProgress(false)
 end)
-ns.RegisterEvent("PLAYER_LOGOUT", function() C.SaveSnapshot() end)
+-- a level-up gives the new level straight away (the level the game reports can lag a moment)
+ns.RegisterEvent("PLAYER_LEVEL_UP", function(newLevel) C.SaveSnapshot(tonumber(newLevel)) end)
+-- no save while logging out: the game's numbers can't be trusted then (it has reported one
+-- level lower with no experience), and every gain was already saved as it happened
 
 -- Ready-made challenges keep today's name and wording (Self-Made became Outlander, rules get
 -- reworded). Each member's client rewrites its own records.
