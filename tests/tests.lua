@@ -2367,6 +2367,25 @@ do
   K.ns.Data.Merge("challenges", "Kurdran#lost1", { x = true, t = K.ns.Now() * 1000, b = "Kurdran" })
 end
 
+-- Lost records come back from the guild with a full sync, even right after a recent sync
+do
+  local ck = K.ns.Challenges.Start(nil, "Keep Me", "Play fair.")
+  H.run(10)
+  check(A.ns.Data.Get("challenges", ck) ~= nil, "the officers hold the challenge")
+  -- the member's copy goes missing (not deleted: just gone from their saved data)
+  local raw = K.ns.Data.Raw("challenges")
+  raw[ck] = nil
+  local clans = K.ns.Data.Raw("clans")
+  local lostClan
+  local lostRec
+  for k, r in pairs(clans) do if not r.x then lostClan, lostRec = k, r; clans[k] = nil; break end end
+  K.ns.db.syncedAt, K.ns.db.fullSyncAt = K.ns.Now() * 1000, K.ns.Now() * 1000 -- synced moments ago
+  K.env.SlashCmdList.IRONFORGED("sync"); H.run(120)
+  check(K.ns.Data.Get("challenges", ck) ~= nil, "/hold sync brings the lost challenge back")
+  check(not lostClan or K.ns.Data.Get("clans", lostClan) ~= nil, "and the lost clan")
+  K.ns.Challenges.Abandon(ck); H.run(5)
+end
+
 -- Officers post the recruitment message from the Roster tab
 do
   local R = A.ns.Recruit

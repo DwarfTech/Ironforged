@@ -515,8 +515,8 @@ SlashCmdList.IRONFORGED = function(msg)
   if cmd == "" or cmd == "show" then
     ns.ToggleMain()
   elseif cmd == "sync" then
-    ns.Comm.RequestSync()
-    ns.Print("Asking the hold for the latest records...")
+    ns.Comm.FullSync()
+    ns.Print("Asking the hold for all its records. Anything missing here comes back in a minute or two.")
   elseif cmd == "cheers" then
     ns.Cheers.Call()
   elseif cmd == "dwarvish" or cmd == "lang" then

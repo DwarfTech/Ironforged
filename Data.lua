@@ -102,12 +102,20 @@ function Data.EnsureGuild()
   local key = ns.GuildKey()
   if not key then store = nil; return false end
   local g = ns.db.guilds[key]
+  local fresh = false
   if not g then
     g = { colls = {} }
     ns.db.guilds[key] = g
+    fresh = true
   end
   local guildName = GetGuildInfo and GetGuildInfo("player")
-  if guildName then adoptOtherStores(key, guildName) end
+  local adopted = guildName and adoptOtherStores(key, guildName) or 0
+  -- a new or merged store, or the one-time repair after records went missing (2.18.16):
+  -- the next sync asks the guild for everything
+  if fresh or adopted > 0 or not ns.db.fullResync16 then
+    ns.db.fullResync16 = true
+    ns.db.syncedAt, ns.db.fullSyncAt, ns.db.rowSyncedAt, ns.db.rowFullSyncAt = nil, nil, nil, nil
+  end
   for _, c in ipairs(Data.COLLECTIONS) do g.colls[c] = g.colls[c] or {} end
   local changed = store ~= g
   store = g

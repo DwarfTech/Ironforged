@@ -288,6 +288,20 @@ function Comm.ClanCatchUp()
   return true
 end
 
+-- Forget when I last synced, so the next sync asks for everything the guild has (data that
+-- went missing here only comes back through a full sync).
+function Comm.ForgetSyncStamps()
+  local db = ns.db
+  if not db then return end
+  db.syncedAt, db.fullSyncAt, db.rowSyncedAt, db.rowFullSyncAt = nil, nil, nil, nil
+end
+
+-- A full sync: everything, from the officers.
+function Comm.FullSync()
+  Comm.ForgetSyncStamps()
+  Comm.RequestSync()
+end
+
 function Comm.RequestSync()
   Comm.stats.lastSync = ns.Now()
   Comm.syncStartMs = ns.Now() * 1000
