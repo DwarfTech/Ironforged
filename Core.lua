@@ -267,7 +267,21 @@ function ns.GuildKey()
   local guildName = GetGuildInfo and GetGuildInfo("player")
   if not guildName then return nil end
   local realm = ns.RealmSuffix()
-  return realm and (guildName .. "-" .. realm) or guildName
+  if realm then return guildName .. "-" .. realm end
+  -- the game hasn't said which realm yet: use this guild's saved data if there is some, and
+  -- otherwise wait, so an empty store never stands in for the real one
+  if ns.db and ns.db.guilds then
+    local best, bestN
+    for k, g in pairs(ns.db.guilds) do
+      if k:sub(1, #guildName + 1) == guildName .. "-" and type(g) == "table" then
+        local n = 0
+        for _, rows in pairs(g.colls or {}) do for _ in pairs(rows) do n = n + 1 end end
+        if not bestN or n > bestN then best, bestN = k, n end
+      end
+    end
+    if best then return best end
+  end
+  return nil
 end
 
 function ns.RefreshRoster()

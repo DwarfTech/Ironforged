@@ -162,8 +162,6 @@ check(not KD.Put("clans", clanId, { name = "Bronzebeard", founder = "Kurdran", l
 check(not MD.Put("clans", "wrongkey", { name = "Bronzebeard", founder = "Muradin", leader = "Muradin" }, true), "a clan's key is its name")
 check(not AD.Put("clans", "x", { name = "X", founder = "Muradin", leader = "Thorin" }, true), "even officers found a clan with its founder leading")
 check(not KD.Put("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, true), "a Vanguard can't found a clan")
-check(not AD.CanWrite("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, "Kurdran"),
-  "and guildmates refuse a clan a Vanguard founded")
 check(AD.Put("clans", "y", { name = "Y", founder = "Kurdran", leader = "Kurdran" }, true), "an officer can still set one up for anyone")
 AD.Delete("clans", "y") -- tidy up: only a Longbeard or the guild master removes clans
 H.run(3)
@@ -2338,6 +2336,35 @@ do
   K.instanceGroup = true; K.units.raid1 = { name = "Dagna" }
   check(#K.ns.Blood.GroupGuildmates() == 0, "a battleground's random group doesn't share the credit")
   K.instanceGroup = false; K.units.raid1 = nil
+end
+
+-- Recovery: a guildmate who doesn't have a clan yet takes it, whoever founded it and whoever leads it now
+do
+  local KD = M.ns.Data
+  -- a clan founded by a lower rank, now led by someone else (handed over)
+  local rec = { name = "Blunderblast", founder = "Kurdran", leader = "Dagna" }
+  check(KD.CanWrite("Dagna", "clans", "blunderblast", rec), "a handed-over clan is taken from its current leader")
+  check(KD.CanWrite("Kurdran", "clans", "blunderblast", rec), "or from its founder")
+  check(not KD.CanWrite("Elda", "clans", "blunderblast", rec), "but not from someone unrelated")
+  check(KD.Merge("clans", "blunderblast", { d = rec, t = (M.ns.Now() - 100) * 1000, b = "Dagna" }), "and it arrives when catching up")
+  KD.Merge("clans", "blunderblast", { x = true, t = K.ns.Now() * 1000, b = "Thorin" }, true)
+end
+-- Recovery: data saved under another key for the same guild comes back
+do
+  local db = K.ns.db
+  local key = K.ns.GuildKey()
+  local guildName = key:match("^(.-)%-") or key
+  local other = guildName .. "-SomeOldRealm"
+  db.guilds[other] = { colls = { challenges = {
+    ["Kurdran#lost1"] = { d = { name = "Lost Challenge", status = "active", ts = 1 }, t = 1000, b = "Kurdran" } } } }
+  check(K.ns.Data.AdoptOtherStores(key, guildName) >= 1, "a store saved under another realm name is merged back")
+  check(db.guilds[other] == nil and K.ns.Data.Get("challenges", "Kurdran#lost1") ~= nil, "and its challenges are back")
+  -- before the game says which realm: the saved store is used, never a new empty one
+  local realGNRN = K.env.GetNormalizedRealmName
+  K.env.GetNormalizedRealmName = function() return nil end
+  check(K.ns.GuildKey() == key, "with no realm name yet, the guild's saved data is still used")
+  K.env.GetNormalizedRealmName = realGNRN
+  K.ns.Data.Merge("challenges", "Kurdran#lost1", { x = true, t = K.ns.Now() * 1000, b = "Kurdran" })
 end
 
 -- Officers post the recruitment message from the Roster tab

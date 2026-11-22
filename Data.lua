@@ -68,6 +68,35 @@ local MAX_TOMBSTONE_AGE = 60 * 60 * 24 * 120 -- forget deletions after ~4 months
 
 local store -- the current guild's table in saved variables
 
+-- Merge every record of `from` into `into` (the newer copy of each row wins, deletions included).
+local function mergeStore(into, from)
+  local n = 0
+  for coll, rows in pairs(from.colls or {}) do
+    into.colls[coll] = into.colls[coll] or {}
+    local dst = into.colls[coll]
+    for k, rec in pairs(rows) do
+      local cur = dst[k]
+      if type(rec) == "table" and (not cur or (rec.t or 0) > (cur.t or 0)) then dst[k] = rec; n = n + 1 end
+    end
+  end
+  return n
+end
+
+-- The same guild's data saved under another key (the realm name came back different, or the
+-- game hadn't given it yet when the addon loaded): fold it into this one, so nothing goes missing.
+local function adoptOtherStores(key, guildName)
+  local g = ns.db.guilds[key]
+  local found = 0
+  for other, og in pairs(ns.db.guilds) do
+    if other ~= key and type(og) == "table" and (other == guildName or other:sub(1, #guildName + 1) == guildName .. "-") then
+      found = found + mergeStore(g, og)
+      ns.db.guilds[other] = nil
+    end
+  end
+  return found
+end
+Data.AdoptOtherStores = adoptOtherStores
+
 function Data.EnsureGuild()
   if not ns.db then return false end
   local key = ns.GuildKey()
@@ -77,6 +106,8 @@ function Data.EnsureGuild()
     g = { colls = {} }
     ns.db.guilds[key] = g
   end
+  local guildName = GetGuildInfo and GetGuildInfo("player")
+  if guildName then adoptOtherStores(key, guildName) end
   for _, c in ipairs(Data.COLLECTIONS) do g.colls[c] = g.colls[c] or {} end
   local changed = store ~= g
   store = g
@@ -315,10 +346,16 @@ function Data.CanWrite(author, coll, key, data)
     local old = Data.Get("clans", key)
     if old and old.founder and founder ~= old.founder then return false end -- the founder never changes
     -- any guildmate may found a clan, and leads it to begin with
-    -- a new clan: founded by a Veteran or above (or set up by an officer)
     if old == nil then
-      return leader == founder and (founder == author or officer)
-        and (officer or (ns.roster[author] ~= nil and ns.RankAtLeast(author, ns.RankSetting("founderRank"))))
+      if officer then return author ~= ns.PlayerName() or leader == founder end
+      if ns.roster[author] == nil then return false end
+      -- founding one myself: Veteran or above, and I lead it to begin with
+      if author == ns.PlayerName() then
+        return leader == founder and founder == author and ns.RankAtLeast(author, ns.RankSetting("founderRank"))
+      end
+      -- a clan I simply don't have yet (new to the guild, or catching up): its founder or its
+      -- current leader wrote it, whatever their rank now or when it was founded
+      return author == founder or author == leader
     end
     if officer then return true end
     if ns.roster[author] == nil then return false end
