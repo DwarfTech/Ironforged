@@ -212,6 +212,7 @@ local rowSession
 local function markRowsSynced(s)
   if s.synced or s.incomplete or not ns.db then return end
   s.synced = true
+  Comm.rowsSyncedOnce = true
   ns.db.rowSyncedAt = s.startMs
   if s.full then ns.db.rowFullSyncAt = s.startMs end
 end

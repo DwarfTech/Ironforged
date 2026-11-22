@@ -150,9 +150,34 @@ function Blood.MyPvPRank()
   return nil, "none"
 end
 
+-- My counts are kept on this computer. If they're lower than what the guild already has from me
+-- (this computer's saved data was lost, or I'm on another computer), take the guild's numbers back
+-- instead of sending lower ones that would erase my tally.
+function Blood.RestoreFromGuild()
+  if not Data.Ready() then return false end
+  local me = ns.PlayerName()
+  local g = me and Data.Get("pvp", me)
+  if type(g) ~= "table" then return false end
+  local p = personal()
+  local raised = false
+  for _, f in ipairs({ "elves", "avenged", "world" }) do
+    local theirs = tonumber(g[f]) or 0
+    if theirs > (tonumber(p[f]) or 0) then p[f] = theirs; raised = true end
+  end
+  return raised
+end
+
 function Blood.Publish()
   if not Data.Ready() then return end
   local me = ns.PlayerName()
+  -- with nothing of mine here yet, wait for the guild's copy before sending anything: a computer
+  -- that lost its saved data must not send zeros over the tally the guild has
+  -- (a new member has nothing anywhere: after ten minutes they start their own)
+  if not Data.Get("pvp", me) and (GetTime() - (Blood.loadedAt or 0)) < 600 then
+    if Blood.SchedulePublish then Blood.SchedulePublish(30) end
+    return
+  end
+  Blood.RestoreFromGuild()
   local p = personal()
   local hk = lifetimeHKs() or p.hk or 0
   p.hk = hk
@@ -176,6 +201,8 @@ local function schedulePublish(delay)
   local function run() publishPending = false; Blood.Publish() end
   if C_Timer then C_Timer.After(delay or 10, run) else run() end
 end
+Blood.SchedulePublish = schedulePublish
+Blood.loadedAt = GetTime and GetTime() or 0
 
 function Blood.Tally(name)
   local t = Data.Get("pvp", name)
@@ -801,6 +828,7 @@ end)
 
 ns.On("DATA_READY", function() schedulePublish(12) end)
 ns.On("DATA_CHANGED", function(coll)
+  if coll == "pvp" and Blood.RestoreFromGuild() then schedulePublish(2) end
   if coll == nil or coll == "avenged" then
     if C_Timer then C_Timer.After(0.5, announceAvenged) else announceAvenged() end
   end

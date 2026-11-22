@@ -391,6 +391,9 @@ function H.fire(client, event, ...)
 end
 
 function H.boot(client)
+  -- the test guild's members are long-standing: no ten-minute wait for their first War Hall numbers
+  -- (a test that starts a computer from nothing sets this back itself)
+  if client.ns.Blood then client.ns.Blood.loadedAt = -1e9 end
   H.fire(client, "ADDON_LOADED", "Ironforged")
   H.fire(client, "PLAYER_LOGIN")
   H.fire(client, "GUILD_ROSTER_UPDATE")

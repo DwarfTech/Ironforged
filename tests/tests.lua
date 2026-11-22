@@ -760,6 +760,9 @@ H.clock = H.clock + 301; D.ns.Comm.PullCrafts(); H.run(6) -- crafts are pulled f
 check(D.ns.Data.Get("crafts", "Kurdran#Mining") == nil, "dropped profession removed")
 
 -- Titles
+-- (their own counts match what they share, as they would in play)
+D.ns.db.pvp = D.ns.db.pvp or {}; D.ns.db.pvp.Dagna = { elves = 3, avenged = 0, world = 0 }
+M.ns.db.pvp = M.ns.db.pvp or {}; M.ns.db.pvp.Muradin = { elves = 40, avenged = 2, world = 0 }
 D.ns.Data.Put("pvp", "Dagna", { hk = 900, elves = 3, avenged = 0 })
 M.ns.Data.Put("pvp", "Muradin", { hk = 10, elves = 40, avenged = 2 })
 H.run(3)
@@ -2451,6 +2454,29 @@ do
   for k, v in pairs(DD.Get("challenges", ck)) do restored[k] = v end
   restored.status, restored.restoredAt = "active", K.ns.Now() + 60
   check(DD.CanWrite("Kurdran", "challenges", ck, restored), "an upheld appeal can still reinstate it")
+end
+
+-- A member whose saved data is lost entirely gets their challenges, clan and War Hall counts back
+do
+  local me = K.ns.PlayerName()
+  local ck = K.ns.Challenges.Start(nil, "Survives a wipe", "Play fair.")
+  local p = K.ns.db.pvp[me]
+  p.world, p.elves = (p.world or 0) + 28, (p.elves or 0) + 4
+  K.ns.Blood.Publish(); H.run(60)
+  local worldWas, elvesWas = p.world, p.elves
+  check(A.ns.Data.Get("pvp", me).world == worldWas and A.ns.Data.Get("challenges", ck) ~= nil, "the guild holds the challenge and the counts")
+  -- the saved-data file is lost: a brand new, empty one
+  K.env.IronforgedDB = nil
+  K = H.relog(K)
+  K.ns.Blood.loadedAt = K.env.GetTime() -- a computer starting from nothing waits for the guild's copy
+  H.run(5)
+  check(K.ns.Data.Get("challenges", ck) == nil, "(the new computer starts empty)")
+  H.run(240)
+  check(K.ns.Data.Get("challenges", ck) ~= nil, "the challenge comes back from the officers")
+  check(K.ns.db.pvp[me] and K.ns.db.pvp[me].world == worldWas and K.ns.db.pvp[me].elves == elvesWas,
+    "the War Hall counts come back")
+  check(A.ns.Data.Get("pvp", me).world == worldWas, "and the guild's copy was never overwritten with zeros")
+  K.ns.Challenges.Abandon(ck); H.run(5)
 end
 
 -- Officers post the recruitment message from the Roster tab
