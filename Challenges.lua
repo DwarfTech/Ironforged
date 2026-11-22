@@ -561,6 +561,7 @@ local function xpNow() return level(), (UnitXP and UnitXP("player")) or 0 end
 -- and where the addon last saw this character (the previous session's final snapshot).
 -- The snapshot is then kept up to date for the whole session, whether or not the guild has
 -- synced yet: an addon that was running never leaves a gap behind.
+local AUDIT_V = 3 -- notes written by this version of the check
 local loginLv, loginXp
 local prevSnap, captured = nil, false
 local audited = false
@@ -616,7 +617,9 @@ function C.Audit(force)
   -- notes left by the old check (it often missed play with the addon on) are cleared once
   if ns.db and not ns.db.auditCleared2 then
     for k, d in Data.Each("challenges") do
-      if Data.SplitKey(k) == me and ((tonumber(d.flags) or 0) > 0 or d.audit) then update(k, { flags = 0, audit = "" }) end
+      if Data.SplitKey(k) == me and ((tonumber(d.flags) or 0) > 0 or (type(d.audit) == "string" and d.audit ~= "")) then
+        update(k, { flags = 0, audit = "", auditV = nil })
+      end
     end
     ns.db.auditCleared, ns.db.auditCleared2 = true, true
   end
@@ -633,9 +636,12 @@ function C.Audit(force)
       if refLv and lv > refLv then
         -- a quiet note on the challenge itself; nothing is announced
         local note = "Played without Ironforged: level " .. refLv .. " to " .. lv .. " (" .. ns.FormatDate(ns.Now()) .. ")."
-        local notes = (type(d.audit) == "string" and d.audit ~= "") and (d.audit .. "\n" .. note) or note
+        -- notes from the old checks (no auditV) were false and are dropped, never added to
+        local keep = d.auditV == AUDIT_V and type(d.audit) == "string" and d.audit ~= ""
+        local notes = keep and (d.audit .. "\n" .. note) or note
         if #notes > 400 then notes = notes:sub(-400) end
-        update(k, { flags = (tonumber(d.flags) or 0) + 1, audit = notes, lvl = lv, xp = xp, seen = ns.Now() })
+        local flags = (d.auditV == AUDIT_V and tonumber(d.flags) or 0) + 1
+        update(k, { flags = flags, audit = notes, auditV = AUDIT_V, lvl = lv, xp = xp, seen = ns.Now() })
       end
     end
   end
@@ -643,7 +649,9 @@ function C.Audit(force)
   pushProgress(true)
 end
 
-function C.Flagged(d) return (tonumber(d.flags) or 0) > 0 end
+-- Only notes from the fixed check count: anything older was a false note and is never shown,
+-- even before its owner has logged in to clear it.
+function C.Flagged(d) return d.auditV == AUDIT_V and (tonumber(d.flags) or 0) > 0 end
 
 ns.RegisterEvent("PLAYER_XP_UPDATE", function(unit)
   if unit and unit ~= "player" then return end

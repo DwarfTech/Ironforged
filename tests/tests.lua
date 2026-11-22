@@ -1026,6 +1026,10 @@ do
   K.level, K.xp = 1, 0
 end
 
+-- notes left by the old checks are never shown, even before their owner logs in to clear them
+check(not A.ns.Challenges.Flagged({ flags = 3, audit = "Played without Ironforged: level 30 to 31 (2026-11-19)." }),
+  "an old false note isn't shown to anyone")
+
 -- old records that said "Start at level 1" get today's wording
 local oldKey = "Kurdran#old1"
 K.ns.Data.Put("challenges", oldKey, { name = "One Life", preset = "onelife", rules = "Start at level 1. Die once and the challenge is over.", ts = 1, startLevel = 1, lvl = 1, status = "failed" })
