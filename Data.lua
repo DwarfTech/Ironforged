@@ -420,7 +420,15 @@ function Data.CanWrite(author, coll, key, data)
   elseif coll == "challenges" then
     local member = splitKey(key)
     if data == nil then return member == author or officer end
-    return member == author and ns.roster[author] ~= nil
+    if member ~= author or ns.roster[author] == nil then return false end
+    -- an ended challenge only comes back to life through an upheld appeal (a newer restoredAt);
+    -- a second computer still showing it as under way can't undo the failure
+    local old = Data.Get("challenges", key)
+    if old and old.status ~= "active" and data.status == "active"
+      and (tonumber(data.restoredAt) or 0) <= (tonumber(old.restoredAt) or 0) then
+      return false
+    end
+    return true
   elseif coll == "lfd" then
     local leader = splitKey(key)
     if data == nil then return leader == author or officer end
@@ -570,7 +578,13 @@ function Data.Merge(coll, key, rec, relayed)
   -- the row it removed, or on a clan that has since gone), so it is taken on the author's word.
   local blind = rec.x and (c[key] == nil or c[key].x)
   if not relayed and not blind and not Data.CanWrite(rec.b, coll, key, (not rec.x) and rec.d or nil) then return false, "perm" end
-  if not newer(rec, c[key]) then return false end
+  -- a challenge that ended (failed, completed, abandoned) beats an older copy still under way on
+  -- another of the member's computers, even if that copy was touched more recently
+  local endsIt = coll == "challenges" and not rec.x and c[key] and not c[key].x
+    and type(rec.d) == "table" and rec.d.status ~= "active"
+    and type(c[key].d) == "table" and c[key].d.status == "active"
+    and (tonumber(c[key].d.restoredAt) or 0) < (tonumber(rec.d.ended) or math.huge)
+  if not endsIt and not newer(rec, c[key]) then return false end
   if rec.x then
     c[key] = { t = rec.t, b = rec.b, x = true }
   else

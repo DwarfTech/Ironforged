@@ -18,7 +18,7 @@ local function set(list) local t = {}; for _, v in ipairs(list) do t[v] = true e
 local SHADOW = set({
   "Shadow Word: Pain", "Mind Blast", "Mind Flay", "Psychic Scream", "Fade", "Mind Control", "Mind Soothe",
   "Mind Vision", "Shadow Protection", "Prayer of Shadow Protection", "Shadowform", "Vampiric Embrace", "Silence",
-  "Mana Burn", "Devouring Plague", "Hex of Weakness", "Shadowguard", "Touch of Weakness", "Shadow Word: Death",
+  "Devouring Plague", "Hex of Weakness", "Shadowguard", "Touch of Weakness", "Shadow Word: Death",
   "Vampiric Touch", "Shadowfiend", "Mind Sear",
 })
 local PRIEST_HEALS = set({
@@ -291,8 +291,23 @@ local function spellName(id)
   return n
 end
 
+-- Mind-controlled or otherwise not in control of my character: whatever it casts isn't my choice.
+local function underControl()
+  if UnitIsCharmed then
+    local ok, charmed = pcall(UnitIsCharmed, "player")
+    if ok and charmed == true then return true end
+  end
+  if HasFullControl then
+    local ok, full = pcall(HasFullControl)
+    if ok and full == false then return true end
+  end
+  return false
+end
+C.UnderControl = underControl
+
 ns.RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", function(unit, _, spellID)
   if unit ~= "player" then return end
+  if underControl() then return end
   local name = spellName(spellID)
   if not name then return end
   for _, c in ipairs(C.MyEnforced()) do

@@ -1444,6 +1444,12 @@ do
   check(K.equip[18] == nil, "Lightbringer takes off the wand")
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g1", 585); H.run(1)
   check(status(lb) == "active", "Smite is fine for Lightbringer")
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g1b", 8129); H.run(1)
+  check(status(lb) == "active", "Mana Burn (Discipline) is fine for Lightbringer")
+  K.charmed = true -- mind-controlled by a boss
+  H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g1c", 589); H.run(1)
+  K.charmed = false
+  check(status(lb) == "active", "a Shadow spell cast while mind-controlled doesn't count")
   H.fire(K, "UNIT_SPELLCAST_SUCCEEDED", "player", "g2", 589); H.run(1)
   check(status(lb) == "failed", "Shadow Word: Pain fails Lightbringer")
   clear()
@@ -2412,6 +2418,35 @@ do
   check(K.ns.Data.Get("challenges", ck) ~= nil, "/hold sync brings the lost challenge back")
   check(not lostClan or K.ns.Data.Get("clans", lostClan) ~= nil, "and the lost clan")
   K.ns.Challenges.Abandon(ck); H.run(5)
+end
+
+-- A failed challenge stays failed when another of the member's computers still shows it under way
+do
+  local ck = K.ns.Challenges.Start(nil, "Two Computers", "Play fair.")
+  H.run(60) -- the sender has sync messages queued ahead
+  local DD = A.ns.Data
+  local _, liveRec = DD.Get("challenges", ck)
+  check(liveRec ~= nil, "guildmates have the challenge")
+  -- a stale copy on the member's other computer, touched later, still "active"
+  local stale = {}
+  for k, v in pairs(liveRec.d) do stale[k] = v end
+  stale.lvl = (stale.lvl or 1) + 1
+  K.ns.Challenges.Fail(ck, "Cast Shadow Word: Pain."); H.run(60)
+  check(DD.Get("challenges", ck).status == "failed", "the failure reaches guildmates")
+  check(not DD.Merge("challenges", ck, { d = stale, t = (K.ns.Now() + 30) * 1000, b = "Kurdran" }),
+    "a newer copy still under way from another computer doesn't undo it")
+  check(DD.Get("challenges", ck).status == "failed", "it stays failed")
+  -- and a computer still showing it under way takes the failure, even though its own copy is newer
+  local MDd = M.ns.Data
+  local failed = select(2, DD.Get("challenges", ck))
+  MDd.Raw("challenges")[ck] = { d = stale, t = (K.ns.Now() + 30) * 1000, b = "Kurdran" }
+  check(MDd.Merge("challenges", ck, failed), "the other computer takes the failure")
+  check(MDd.Get("challenges", ck).status == "failed", "and shows it failed")
+  -- an upheld appeal still brings it back
+  local restored = {}
+  for k, v in pairs(DD.Get("challenges", ck)) do restored[k] = v end
+  restored.status, restored.restoredAt = "active", K.ns.Now() + 60
+  check(DD.CanWrite("Kurdran", "challenges", ck, restored), "an upheld appeal can still reinstate it")
 end
 
 -- Officers post the recruitment message from the Roster tab
