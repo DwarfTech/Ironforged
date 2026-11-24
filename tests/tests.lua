@@ -2511,6 +2511,35 @@ do
   K.units.nameplate3 = nil
 end
 
+-- The Book of Grudges: search by name, and the "grudged foe is near" popup shows the whole deed
+do
+  local long = "Stole a Silver Vein from me when I cleared the whole cave to claim it myself, then danced on my corpse and laughed in say chat about it"
+  A.ns.Data.Put("grudges", A.ns.Data.KeyOf("Searchy Foe"), { against = "Searchy Foe", faction = "Horde", deed = long, ts = A.ns.Now() })
+  H.run(3)
+  A.ns.ToggleMain("grudges")
+  local gf
+  for _, f in ipairs(A.frames) do if f.search and f.writeButton then gf = f end end
+  check(gf ~= nil, "the Book has a search box")
+  gf.search:SetText("searchy"); gf.search.__scripts.OnTextChanged(gf.search); H.run(1)
+  local rows = gf.list.items or {}
+  check(#rows == 1 and rows[1].data == A.ns.Data.KeyOf("Searchy Foe"), "searching a name finds that grudge")
+  gf.search:SetText(""); gf.search.__scripts.OnTextChanged(gf.search); H.run(1)
+  check(#(gf.list.items or {}) > 1, "clearing the search shows the whole book")
+  A.ns.ToggleMain()
+  -- the popup gets the whole deed and can open the grudge
+  local got
+  A.ns.On("GRUDGE_NEAR", function(foe, deed, count, key) got = { deed = deed, key = key } end)
+  A.target = { name = "Searchy Foe", race = "Orc", raceName = "Orc", faction = "Horde" }
+  H.fire(A, "PLAYER_TARGET_CHANGED"); H.run(2)
+  check(got and got.deed == long and got.key == A.ns.Data.KeyOf("Searchy Foe"), "the alert carries the whole deed and the grudge")
+  local doom = A.env.IronforgedDoomFrame
+  check(doom and doom:IsShown() and doom.read:IsShown(), "the popup has a Read grudge button")
+  doom.read.__scripts.OnClick(doom.read)
+  check(A.env.IronforgedDialog:IsShown(), "which opens the grudge")
+  A.env.IronforgedDialog:Hide(); doom:Hide(); A.target = nil
+  if A.ns.UI.Refresh then A.ns.ToggleMain(); A.ns.ToggleMain() end
+end
+
 -- Officers post the recruitment message from the Roster tab
 do
   local R = A.ns.Recruit

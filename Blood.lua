@@ -747,8 +747,7 @@ end
 local function alertSighting(foe, spotter, zone)
   local grudges = takeNewGrudges(foe)
   if #grudges == 0 then return false end
-  local deed = grudges[1].data.deed or ""
-  if #deed > 60 then deed = deed:sub(1, 57) .. "..." end
+  local deed = ((grudges[1].data.deed or ""):gsub("\n", " "))
   local where = (zone and zone ~= "") and (" in " .. zone) or ""
   if spotter then
     ns.Print("|cffff4040GRUDGED FOE SPOTTED:|r " .. ns.Name(spotter) .. " sees " .. foe .. where .. ". (" .. deed .. ")")
@@ -759,7 +758,7 @@ local function alertSighting(foe, spotter, zone)
       pcall(RaidNotice_AddMessage, RaidWarningFrame, "Grudged foe: " .. foe, ChatTypeInfo.RAID_WARNING)
     end
     if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then pcall(PlaySound, SOUNDKIT.RAID_WARNING) end
-    ns.Fire("GRUDGE_NEAR", foe, deed, #grudges)
+    ns.Fire("GRUDGE_NEAR", foe, deed, #grudges, grudges[1].key)
   end
   return true
 end

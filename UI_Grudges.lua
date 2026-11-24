@@ -5,7 +5,7 @@ local ADDON, ns = ...
 local UI = ns.UI
 local Data = ns.Data
 
-local state = { showAvenged = true }
+local state = { showAvenged = true, search = "" }
 local SIDES = { { text = "Horde", value = "Horde" }, { text = "Alliance", value = "Alliance" } }
 
 local function guessSide(name)
@@ -209,9 +209,9 @@ end
 UI.ExportGrudges = exportGrudges
 
 local function build(f, w, h)
-  f.writeButton = UI.Button(f, "Write a grudge", 130, 22, function() writeGrudge(nil) end)
+  f.writeButton = UI.Button(f, "Write a grudge", 112, 22, function() writeGrudge(nil) end)
   f.writeButton:SetPoint("TOPLEFT", 4, -2)
-  f.targetButton = UI.Button(f, "Grudge my target", 130, 22, function()
+  f.targetButton = UI.Button(f, "Grudge my target", 124, 22, function()
     local name = UnitExists("target") and UnitIsPlayer("target") and ns.UnitDisplayName("target")
     if not name then ns.Print("Target the wrongdoer first."); return end
     ns.Blood.Learn("target")
@@ -224,6 +224,19 @@ local function build(f, w, h)
   end)
   avengedBox:SetChecked(true)
   avengedBox:SetPoint("LEFT", f.targetButton, "RIGHT", 10, 0)
+  -- find a grudge by name (or by what they did)
+  local search = UI.EditBox(f, 100, 40)
+  search:SetPoint("LEFT", avengedBox, "RIGHT", 96, 0)
+  local hint = UI.Label(search, "Search names", "GameFontDisableSmall")
+  hint:SetPoint("LEFT", 6, 0)
+  search:SetScript("OnTextChanged", function(self)
+    local text = self:GetText() or ""
+    hint:SetShown(text == "")
+    state.search = ns.Trim(text):lower()
+    UI.ScheduleRefresh()
+  end)
+  search:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
+  f.search = search
   f.count = UI.Label(f, "", "GameFontHighlightSmall")
   f.count:SetPoint("TOPRIGHT", -6, -7)
   f.exportButton = UI.Button(f, "Export", 70, 22, function() exportGrudges("reading") end)
@@ -242,7 +255,10 @@ local function refresh(f)
   for key, g in Data.Each("grudges") do
     local a = Data.Avenged(key)
     if a then avenged = avenged + 1 else open = open + 1 end
-    if state.showAvenged or not a then
+    local q = state.search
+    local hit = q == "" or (g.against or ""):lower():find(q, 1, true) or (g.deed or ""):lower():find(q, 1, true)
+      or ns.Data.FoeMatchKey(g.against or ""):find(ns.Data.FoeMatchKey(q), 1, true)
+    if hit and (state.showAvenged or not a) then
       local status
       if a then
         status = "|cffffd040AVENGED|r |cff999999" .. ns.Name(a.by) .. "|r"
@@ -263,7 +279,7 @@ local function refresh(f)
     return a.ts > b.ts
   end)
   f.list:SetItems(items, "The book is empty. For now.")
-  f.count:SetText("|cffff6060" .. open .. " unavenged|r   |cffffd040" .. avenged .. " avenged|r")
+  f.count:SetText("|cffff6060" .. open .. "|r open  |cffffd040" .. avenged .. "|r avenged")
   f.exportButton:SetShown(ns.IAmOfficer())
 end
 
@@ -308,9 +324,9 @@ local function buildDoom()
   doom.title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 10, -2)
   doom.sub = UI.Label(doom, "", "GameFontHighlightSmall")
   doom.sub:SetPoint("TOPLEFT", doom.title, "BOTTOMLEFT", 0, -4)
-  doom.sub:SetWidth(250)
+  doom.sub:SetWidth(270)
   doom.sub:SetWordWrap(true)
-  doom.sub:SetMaxLines(3)
+  doom.sub:SetMaxLines(8)
   local close = CreateFrame("Button", nil, doom, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -4, -4)
   close:SetScript("OnClick", hideDoom)
@@ -323,38 +339,46 @@ local function buildDoom()
   go:SetScript("PostClick", function() hideDoom() end)
   go:SetPoint("BOTTOMLEFT", 18, 16)
   doom.go = go
-  doom.no = UI.Button(doom, "Not now", 96, 26, hideDoom)
-  doom.no:SetPoint("LEFT", doom.go, "RIGHT", 8, 0)
+  doom.read = UI.Button(doom, "Read grudge", 96, 26, function()
+    if doom.key then ns.ToggleMain("grudges"); showGrudge(doom.key) end
+  end)
+  doom.read:SetPoint("LEFT", doom.go, "RIGHT", 8, 0)
+  doom.no = UI.Button(doom, "Not now", 80, 26, hideDoom)
+  doom.no:SetPoint("LEFT", doom.read, "RIGHT", 8, 0)
   doom:Hide()
   return doom
 end
 
-local function showDoom(foe, deed, count)
+local function showDoom(foe, deed, count, key)
   local d = buildDoom()
-  d.foe = foe
+  d.foe, d.key = foe, key
   -- the emote finds them by their character name
   local who = ns.Name(foe)
   d.go:SetAttribute("macrotext", "/doom " .. who)
   d.sub:SetText("|cffff8060" .. foe .. "|r" .. ((deed and deed ~= "") and (": " .. deed) or "") ..
     ((count or 1) > 1 and ("  |cff999999(+" .. (count - 1) .. " more)|r") or ""))
+  -- grow to fit the whole deed
+  local textH = (d.sub.GetStringHeight and d.sub:GetStringHeight()) or 30
+  d:SetHeight(math.max(136, 100 + textH))
+  d.read:SetShown(key ~= nil)
   d:Show()
   d.shownAt = GetTime and GetTime() or 0
   local at = d.shownAt
   if C_Timer then C_Timer.After(30, function() if d.shownAt == at then hideDoom() end end) end
 end
 
-ns.On("GRUDGE_NEAR", function(foe, deed, count)
+ns.On("GRUDGE_NEAR", function(foe, deed, count, key)
   if not ns.settings or ns.settings.doomPopup == false then return end
   if inCombat() then
-    pendingDoom = { foe = foe, deed = deed, count = count, at = GetTime and GetTime() or 0 }
+    pendingDoom = { foe = foe, deed = deed, count = count, key = key, at = GetTime and GetTime() or 0 }
     return
   end
-  showDoom(foe, deed, count)
+  showDoom(foe, deed, count, key)
 end)
 
 ns.RegisterEvent("PLAYER_REGEN_ENABLED", function()
   if hidePending and doom then hidePending = false; doom:Hide() end
   local p = pendingDoom
   pendingDoom = nil
-  if p and (GetTime and GetTime() or 0) - p.at < 60 then showDoom(p.foe, p.deed, p.count) end
+  if p and (GetTime and GetTime() or 0) - p.at < 60 then showDoom(p.foe, p.deed, p.count, p.key) end
 end)
