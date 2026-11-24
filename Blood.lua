@@ -502,14 +502,27 @@ local function noteDeath(unit)
   local okP, isPlayer = pcall(UnitIsPlayer, unit)
   if not okP or isSecret(isPlayer) or not isPlayer then return end
   local okD, dead = pcall(UnitIsDeadOrGhost, unit)
-  if not okD or isSecret(dead) or not dead then return end
+  if okD and isSecret(dead) then diag().secretDeaths = (diag().secretDeaths or 0) + 1 end
+  if not okD or isSecret(dead) or not dead then
+    -- the game hides "dead" from some units: an empty health bar says it too
+    local okH, hp = pcall(UnitHealth, unit)
+    if not (okH and type(hp) == "number" and not isSecret(hp) and hp <= 0) then return end
+  end
   local name = learn(unit)
   if not name or ns.IsGuildmateName(name) then return end
   local f = foeCache()[Data.FoeKey(name)]
   if f and f.faction == "Alliance" then return end
   local key = Data.FoeKey(name)
   -- my own target died: an elf counts and a grudge is avenged, even without honor
-  if unit == "target" then pcall(Blood.FoeDied, name, false) end
+  if unit == "target" then
+    pcall(Blood.FoeDied, name, false)
+  elseif #Data.GrudgesAgainst(name) > 0 then
+    -- a grudge target dying on a nameplate near me while I'm in the fight (a lowbie one-shot
+    -- without ever being targeted, or felled by my group): the grudge is avenged
+    diag().grudgeDeaths = (diag().grudgeDeaths or 0) + 1
+    local okC, inCombat = pcall(UnitAffectingCombat, "player")
+    if okC and inCombat == true then pcall(Blood.FoeDied, name, false, true) end
+  end
   for _, r in ipairs(recentDeaths) do if r.key == key and GetTime() - r.t < 10 then return end end
   table.insert(recentDeaths, 1, { name = name, key = key, t = GetTime() })
   while #recentDeaths > 20 do table.remove(recentDeaths) end
@@ -519,14 +532,15 @@ Blood.NoteDeath = noteDeath
 -- A Horde player died without (or before) an honorable kill. It counts when I slew them, or when
 -- they were the Horde player I was fighting (my target within the last 15 seconds): an elf counts
 -- toward Elves slain, and open Horde grudges against them are avenged.
-function Blood.FoeDied(name, mine)
+function Blood.FoeDied(name, mine, grudgeNearby)
   if not name or name == "" or isSecret(name) or ns.IsGuildmateName(name) then return false end
   local key, foe = findFoe(name)
   if foe and foe.faction == "Alliance" then return false end
   local elf = foe ~= nil and Blood.IsElf(foe.race, foe.raceName)
   local grudged = #Data.GrudgesAgainst(name) > 0
+  if grudgeNearby then elf = false end -- a death seen nearby avenges a grudge; it doesn't add an elf
   if not elf and not grudged then return false end
-  local fighting = mine
+  local fighting = mine or grudgeNearby
   if not fighting then
     local first = key:match("^(%S+)")
     local lt = lastFoeTarget

@@ -2487,6 +2487,30 @@ do
   K.ns.Challenges.Abandon(ck); H.run(5)
 end
 
+-- A grudge target one-shot without being targeted (a grey lowbie, no honor) is still avenged
+do
+  local name = "Lowbie Gankfodder"
+  A.ns.Data.Put("grudges", A.ns.Data.KeyOf(name), { against = name, faction = "Horde", deed = "camped the flight master", ts = A.ns.Now() })
+  H.run(4)
+  local gk = A.ns.Data.KeyOf(name)
+  K.target = nil
+  K.units.nameplate3 = { name = name, race = "Orc", raceName = "Orc", faction = "Horde", player = true }
+  H.fire(K, "NAME_PLATE_UNIT_ADDED", "nameplate3"); H.run(1)
+  -- out of combat (someone else's fight): not mine
+  K.units.nameplate3.dead = true
+  H.fire(K, "UNIT_HEALTH", "nameplate3"); H.run(2)
+  check(K.ns.Data.Avenged(gk) == nil, "a grudge target dying near me out of my fight isn't avenged by me")
+  -- in the fight, never targeted
+  K.units.nameplate3.dead = false
+  H.clock = H.clock + 30
+  K.inCombat = true
+  K.units.nameplate3.dead = true
+  H.fire(K, "UNIT_HEALTH", "nameplate3"); H.run(2)
+  K.inCombat = false
+  check(K.ns.Data.Avenged(gk) ~= nil, "one-shot in my fight without being targeted: avenged")
+  K.units.nameplate3 = nil
+end
+
 -- Officers post the recruitment message from the Roster tab
 do
   local R = A.ns.Recruit

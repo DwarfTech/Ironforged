@@ -160,6 +160,7 @@ local function makeClient(shortName, race, fullName)
     if client.units[u] then return client.units[u].dead and true or false end
     return false
   end
+  env.UnitAffectingCombat = function(u) return u == "player" and client.inCombat == true end
   client.hk = 0
   env.GetPVPLifetimeStats = function() return client.hk, 0, 0 end
   env.GetPVPSessionStats = function() return client.sessionHK or 0, 0 end
