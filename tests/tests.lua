@@ -2404,6 +2404,14 @@ do
   local realGNRN = K.env.GetNormalizedRealmName
   K.env.GetNormalizedRealmName = function() return nil end
   check(K.ns.GuildKey() == key, "with no realm name yet, the guild's saved data is still used")
+  -- a game that never gives a realm name, and no saved data: the guild still loads
+  local realRN = K.env.GetRealmName
+  K.env.GetRealmName = function() return nil end
+  local savedGuilds = K.ns.db.guilds
+  K.ns.db.guilds = {}
+  check(K.ns.GuildKey() == guildName, "with no realm name and no saved data, the guild loads under its own name")
+  K.ns.db.guilds = savedGuilds
+  K.env.GetRealmName = realRN
   K.env.GetNormalizedRealmName = realGNRN
   K.ns.Data.Merge("challenges", "Kurdran#lost1", { x = true, t = K.ns.Now() * 1000, b = "Kurdran" })
 end

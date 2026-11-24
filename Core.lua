@@ -59,8 +59,14 @@ function ns.NewId()
 end
 
 function ns.RealmSuffix()
-  local realm = GetNormalizedRealmName and GetNormalizedRealmName()
-  if realm and realm ~= "" then return realm end
+  local ok, realm = pcall(function() return GetNormalizedRealmName and GetNormalizedRealmName() end)
+  if ok and type(realm) == "string" and realm ~= "" and not (issecretvalue and issecretvalue(realm)) then return realm end
+  -- some players' games never give the short form: build it from the full realm name
+  local ok2, full = pcall(function() return GetRealmName and GetRealmName() end)
+  if ok2 and type(full) == "string" and full ~= "" and not (issecretvalue and issecretvalue(full)) then
+    local norm = full:gsub("[%s%-]", "")
+    if norm ~= "" then return norm end
+  end
   return nil
 end
 
@@ -268,12 +274,13 @@ function ns.GuildKey()
   if not guildName then return nil end
   local realm = ns.RealmSuffix()
   if realm then return guildName .. "-" .. realm end
-  -- the game hasn't said which realm yet: use this guild's saved data if there is some, and
-  -- otherwise wait, so an empty store never stands in for the real one
+  -- no realm name from the game: use this guild's saved data if there is some, under whatever
+  -- name it was saved; otherwise the guild's name alone. Never wait: some players' games never
+  -- give a realm name. (Stores saved under another name for the same guild are merged in anyway.)
   if ns.db and ns.db.guilds then
     local best, bestN
     for k, g in pairs(ns.db.guilds) do
-      if k:sub(1, #guildName + 1) == guildName .. "-" and type(g) == "table" then
+      if (k == guildName or k:sub(1, #guildName + 1) == guildName .. "-") and type(g) == "table" then
         local n = 0
         for _, rows in pairs(g.colls or {}) do for _ in pairs(rows) do n = n + 1 end end
         if not bestN or n > bestN then best, bestN = k, n end
@@ -281,7 +288,7 @@ function ns.GuildKey()
     end
     if best then return best end
   end
-  return nil
+  return guildName
 end
 
 function ns.RefreshRoster()
